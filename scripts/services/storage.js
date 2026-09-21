@@ -14,21 +14,31 @@ const STORAGE_KEYS = {
   TRINOVA_API_URL: 'sloane_trinova_api_url'
 };
 
+const safeStorage = {
+  getItem(key) {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(key);
+  },
+  setItem(key, value) {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(key, value);
+  }
+};
+
 export const StorageService = {
   // --- Businesses ---
   getBusinesses() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.BUSINESSES);
+      const data = safeStorage.getItem(STORAGE_KEYS.BUSINESSES);
       return data ? JSON.parse(data) : INITIAL_BUSINESSES;
     } catch (e) {
-      console.error('Failed to read businesses from storage', e);
       return INITIAL_BUSINESSES;
     }
   },
 
   saveBusinesses(businesses) {
     try {
-      localStorage.setItem(STORAGE_KEYS.BUSINESSES, JSON.stringify(businesses));
+      safeStorage.setItem(STORAGE_KEYS.BUSINESSES, JSON.stringify(businesses));
     } catch (e) {
       console.error('Failed to save businesses to storage', e);
     }
@@ -37,17 +47,16 @@ export const StorageService = {
   // --- Clients ---
   getClients() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+      const data = safeStorage.getItem(STORAGE_KEYS.CLIENTS);
       return data ? JSON.parse(data) : INITIAL_CLIENTS;
     } catch (e) {
-      console.error('Failed to read clients from storage', e);
       return INITIAL_CLIENTS;
     }
   },
 
   saveClients(clients) {
     try {
-      localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+      safeStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
     } catch (e) {
       console.error('Failed to save clients to storage', e);
     }
@@ -56,7 +65,7 @@ export const StorageService = {
   // --- CEO Brain (Strictly Private) ---
   getBrainEntries() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.BRAIN);
+      const data = safeStorage.getItem(STORAGE_KEYS.BRAIN);
       return data ? JSON.parse(data) : [
         {
           id: 'b-init-1',
@@ -79,7 +88,7 @@ export const StorageService = {
 
   saveBrainEntries(entries) {
     try {
-      localStorage.setItem(STORAGE_KEYS.BRAIN, JSON.stringify(entries));
+      safeStorage.setItem(STORAGE_KEYS.BRAIN, JSON.stringify(entries));
     } catch (e) {
       console.error('Failed to save CEO brain entries', e);
     }
@@ -88,7 +97,7 @@ export const StorageService = {
   // --- Companies House Cache ---
   getCHCache() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CH_CACHE);
+      const data = safeStorage.getItem(STORAGE_KEYS.CH_CACHE);
       return data ? JSON.parse(data) : {};
     } catch (e) {
       return {};
@@ -97,7 +106,7 @@ export const StorageService = {
 
   saveCHCache(cache) {
     try {
-      localStorage.setItem(STORAGE_KEYS.CH_CACHE, JSON.stringify(cache));
+      safeStorage.setItem(STORAGE_KEYS.CH_CACHE, JSON.stringify(cache));
     } catch (e) {
       console.error('Failed to save CH cache', e);
     }
@@ -105,10 +114,10 @@ export const StorageService = {
 
   // --- Trinova Configuration ---
   getTrinovaApiUrl() {
-    return localStorage.getItem(STORAGE_KEYS.TRINOVA_API_URL) || 'https://trinova-staging.local/api/v1';
+    return safeStorage.getItem(STORAGE_KEYS.TRINOVA_API_URL) || 'https://testnova-production-7b65.up.railway.app/api/v1';
   },
 
   setTrinovaApiUrl(url) {
-    localStorage.setItem(STORAGE_KEYS.TRINOVA_API_URL, url);
+    safeStorage.setItem(STORAGE_KEYS.TRINOVA_API_URL, url);
   }
 };

@@ -47,24 +47,94 @@ class SloaneApp {
   }
 
   async checkTrinovaBackend() {
+    const statusBtn = document.getElementById('trinovaStatusBtn');
+    const statusDot = document.getElementById('trinovaStatusDot');
+    const statusText = document.getElementById('trinovaStatusText');
+
+    if (statusDot) statusDot.style.background = 'var(--amber)';
+    if (statusText) statusText.textContent = 'Trinova: Connecting...';
+
     try {
-      const res = await fetch('http://localhost:4000/api/v1/health');
-      if (res.ok) {
-        const eyebrow = document.querySelector('.eyebrow');
-        if (eyebrow && !document.getElementById('trinovaBadge')) {
-          const badge = document.createElement('span');
-          badge.id = 'trinovaBadge';
-          badge.className = 'pill green';
-          badge.style.marginLeft = '12px';
-          badge.style.fontSize = '11px';
-          badge.style.padding = '2px 8px';
-          badge.innerHTML = '⚡ Trinova API Live (Port 4000)';
-          eyebrow.appendChild(badge);
+      const health = await ApiService.checkHealth();
+      if (health.ok) {
+        const auth = await ApiService.verifyAuth();
+        const duration = health.durationMs || 0;
+
+        if (statusBtn) {
+          statusBtn.className = 'pill green';
+          statusBtn.title = `Connected to TriNova API (${duration}ms) • Click to open settings`;
         }
+        if (statusDot) statusDot.style.background = 'var(--green)';
+        if (statusText) statusText.textContent = `⚡ Trinova: Live (${duration}ms)`;
+
+        this.updateConfigModalTelemetry(health, auth);
+        this.logToTrinovaConsole(`[Connection] Successfully connected to TriNova API at ${ApiService.config.baseUrl} (${duration}ms). DB: ${health.database}`);
+        return true;
       }
     } catch (e) {
-      console.log('Trinova backend check:', e);
+      console.log('Trinova connection check failed:', e);
     }
+
+    if (statusBtn) {
+      statusBtn.className = 'pill neutral';
+      statusBtn.title = 'TriNova API is offline or waking up • Running in standalone cached mode';
+    }
+    if (statusDot) statusDot.style.background = 'var(--muted)';
+    if (statusText) statusText.textContent = 'Trinova: Standalone Mode';
+
+    this.updateConfigModalTelemetry({ ok: false, error: 'Cannot connect to target API' }, { ok: false });
+    this.logToTrinovaConsole(`[Connection] TriNova API at ${ApiService.config.baseUrl} is unreachable. Operating in local cache fallback mode.`);
+    return false;
+  }
+
+  updateConfigModalTelemetry(health, auth) {
+    const dot = document.getElementById('modalTrinovaStatusDot');
+    const title = document.getElementById('modalTrinovaStatusTitle');
+    const latency = document.getElementById('modalTrinovaLatency');
+    const env = document.getElementById('modalTargetEnv');
+    const db = document.getElementById('modalDbStatus');
+    const actor = document.getElementById('modalActor');
+
+    if (health && health.ok) {
+      if (dot) dot.style.background = 'var(--green)';
+      if (title) {
+        title.textContent = 'Connected · TriNova /api/v1 Live';
+        title.style.color = 'var(--green)';
+      }
+      if (latency) latency.textContent = `${health.durationMs || 0} ms`;
+      if (db) {
+        db.textContent = health.database || 'Connected';
+        db.style.color = 'var(--green)';
+      }
+      if (actor) {
+        actor.textContent = auth?.actor || 'sloane_ceo';
+        actor.title = auth?.scopes ? `Scopes: ${auth.scopes.join(', ')}` : '';
+      }
+    } else {
+      if (dot) dot.style.background = 'var(--amber)';
+      if (title) {
+        title.textContent = 'Disconnected / Standalone Mode';
+        title.style.color = 'var(--amber)';
+      }
+      if (latency) latency.textContent = 'Offline';
+      if (db) {
+        db.textContent = 'Local Cache';
+        db.style.color = 'var(--muted)';
+      }
+      if (actor) actor.textContent = 'Local Guest';
+    }
+
+    if (env) {
+      const url = ApiService.config.baseUrl;
+      env.textContent = url.includes('railway') ? 'Railway Live' : (url.includes('localhost') ? 'Localhost' : 'Custom');
+    }
+  }
+
+  logToTrinovaConsole(msg) {
+    const consoleEl = document.getElementById('trinovaConsoleOutput');
+    if (!consoleEl) return;
+    const time = new Date().toLocaleTimeString('en-GB');
+    consoleEl.textContent = `[${time}] ${msg}\n` + consoleEl.textContent;
   }
 
   bindEvents() {
@@ -181,6 +251,86 @@ class SloaneApp {
     const syncChBtn = document.getElementById('syncChBtn');
     if (syncChBtn) {
       syncChBtn.addEventListener('click', async () => {
+        await this.handleSyncCompaniesHouse();
+      });
+    }
+
+    // TriNova Connection Pill trigger
+    const trinovaStatusBtn = document.getElementById('trinovaStatusBtn');
+    if (trinovaStatusBtn) {
+      trinovaStatusBtn.addEventListener('click', () => {
+        const baseUrlInput = document.getElementById('configBaseUrl');
+        const tokenInput = document.getElementById('configToken');
+        if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
+        if (tokenInput) tokenInput.value = ApiService.config.token;
+        ModalManager.open('trinovaConfigModal', trinovaStatusBtn);
+      });
+    }
+
+    // TriNova Config Form submit
+    const trinovaConfigForm = document.getElementById('trinovaConfigForm');
+    if (trinovaConfigForm) {
+      trinovaConfigForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const baseUrl = document.getElementById('configBaseUrl').value.trim();
+        const token = document.getElementById('configToken').value.trim();
+        ApiService.configure({ baseUrl, token });
+        Toast.info('Connecting to updated TriNova endpoint...');
+        this.logToTrinovaConsole(`Configuration saved. Re-testing endpoint ${baseUrl}...`);
+        await this.checkTrinovaBackend();
+        await this.renderClients();
+        Toast.success('TriNova configuration saved.');
+      });
+    }
+
+    // TriNova Reset to Defaults
+    const configResetBtn = document.getElementById('configResetDefaultsBtn');
+    if (configResetBtn) {
+      configResetBtn.addEventListener('click', async () => {
+        ApiService.resetToDefaults();
+        const baseUrlInput = document.getElementById('configBaseUrl');
+        const tokenInput = document.getElementById('configToken');
+        if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
+        if (tokenInput) tokenInput.value = ApiService.config.token;
+        Toast.info('Reset to default Railway endpoints.');
+        this.logToTrinovaConsole('Reset configuration to Railway defaults.');
+        await this.checkTrinovaBackend();
+      });
+    }
+
+    // Diagnostic Tool: Test Health & Auth
+    const testHealthBtn = document.getElementById('btnTestTrinovaHealth');
+    if (testHealthBtn) {
+      testHealthBtn.addEventListener('click', async () => {
+        this.logToTrinovaConsole('Executing GET /api/v1/health and GET /api/v1/auth/verify...');
+        const health = await ApiService.checkHealth();
+        const auth = await ApiService.verifyAuth();
+        this.updateConfigModalTelemetry(health, auth);
+        this.logToTrinovaConsole(`Result: Health=${health.ok ? 'OK' : 'FAIL'}, Database=${health.database || 'n/a'}, Actor=${auth.actor || 'none'}, Scopes=${(auth.scopes || []).join(',')}`);
+        Toast.info(health.ok ? `TriNova is Live (${health.durationMs}ms)` : 'TriNova API is offline.');
+      });
+    }
+
+    // Diagnostic Tool: Force Sync Clients
+    const syncClientsBtn = document.getElementById('btnForceSyncClients');
+    const syncTrinovaToolbarBtn = document.getElementById('clientSyncTrinovaBtn');
+    const handleSyncClientsClick = async () => {
+      Toast.info('Fetching live client entities from TriNova...');
+      this.logToTrinovaConsole('Executing GET /api/v1/clients...');
+      const res = await ApiService.getClients({ search: this.searchQuery, biz: this.selectedBizFilter });
+      await this.renderClients();
+      this.logToTrinovaConsole(`Client sync complete. Loaded ${res.data.length} records (Source: ${res.source}).`);
+      Toast.success(`Synced ${res.data.length} client entities (${res.source === 'trinova_live' ? 'Live TriNova' : 'Cached Local'}).`);
+    };
+
+    if (syncClientsBtn) syncClientsBtn.addEventListener('click', handleSyncClientsClick);
+    if (syncTrinovaToolbarBtn) syncTrinovaToolbarBtn.addEventListener('click', handleSyncClientsClick);
+
+    // Diagnostic Tool: Force Sync Statutory
+    const syncStatutoryBtn = document.getElementById('btnForceSyncStatutory');
+    if (syncStatutoryBtn) {
+      syncStatutoryBtn.addEventListener('click', async () => {
+        this.logToTrinovaConsole('Executing POST /api/v1/statutory/sync...');
         await this.handleSyncCompaniesHouse();
       });
     }
@@ -362,10 +512,23 @@ class SloaneApp {
   }
 
   async renderClients() {
-    const { data: clients } = await ApiService.getClients({
+    const res = await ApiService.getClients({
       search: this.searchQuery,
       biz: this.selectedBizFilter
     });
+    const clients = res.data || [];
+
+    // Update Client 360 data source badge
+    const badge = document.getElementById('clientDataSourceBadge');
+    if (badge) {
+      if (res.source === 'trinova_live') {
+        badge.className = 'source-badge ch-live';
+        badge.textContent = `⚡ Live TriNova (${res.meta?.total || clients.length})`;
+      } else {
+        badge.className = 'source-badge';
+        badge.textContent = `Cached Local (${clients.length})`;
+      }
+    }
 
     const tbody = document.getElementById('clientTableBody');
     if (!tbody) return;
@@ -794,29 +957,44 @@ class SloaneApp {
       return;
     }
 
+    // Resolve matching company ID
+    const clients = StorageService.getClients();
+    const match = clients.find(c => c.name === companyName);
+    const companyId = match ? (match.rawId || match.id) : 1;
+
     try {
+      this.logToTrinovaConsole(`Posting internal note to TriNova for company ${companyName} (${visibility})...`);
       const res = await ApiService.sendNoteToTrinova({
-        text,
+        companyId,
         companyName,
+        text,
         visibility
       });
 
       ModalManager.close('trinovaNoteModal');
       Toast.success(res.message);
+      this.logToTrinovaConsole(`Note posted successfully: ${res.message}`);
     } catch (err) {
       Toast.error(err.message || 'Failed to send note to Trinova.');
+      this.logToTrinovaConsole(`Note post failed: ${err.message}`);
     }
   }
 
   async handleSyncCompaniesHouse() {
     const statusText = document.getElementById('chSyncStatusText');
-    if (statusText) statusText.textContent = 'Syncing live data from Companies House server...';
+    if (statusText) statusText.textContent = 'Syncing live data from Companies House & TriNova...';
 
     const result = await ApiService.syncCompaniesHouse();
-    Toast.success(`Live sync complete: reconciled ${result.syncedCount} company records.`);
+    const syncMsg = result.backendSynced 
+      ? `Live sync complete: reconciled ${result.syncedCount} companies with TriNova backend.`
+      : `Reconciliation complete: verified ${result.syncedCount} companies locally.`;
+
+    Toast.success(syncMsg);
+    this.logToTrinovaConsole(`Statutory sync: ${syncMsg}`);
 
     if (statusText) {
-      statusText.textContent = `Live verified: ${result.syncedCount} companies checked at ${new Date(result.syncedAt).toLocaleTimeString('en-GB')}`;
+      const liveTag = result.backendSynced ? ' [TriNova Synced]' : ' [Local Cache]';
+      statusText.textContent = `Live verified: ${result.syncedCount} companies checked at ${new Date(result.syncedAt).toLocaleTimeString('en-GB')}${liveTag}`;
     }
 
     this.renderStatutory();
