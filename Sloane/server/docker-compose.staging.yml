@@ -1,0 +1,91 @@
+# ==============================================================================
+# Staging Docker Compose Stack with Mailpit Sandboxed Delivery
+# Guarantees zero external emails delivered to real client email addresses.
+# Reference: context/05_data_security_context.md §9 & context/06_testing_deployment_context.md §9
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # 1. Trinova Integration Backend Server (Staging Profile)
+  trinova-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trinova_api_staging
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=staging
+      - PORT=4000
+      - LOG_LEVEL=debug
+      - SLOANE_API_KEY=tn_sec_live_sloane_readwrite_2026
+      - SLOANE_READONLY_API_KEY=tn_sec_live_sloane_readonly_2026
+      - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-ch_test_staging_key}
+      - COMPANIES_HOUSE_BASE_URL=https://api.company-information.service.gov.uk
+      - SIGNING_PROVIDER=documenso
+      - SIGNING_API_URL=http://documenso:3000/api/v1
+      - SIGNING_API_KEY=documenso_staging_key
+      - SIGNING_WEBHOOK_SECRET=documenso_webhook_secret_hmac_2026
+      - STORAGE_ROOT_PATH=/var/data/trinova/documents
+      # Mail Sandboxing: Diverts all emails to Mailpit container
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_SANDBOX_MODE=true
+    volumes:
+      - staging_documents:/var/data/trinova/documents
+    depends_on:
+      - mailpit
+      - db
+      - documenso
+
+  # 2. Mailpit Email Sandbox (Catches all signing invitations & portal notifications)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: trinova_mailpit_sandbox
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI for inspecting captured invitations
+
+  # 3. Documenso Community Edition (Staging Instance)
+  documenso:
+    image: documenso/documenso:latest
+    container_name: trinova_documenso_staging
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=staging_32_byte_secret_testing_only
+      - ENCRYPTION_SECONDARY_KEY=staging_32_byte_encryption_test
+      - DATABASE_URL=postgresql://documenso_user:documenso_staging_pass@db:5432/documenso_staging?schema=public
+      - NEXT_PUBLIC_DISABLE_SIGNUP=true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 4. PostgreSQL Database (Staging Database - Strictly Isolated)
+  db:
+    image: postgres:16-alpine
+    container_name: trinova_postgres_staging
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=documenso_user
+      - POSTGRES_PASSWORD=documenso_staging_pass
+      - POSTGRES_DB=documenso_staging
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documenso_user -d documenso_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  staging_documents:
+    driver: local
+  staging_postgres_data:
+    driver: local

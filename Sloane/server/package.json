@@ -1,0 +1,21 @@
+{
+  "name": "trinova-api-server",
+  "version": "1.0.0",
+  "description": "Sloane ⇄ Trinova Backend API & Signing Integration Service",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "test:smoke": "node --test tests/smoke.test.js",
+    "migrate:up": "node src/data/migrator.js up",
+    "migrate:down": "node src/data/migrator.js down",
+    "migrate:status": "node src/data/migrator.js status",
+    "deploy": "node -e \"const p = process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\deploy.ps1' : 'bash ./scripts/deploy.sh'; import('node:child_process').then(cp => cp.execSync(p, { stdio: 'inherit' }));\"",
+    "rollback": "node -e \"const p = process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\rollback.ps1' : 'bash ./scripts/rollback.sh'; import('node:child_process').then(cp => cp.execSync(p, { stdio: 'inherit' }));\""
+  },
+  "keywords": ["trinova", "sloane", "integration", "api"],
+  "author": "Trinova Engineering",
+  "license": "UNLICENSED",
+  "private": true
+}

@@ -1,0 +1,558 @@
+/* Sloane View-Specific Styles */
+
+/* ==========================================================================
+   1. Command Centre View
+   ========================================================================== */
+.cmd-top-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.92fr 0.92fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Top 3 List */
+.top3-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.top3-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+
+.top3-item.item-red {
+  border-left-color: var(--red);
+}
+
+.top3-item-content {
+  flex: 1;
+}
+
+.top3-item-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.top3-item-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Red Alerts Card Content */
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 93, 103, 0.08);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--red-border);
+  margin-bottom: 12px;
+}
+
+.alert-item-content {
+  flex: 1;
+}
+
+.alert-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+}
+
+.alert-desc {
+  font-size: 11px;
+  color: #ffb8bd;
+  margin-top: 2px;
+}
+
+/* Diary Items */
+.diary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diary-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--panel2);
+  border-radius: var(--radius-sm);
+}
+
+.diary-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diary-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Command Pulse Metrics Row */
+.pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Bottom Grid (Waiting sign-off & Attention emails) */
+.cmd-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.signoff-item, .email-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.signoff-item:last-child, .email-item:last-child {
+  margin-bottom: 0;
+}
+
+.item-main {
+  flex: 1;
+}
+
+.item-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.item-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ==========================================================================
+   2. Businesses View
+   ========================================================================== */
+.biz-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.biz-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 180px;
+}
+
+.biz-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.biz-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.biz-type {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.biz-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.biz-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.biz-stat-n {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.biz-stat-lbl {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   3. People & Work View
+   ========================================================================== */
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.person-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.person-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.person-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.person-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.person-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.person-role {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.work-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.work-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--panel2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+/* ==========================================================================
+   4. Statutory Monitor View
+   ========================================================================== */
+.stat-radar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.stat-top-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.ch-connection-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ch-conn-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ch-dot-live {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--green);
+  box-shadow: 0 0 10px var(--green);
+}
+
+/* Section Divider in Statutory */
+.stat-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 32px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   5. Intelligence View
+   ========================================================================== */
+.intel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.intel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.intel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intel-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel2);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--blue);
+}
+
+.intel-item.intel-critical {
+  border-left-color: var(--red);
+}
+
+.intel-item.intel-chase {
+  border-left-color: var(--amber);
+}
+
+.intel-item-content {
+  flex: 1;
+}
+
+.intel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.intel-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ==========================================================================
+   6. CEO Brain View
+   ========================================================================== */
+.brain-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.brain-capture-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.brain-textarea {
+  width: 100%;
+  min-height: 120px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+}
+
+.brain-textarea:focus {
+  border-color: var(--accent);
+}
+
+.brain-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.brain-privacy-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.brain-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brain-entry {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color var(--transition-fast);
+}
+
+.brain-entry:hover {
+  border-color: rgba(201, 166, 107, 0.3);
+}
+
+.brain-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.brain-entry-text {
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.brain-entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(38, 49, 64, 0.5);
+}
+
+/* Responsive Overrides */
+@media (max-width: 1100px) {
+  .cmd-top-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .cmd-top-grid > .card:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .pulse-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .cmd-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .biz-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-radar-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-top-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .intel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .people-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .cmd-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pulse-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .biz-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-radar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-top-actions {
+    grid-template-columns: 1fr;
+  }
+}

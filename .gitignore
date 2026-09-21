@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Runtime & Logs
+*.log
+logs/
+
+# Storage & Backups
+storage/documents/*
+!storage/documents/.gitkeep
+backups/*.sql
+backups/*.tar.gz
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Build & Archives
+*.zip
+scratch/

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sloane — Private CEO Command Centre</title>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/views.css">
+</head>
+<body>
+
+  <!-- Mobile Top Navigation Bar -->
+  <header class="mobile-nav-bar" id="mobileNavBar">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="brand-mark">S</div>
+      <span style="font-weight: 850; font-size: 15px; letter-spacing: 0.1em;">SLOANE</span>
+    </div>
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu">
+      ☰ Menu
+    </button>
+  </header>
+
+  <!-- App Shell -->
+  <div class="shell">
+    
+    <!-- Sticky Sidebar -->
+    <aside class="side" role="navigation" aria-label="Main Navigation">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div class="brand-text">
+          <span class="brand-title">SLOANE</span>
+          <span class="brand-subtitle">Command Centre</span>
+        </div>
+      </div>
+
+      <ul class="nav-list">
+        <li>
+          <button class="nav-btn active" data-view="command" id="nav-command">
+            <span class="nav-btn-content">
+              <span>📊</span>
+              <span>Command Centre</span>
+            </span>
+            <span class="nav-badge badge-accent">7</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="businesses" id="nav-businesses">
+            <span class="nav-btn-content">
+              <span>🏢</span>
+              <span>Businesses</span>
+            </span>
+            <span class="nav-badge">6</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="clients" id="nav-clients">
+            <span class="nav-btn-content">
+              <span>📁</span>
+              <span>Client 360</span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="people" id="nav-people">
+            <span class="nav-btn-content">
+              <span>👥</span>
+              <span>People & Work</span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="statutory" id="nav-statutory">
+            <span class="nav-btn-content">
+              <span>⚖️</span>
+              <span>Statutory Monitor</span>
+            </span>
+            <span class="nav-badge" id="statNavBadge">4</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="intelligence" id="nav-intelligence">
+            <span class="nav-btn-content">
+              <span>⚡</span>
+              <span>Intelligence</span>
+            </span>
+            <span class="nav-badge badge-red">3</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="brain" id="nav-brain">
+            <span class="nav-btn-content">
+              <span>🧠</span>
+              <span>CEO Brain</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- Pinned Profile Footer -->
+      <div class="profile">
+        <div class="avatar">KA</div>
+        <div class="profile-info">
+          <span class="profile-name">Kirsty Allen</span>
+          <span class="profile-role">Private Workspace · CEO View</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main>
+      
+      <!-- Top Bar: Greeting & Ask Sloane -->
+      <div class="top">
+        <div class="greeting-block">
+          <div class="eyebrow">
+            <span class="dot green"></span>
+            <span>Private CEO Command Centre · Outlook Connected</span>
+          </div>
+          <h1>Good morning, Kirsty</h1>
+        </div>
+
+        <div class="ask-wrapper">
+          <form class="ask-form" id="askForm">
+            <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane anything about your businesses, tasks, filings..." autocomplete="off">
+            <button type="submit" class="ask-btn">Ask</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           View 1: Command Centre
+           ==================================================================== -->
+      <section class="view" id="view-command">
+        
+        <!-- Top 3 Asymmetric Grid -->
+        <div class="cmd-top-grid">
+          
+          <!-- Top 3 Card -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Your Top 3 — Do These First</h2>
+              <span class="pill amber">Urgent Priorities</span>
+            </div>
+            <div class="top3-list" id="top3Container">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+          <!-- Red Alerts Card -->
+          <div class="card redcard">
+            <div class="card-header">
+              <h2 style="color: var(--red);"><span class="dot red"></span> Red Alerts</h2>
+              <button class="card-action-btn" id="openMissedModalBtn">What Have I Missed? ↗</button>
+            </div>
+            <div class="alert-item">
+              <span class="dot red" style="margin-top: 4px;"></span>
+              <div class="alert-item-content">
+                <div class="alert-title">CRITICAL: Woofington Park Strike-Off Proposal</div>
+                <div class="alert-desc">First Gazette publication registered. Immediate accounts filing required to protect entity.</div>
+              </div>
+            </div>
+            <div class="alert-item" style="margin-bottom: 0;">
+              <span class="dot red" style="margin-top: 4px;"></span>
+              <div class="alert-item-content">
+                <div class="alert-title">OVERDUE: R GB Elevations Ltd Accounts</div>
+                <div class="alert-desc">50 days past deadline. Penalty tier active. Final bank records pending.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Today's Diary Card -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Today's Diary (Outlook)</h2>
+              <span class="pill green">Connected</span>
+            </div>
+            <div class="diary-list" id="diaryContainer">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Pulse Metrics Row -->
+        <div class="pulse-grid">
+          <div class="card metric">
+            <div class="n" id="pulseSignoffs">2</div>
+            <div class="lbl">Waiting sign-off</div>
+          </div>
+          <div class="card metric">
+            <div class="n" id="pulseEmails">2</div>
+            <div class="lbl">Sloane attention emails</div>
+          </div>
+          <div class="card metric metric-urgent">
+            <div class="n" id="pulseOverdue">4</div>
+            <div class="lbl">Overdue filings</div>
+          </div>
+          <div class="card metric metric-warning">
+            <div class="n" id="pulseDue7d">6</div>
+            <div class="lbl">Due in next 14 days</div>
+          </div>
+          <div class="card metric">
+            <div class="n" id="pulseBlocked">1</div>
+            <div class="lbl">Team blocked</div>
+          </div>
+          <div class="card metric">
+            <div class="n" id="pulseBizAreas">6</div>
+            <div class="lbl">Business areas</div>
+          </div>
+        </div>
+
+        <!-- Businesses Quick Grid -->
+        <div style="margin-bottom: 24px;">
+          <div class="card-header" style="margin-bottom: 12px;">
+            <h2 style="font-size: 15px;">Your Businesses Overview</h2>
+            <button class="btn btn-secondary" onclick="app.switchView('businesses')" style="padding: 4px 12px; font-size: 11px;">View All ↗</button>
+          </div>
+          <div class="biz-grid" id="cmdBizCards" style="margin-top: 0;">
+            <!-- Dynamically Populated -->
+          </div>
+        </div>
+
+        <!-- Bottom Grid: Sign-offs & Attention Emails -->
+        <div class="cmd-bottom-grid">
+          
+          <div class="card">
+            <div class="card-header">
+              <h2>Waiting for Your Sign-off</h2>
+              <span class="pill amber">Action Required</span>
+            </div>
+            <div id="waitingSignoffContainer">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Emails Sloane Thinks Need You</h2>
+              <span class="pill blue">Outlook Radar</span>
+            </div>
+            <div id="attentionEmailsContainer">
+              <!-- Dynamically Populated -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           View 2: Businesses View
+           ==================================================================== -->
+      <section class="view hidden" id="view-businesses">
+        <div class="card-header" style="margin-bottom: 8px;">
+          <div>
+            <h2 style="font-size: 18px;">Business Areas</h2>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              The core commercial and professional entities operated by Kirsty Allen.
+            </p>
+          </div>
+          <button class="btn btn-primary" id="openAddBizBtn">+ Add Business Area</button>
+        </div>
+
+        <div class="biz-grid" id="fullBizCards">
+          <!-- Dynamically Populated -->
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           View 3: Client 360 View
+           ==================================================================== -->
+      <section class="view hidden" id="view-clients">
+        <div class="card-header" style="margin-bottom: 14px;">
+          <div>
+            <h2 style="font-size: 18px;">Client 360 Database</h2>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              Consolidated corporate records, statutory dates, and tax obligations across all practice entities.
+            </p>
+          </div>
+          <button class="btn btn-primary" id="openAddClientBtn">+ Add Client / Company</button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="text" class="search-input" id="clientSearchInput" placeholder="Search name, CRN, directors, notes...">
+            <select class="select-input" id="clientBizFilter">
+              <option value="All">All Business Areas</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <span class="syncmeta" id="clientCountMeta">Showing client records</span>
+          </div>
+        </div>
+
+        <!-- Clients Table -->
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Company / Client</th>
+                <th>Company No</th>
+                <th>Year End</th>
+                <th>Accounts Due</th>
+                <th>Confirm Stmt</th>
+                <th>VAT Status</th>
+                <th>Officers / Directors</th>
+                <th>Risk</th>
+                <th>Private Notes</th>
+              </tr>
+            </thead>
+            <tbody id="clientTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           View 4: People & Work View
+           ==================================================================== -->
+      <section class="view hidden" id="view-people">
+        <div class="card-header" style="margin-bottom: 8px;">
+          <div>
+            <h2 style="font-size: 18px;">People & Work Oversight</h2>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              Assigned deliverables, stages, bottlenecks, and private CEO observations across team members.
+            </p>
+          </div>
+        </div>
+
+        <div class="people-grid" id="peopleGridContainer">
+          <!-- Dynamically Populated -->
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           View 5: Statutory Monitor View
+           ==================================================================== -->
+      <section class="view hidden" id="view-statutory">
+        
+        <!-- Risk Rule Explanation Banner -->
+        <div class="sourcebanner">
+          <span>⚖️</span>
+          <span>
+            <strong>Sloane Statutory Urgency Engine:</strong> Past date = PAST DATE · verify; Due in 0–14d = RED; 15–30d = AMBER; 31+d = CLEAR. Active strike-off proposals and overdue Companies House flags are automatically promoted to RED.
+          </span>
+        </div>
+
+        <!-- Radar Stats Row -->
+        <div class="stat-radar-grid">
+          <div class="card metric">
+            <div class="n" id="statRadarTracked">33</div>
+            <div class="lbl">Tracked Companies</div>
+          </div>
+          <div class="card metric">
+            <div class="n" id="statRadarVat">18</div>
+            <div class="lbl">VAT Deadlines Tracked</div>
+          </div>
+          <div class="card metric metric-urgent">
+            <div class="n" id="statRadarRed">4</div>
+            <div class="lbl">Action Required (RED)</div>
+          </div>
+          <div class="card metric">
+            <div class="n" id="statRadarClear" style="color: var(--green);">29</div>
+            <div class="lbl">In Good Standing (CLEAR)</div>
+          </div>
+        </div>
+
+        <!-- Companies House Connection Box -->
+        <div class="ch-connection-box">
+          <div class="ch-conn-info">
+            <div class="ch-dot-live"></div>
+            <div>
+              <div style="font-weight: 700; font-size: 13px;">Companies House Live Integration</div>
+              <div class="syncmeta" id="chSyncStatusText">Connected via backend service · Auto-reconciles statutory status & strike-offs</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="syncChBtn">Run Live Sync 🔄</button>
+        </div>
+
+        <!-- Statutory Deadlines Table -->
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>CRN</th>
+                <th>Year End</th>
+                <th>Accounts Due</th>
+                <th>Nearest Obligation</th>
+                <th>Status</th>
+                <th>Notes / Reconciliation</th>
+              </tr>
+            </thead>
+            <tbody id="statutoryTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tracker Actions Sub-table -->
+        <div class="stat-section-title">
+          <span>🚨</span>
+          <span>Specific Statutory Action Tracker</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>CRN</th>
+                <th>Identified Issue</th>
+                <th>Required Action</th>
+                <th>Urgency</th>
+              </tr>
+            </thead>
+            <tbody id="actionTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- VAT Schedule Sub-table -->
+        <div class="stat-section-title">
+          <span>📑</span>
+          <span>VAT Return Filing Schedule</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Client Name</th>
+                <th>Period</th>
+                <th>Filing Due Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="vatTableBody">
+              <!-- Dynamically Populated -->
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           View 6: Intelligence View
+           ==================================================================== -->
+      <section class="view hidden" id="view-intelligence">
+        <div class="card-header" style="margin-bottom: 8px;">
+          <div>
+            <h2 style="font-size: 18px;">Executive Intelligence Radar</h2>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              Automated scans surfacing compliance vulnerabilities, delegated work bottlenecks, and schedule collisions.
+            </p>
+          </div>
+        </div>
+
+        <div class="intel-grid" id="intelGridContainer">
+          <!-- Dynamically Populated -->
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           View 7: CEO Brain View
+           ==================================================================== -->
+      <section class="view hidden" id="view-brain">
+        <div class="brain-wrapper">
+          
+          <div class="card-header" style="margin-bottom: 12px;">
+            <div>
+              <h2 style="font-size: 18px;">CEO Brain (Private Workspace)</h2>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                Low-friction capture for unvarnished thoughts, meeting debriefs, and strategic ideas.
+              </p>
+            </div>
+          </div>
+
+          <!-- Quick Capture Form -->
+          <div class="brain-capture-box">
+            <form id="brainForm">
+              <textarea class="brain-textarea" id="brainInput" placeholder="Tell Sloane anything — conversations, promises made, gut checks, follow-ups..."></textarea>
+              <div class="brain-actions">
+                <div class="brain-privacy-badge">
+                  <span>🔒</span>
+                  <span>Strictly private — stored locally, never visible in Trinova without explicit opt-in</span>
+                </div>
+                <button type="submit" class="btn btn-primary">Save to Brain</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Entries Feed -->
+          <div class="brain-feed" id="brainFeedContainer">
+            <!-- Dynamically Populated -->
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ====================================================================
+       Modals
+       ==================================================================== -->
+
+  <!-- Modal 1: Add Client / Company -->
+  <div class="modal-overlay" id="clientModal" aria-hidden="true">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Add Client / Company Record</h3>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <form id="clientForm">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="clientName">Company / Client Name *</label>
+              <input type="text" class="form-control" id="clientName" required placeholder="e.g. Acme Holdings Limited">
+            </div>
+
+            <div class="form-group">
+              <label for="modalClientBiz">Business Area</label>
+              <select class="form-control" id="modalClientBiz">
+                <!-- Dynamically Populated -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="clientNo">Company Number (CRN)</label>
+              <input type="text" class="form-control" id="clientNo" placeholder="8-character alphanumeric">
+            </div>
+
+            <div class="form-group">
+              <label for="clientYear">Year End Date</label>
+              <input type="date" class="form-control" id="clientYear">
+            </div>
+
+            <div class="form-group">
+              <label for="clientAccounts">Accounts Due Date</label>
+              <input type="date" class="form-control" id="clientAccounts">
+            </div>
+
+            <div class="form-group">
+              <label for="clientConfirm">Confirmation Statement Due</label>
+              <input type="date" class="form-control" id="clientConfirm">
+            </div>
+
+            <div class="form-group">
+              <label for="clientVat">VAT Registered?</label>
+              <select class="form-control" id="clientVat">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="clientVatNo">VAT Number</label>
+              <input type="text" class="form-control" id="clientVatNo" placeholder="GB 123 4567 89">
+            </div>
+
+            <div class="form-group">
+              <label for="clientPaye">PAYE Reference</label>
+              <input type="text" class="form-control" id="clientPaye" placeholder="123/AB456">
+            </div>
+
+            <div class="form-group">
+              <label for="clientCis">CIS Status</label>
+              <select class="form-control" id="clientCis">
+                <option value="No">No</option>
+                <option value="Contractor">Contractor</option>
+                <option value="Subcontractor">Subcontractor</option>
+                <option value="Both">Both</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="clientRisk">Risk Level</label>
+              <select class="form-control" id="clientRisk">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+
+            <div class="form-group full">
+              <label for="clientDirs">Directors & Key Officers</label>
+              <input type="text" class="form-control" id="clientDirs" placeholder="e.g. John Doe (Director), Jane Smith (Shareholder)">
+            </div>
+
+            <div class="form-group full">
+              <label for="clientOwner">Internal Owner / Manager</label>
+              <input type="text" class="form-control" id="clientOwner" placeholder="Kirsty Allen">
+            </div>
+
+            <div class="form-group full">
+              <label for="clientNotes">Private Notes</label>
+              <textarea class="form-control" id="clientNotes" placeholder="Private observations, fee arrangements, commercial flags..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Client Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Add Business Area -->
+  <div class="modal-overlay" id="bizModal" aria-hidden="true">
+    <div class="modal-box" style="width: min(500px, 94vw);">
+      <div class="modal-header">
+        <h3>Add Business Area</h3>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <form id="bizForm">
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="bizName">Business Area Name *</label>
+            <input type="text" class="form-control" id="bizName" required placeholder="e.g. New Venture Partners">
+          </div>
+          <div class="form-group">
+            <label for="bizType">Category / Sector *</label>
+            <input type="text" class="form-control" id="bizType" required placeholder="e.g. Property & Development">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Area</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: What Have I Missed? -->
+  <div class="modal-overlay" id="missedModal" aria-hidden="true">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Safety-Net Scan: What Have I Missed?</h3>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body" id="missedModalContent">
+        <!-- Dynamically Populated -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close-modal>Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Send Note to Trinova (Explicit Privacy Boundary Action) -->
+  <div class="modal-overlay" id="trinovaNoteModal" aria-hidden="true">
+    <div class="modal-box" style="width: min(600px, 94vw);">
+      <div class="modal-header">
+        <h3>Write Internal Note to Trinova</h3>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <form id="trinovaNoteForm">
+        <div class="modal-body">
+          <div class="sourcebanner" style="margin-bottom: 16px;">
+            <span>⚠️</span>
+            <span>
+              <strong>Privacy Boundary Check:</strong> You are transferring a private CEO Brain note into Trinova's shared operational system. This will be visible to authorized staff.
+            </span>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="trinovaNoteCompany">Target Company *</label>
+            <select class="form-control" id="trinovaNoteCompany" required>
+              <!-- Dynamically Populated -->
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="trinovaNoteVisibility">Visibility in Trinova</label>
+            <select class="form-control" id="trinovaNoteVisibility">
+              <option value="staff_only">Staff Only (Private to practice team)</option>
+              <option value="client_visible">Client Visible (Shared with client)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="trinovaNoteContent">Note Content *</label>
+            <textarea class="form-control" id="trinovaNoteContent" required style="min-height: 110px;"></textarea>
+          </div>
+
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; background: var(--panel2); border-radius: var(--radius-sm);">
+            <input type="checkbox" id="trinovaNoteConfirm" required style="margin-top: 3px;">
+            <label for="trinovaNoteConfirm" style="font-size: 11px; color: var(--text); cursor: pointer;">
+              I explicitly authorize transferring this note to Trinova and logging my user ID and timestamp in the audit log.
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Post Note to Trinova ↗</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Main Application Script (ES Module) -->
+  <script type="module" src="scripts/app.js"></script>
+</body>
+</html>

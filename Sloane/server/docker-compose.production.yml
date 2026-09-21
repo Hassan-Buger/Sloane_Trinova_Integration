@@ -1,0 +1,90 @@
+# ==============================================================================
+# Production Docker Compose Stack
+# Includes: Trinova Integration API, Documenso Community Edition (AGPL-3.0),
+#           and PostgreSQL 16 with persistent volumes.
+# Reference: context/signing-provider-evaluation.md & context/production-rollback-runbook.md
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # 1. Trinova Integration Backend Server
+  trinova-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trinova_api_server
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - LOG_LEVEL=info
+      - SLOANE_API_KEY=${SLOANE_API_KEY}
+      - SLOANE_READONLY_API_KEY=${SLOANE_READONLY_API_KEY}
+      - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY}
+      - COMPANIES_HOUSE_BASE_URL=${COMPANIES_HOUSE_BASE_URL:-https://api.company-information.service.gov.uk}
+      - SIGNING_PROVIDER=documenso
+      - SIGNING_API_URL=http://documenso:3000/api/v1
+      - SIGNING_API_KEY=${SIGNING_API_KEY}
+      - SIGNING_WEBHOOK_SECRET=${SIGNING_WEBHOOK_SECRET}
+      - STORAGE_ROOT_PATH=/var/data/trinova/documents
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASS=${MAIL_PASS}
+      - MAIL_SANDBOX_MODE=false
+    volumes:
+      - trinova_documents:/var/data/trinova/documents
+    depends_on:
+      db:
+        condition: service_healthy
+      documenso:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 2. Documenso Community Edition (Self-Hosted Document Signing Engine)
+  documenso:
+    image: documenso/documenso:latest
+    container_name: trinova_documenso_signing
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${DOCUMENSO_NEXTAUTH_SECRET:-replace_with_32_byte_secret_minimum}
+      - ENCRYPTION_SECONDARY_KEY=${DOCUMENSO_ENCRYPTION_KEY:-replace_with_32_byte_encryption_key}
+      - DATABASE_URL=postgresql://documenso_user:documenso_secure_pass@db:5432/documenso_db?schema=public
+      - NEXT_PUBLIC_DISABLE_SIGNUP=true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 3. PostgreSQL Database (Storage for Documenso and Trinova entities)
+  db:
+    image: postgres:16-alpine
+    container_name: trinova_postgres_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=documenso_user
+      - POSTGRES_PASSWORD=documenso_secure_pass
+      - POSTGRES_DB=documenso_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documenso_user -d documenso_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  trinova_documents:
+    driver: local
+  postgres_data:
+    driver: local
