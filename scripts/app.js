@@ -4,11 +4,11 @@
  * and event bindings.
  */
 
-import { StorageService } from './services/storage.js';
-import { ReconciliationEngine } from './services/reconciliation.js';
-import { ApiService } from './services/api.js';
-import { ModalManager } from './components/modal.js';
-import { Toast } from './components/toast.js';
+import { StorageService } from './services/storage.js?v=2.1.0';
+import { ReconciliationEngine } from './services/reconciliation.js?v=2.1.0';
+import { ApiService } from './services/api.js?v=2.1.0';
+import { ModalManager } from './components/modal.js?v=2.1.0';
+import { Toast } from './components/toast.js?v=2.1.0';
 import {
   ACCOUNTS_TRACKER,
   ACTION_TRACKER,
