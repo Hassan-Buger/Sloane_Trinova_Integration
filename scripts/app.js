@@ -4,11 +4,12 @@
  * and event bindings.
  */
 
-import { StorageService } from './services/storage.js?v=2.1.0';
-import { ReconciliationEngine } from './services/reconciliation.js?v=2.1.0';
-import { ApiService } from './services/api.js?v=2.1.0';
-import { ModalManager } from './components/modal.js?v=2.1.0';
-import { Toast } from './components/toast.js?v=2.1.0';
+import { StorageService } from './services/storage.js?v=2.2.0';
+import { ReconciliationEngine } from './services/reconciliation.js?v=2.2.0';
+import { ApiService } from './services/api.js?v=2.2.0';
+import { AuthService } from './services/auth.js?v=2.2.0';
+import { ModalManager } from './components/modal.js?v=2.2.0';
+import { Toast } from './components/toast.js?v=2.2.0';
 import {
   ACCOUNTS_TRACKER,
   ACTION_TRACKER,
@@ -26,6 +27,8 @@ class SloaneApp {
     this.searchQuery = '';
     this.selectedBizFilter = 'All';
     this.selectedBrainEntryForTrinova = null;
+    this.authEventsBound = false;
+    this.appEventsBound = false;
   }
 
   async init() {
@@ -33,8 +36,22 @@ class SloaneApp {
     ModalManager.init();
     Toast.init();
 
+    // Bind authentication UI events
+    this.bindAuthEvents();
+
+    // Verify session
+    if (!AuthService.isAuthenticated()) {
+      this.showLoginView();
+      return;
+    }
+
+    this.showAppView();
+
     // Bind navigation and UI events
-    this.bindEvents();
+    if (!this.appEventsBound) {
+      this.bindEvents();
+      this.appEventsBound = true;
+    }
 
     // Initial render of all view pipelines
     await this.renderAll();
@@ -44,6 +61,167 @@ class SloaneApp {
 
     // Switch to default view
     this.switchView('command');
+  }
+
+  showLoginView() {
+    const authShell = document.getElementById('authShell');
+    const appShell = document.querySelector('.shell');
+    const mobileNav = document.getElementById('mobileNavBar');
+
+    if (authShell) authShell.classList.remove('auth-hidden');
+    if (appShell) appShell.style.display = 'none';
+    if (mobileNav) mobileNav.style.display = 'none';
+
+    const emailInput = document.getElementById('loginEmail');
+    if (emailInput && !emailInput.value) {
+      emailInput.value = AuthService.getRememberedEmail();
+    }
+    const passInput = document.getElementById('loginPassword');
+    if (passInput) {
+      setTimeout(() => passInput.focus(), 120);
+    }
+  }
+
+  showAppView() {
+    const authShell = document.getElementById('authShell');
+    const appShell = document.querySelector('.shell');
+    const mobileNav = document.getElementById('mobileNavBar');
+
+    if (authShell) authShell.classList.add('auth-hidden');
+    if (appShell) appShell.style.display = 'grid';
+    if (mobileNav) mobileNav.style.display = 'flex';
+
+    // Update profile display with active authenticated user
+    const user = AuthService.getUser();
+    const avatarEls = document.querySelectorAll('#sidebarAvatar, .avatar');
+    avatarEls.forEach(el => { el.textContent = user.avatar || 'KA'; });
+
+    const nameEls = document.querySelectorAll('#sidebarUserName, .profile-name');
+    nameEls.forEach(el => { el.textContent = user.name || 'Kirsty Allen'; });
+
+    const greetingEl = document.querySelector('.greeting-block h1');
+    if (greetingEl) {
+      const firstName = (user.name || 'Kirsty').split(' ')[0];
+      const hour = new Date().getHours();
+      const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+      greetingEl.textContent = `Good ${timeOfDay}, ${firstName}`;
+    }
+  }
+
+  bindAuthEvents() {
+    if (this.authEventsBound) return;
+    this.authEventsBound = true;
+
+    // Login Form Submit
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+      loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+    }
+
+    // Quick Fill Demo Button
+    const quickFillBtn = document.getElementById('btnAuthQuickFill');
+    if (quickFillBtn) {
+      quickFillBtn.addEventListener('click', () => {
+        const emailInput = document.getElementById('loginEmail');
+        const passInput = document.getElementById('loginPassword');
+        if (emailInput) emailInput.value = 'kirsty.allen@trinova.co.uk';
+        if (passInput) passInput.value = 'password123';
+        const alertEl = document.getElementById('authAlert');
+        if (alertEl) alertEl.classList.remove('visible');
+        Toast.info('CEO test credentials populated. Ready to sign in.');
+      });
+    }
+
+    // Password Visibility Toggle
+    const togglePassBtn = document.getElementById('btnTogglePassword');
+    const passInput = document.getElementById('loginPassword');
+    if (togglePassBtn && passInput) {
+      togglePassBtn.addEventListener('click', () => {
+        const isPassword = passInput.type === 'password';
+        passInput.type = isPassword ? 'text' : 'password';
+        togglePassBtn.classList.toggle('is-visible', isPassword);
+        togglePassBtn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+      });
+    }
+
+    // Reset PIN Info
+    const forgotLink = document.getElementById('authForgotLink');
+    if (forgotLink) {
+      forgotLink.addEventListener('click', () => {
+        Toast.info('CEO credentials configured for test environment: kirsty.allen@trinova.co.uk / password123', 6000);
+      });
+    }
+
+    // Lock session buttons
+    const lockSidebarBtn = document.getElementById('sidebarLockBtn');
+    if (lockSidebarBtn) {
+      lockSidebarBtn.addEventListener('click', () => this.handleLogout());
+    }
+
+    const lockHeaderBtn = document.getElementById('headerLockBtn');
+    if (lockHeaderBtn) {
+      lockHeaderBtn.addEventListener('click', () => this.handleLogout());
+    }
+  }
+
+  async handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail')?.value;
+    const password = document.getElementById('loginPassword')?.value;
+    const remember = document.getElementById('loginRemember')?.checked ?? true;
+    const submitBtn = document.getElementById('btnLoginSubmit');
+    const alertEl = document.getElementById('authAlert');
+    const alertMsg = document.getElementById('authAlertMsg');
+
+    if (alertEl) alertEl.classList.remove('visible');
+    if (submitBtn) {
+      submitBtn.classList.add('is-loading');
+      submitBtn.disabled = true;
+    }
+
+    try {
+      const session = await AuthService.login({ email, password, remember });
+      
+      Toast.success(`Welcome back, ${session.user.name}. Executive session verified.`);
+      
+      this.showAppView();
+      
+      if (!this.appEventsBound) {
+        this.bindEvents();
+        this.appEventsBound = true;
+      }
+
+      await this.renderAll();
+      await this.checkTrinovaBackend();
+      this.switchView('command');
+
+      const passInput = document.getElementById('loginPassword');
+      if (passInput) passInput.value = '';
+
+    } catch (err) {
+      if (alertEl && alertMsg) {
+        alertMsg.textContent = err.message || 'Authentication failed. Please verify credentials.';
+        alertEl.classList.add('visible');
+      } else {
+        Toast.error(err.message || 'Authentication failed.');
+      }
+      const passInput = document.getElementById('loginPassword');
+      if (passInput) {
+        passInput.focus();
+        passInput.select();
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.classList.remove('is-loading');
+        submitBtn.disabled = false;
+      }
+    }
+  }
+
+  handleLogout() {
+    AuthService.logout();
+    Toast.info('Executive session locked. Access restricted.');
+    this.showLoginView();
   }
 
   async checkTrinovaBackend() {

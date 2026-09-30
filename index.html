@@ -15,8 +15,120 @@
   <link rel="stylesheet" href="styles/layout.css">
   <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/views.css">
+  <link rel="stylesheet" href="styles/auth.css?v=2.2.0">
 </head>
 <body>
+
+  <!-- Full-Page Executive CEO Login Screen (TriNova Aligned) -->
+  <main class="auth-shell" id="authShell">
+    <div class="auth-atmosphere" aria-hidden="true"></div>
+
+    <section class="auth-container" aria-labelledby="authTitle">
+      <div class="auth-brand">
+        <div class="auth-brand-logo">
+          <div class="auth-brand-mark">S</div>
+          <span class="auth-brand-title">SLOANE</span>
+        </div>
+        <div class="auth-brand-badge">
+          <span>🔒 Private CEO Command Centre · TriNova Group</span>
+        </div>
+      </div>
+
+      <div class="auth-card">
+        <header class="auth-card-header">
+          <h1 id="authTitle">Sign in to CEO Portal</h1>
+          <p>Welcome back, Kirsty. Authenticate your executive session to access practice intelligence, statutory monitors, and CEO Brain.</p>
+        </header>
+
+        <!-- Demo Quick-Fill Pill -->
+        <div class="auth-demo-pill">
+          <div>
+            <span>Test CEO Access: </span>
+            <code>kirsty.allen@trinova.co.uk</code> · <code>password123</code>
+          </div>
+          <button type="button" class="auth-demo-btn" id="btnAuthQuickFill">Quick Fill</button>
+        </div>
+
+        <!-- Alert Notification -->
+        <div class="auth-alert auth-alert-error" id="authAlert" role="alert">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span id="authAlertMsg">Invalid executive credentials.</span>
+        </div>
+
+        <form class="auth-form" id="loginForm" novalidate>
+          <div class="auth-field">
+            <label for="loginEmail">Executive Email Address</label>
+            <div class="auth-input-wrap">
+              <svg class="auth-input-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="18" height="14" rx="2.5"></rect>
+                <path d="m4 7 8 6 8-6"></path>
+              </svg>
+              <input class="auth-input" id="loginEmail" type="email" name="email" placeholder="kirsty.allen@trinova.co.uk" required autocomplete="email" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <div class="auth-label-row">
+              <label for="loginPassword">Executive Password</label>
+              <a href="javascript:void(0)" class="auth-forgot" id="authForgotLink">Need PIN reset?</a>
+            </div>
+            <div class="auth-input-wrap">
+              <svg class="auth-input-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="10" width="16" height="11" rx="2.5"></rect>
+                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+              </svg>
+              <input class="auth-input auth-input-password" id="loginPassword" type="password" name="password" placeholder="Enter executive password" required autocomplete="current-password">
+              <button class="auth-password-toggle" type="button" id="btnTogglePassword" aria-label="Toggle password visibility">
+                <!-- Eye Show SVG -->
+                <svg class="auth-eye auth-eye-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6Z"></path>
+                  <circle cx="12" cy="12" r="2.5"></circle>
+                </svg>
+                <!-- Eye Hide SVG -->
+                <svg class="auth-eye auth-eye-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m3 3 18 18"></path>
+                  <path d="M10.7 6.1A10.6 10.6 0 0 1 12 6c6 0 9.5 6 9.5 6a15.5 15.5 0 0 1-2.1 2.8"></path>
+                  <path d="M6.6 6.6A15.6 15.6 0 0 0 2.5 12s3.5 6 9.5 6a9.5 9.5 0 0 0 4-.9"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="auth-options">
+            <label class="auth-checkbox-label">
+              <input type="checkbox" id="loginRemember" checked>
+              <span>Keep executive session active</span>
+            </label>
+          </div>
+
+          <button class="auth-submit" type="submit" id="btnLoginSubmit">
+            <span class="auth-submit-label">Sign in to Command Centre</span>
+            <svg class="auth-submit-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"></path>
+              <path d="m14 7 5 5-5 5"></path>
+            </svg>
+            <span class="auth-spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+
+        <div class="auth-trust">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+            <path d="m9.5 12 1.7 1.7 3.5-3.7"></path>
+          </svg>
+          <span>End-to-end encrypted session · Strict CEO privacy boundaries</span>
+        </div>
+      </div>
+
+      <p class="auth-support">
+        Authorised access for Kirsty Allen · TriNova Accounting Practice Group.
+      </p>
+    </section>
+  </main>
 
   <!-- Mobile Top Navigation Bar -->
   <header class="mobile-nav-bar" id="mobileNavBar">
@@ -106,12 +218,17 @@
       </ul>
 
       <!-- Pinned Profile Footer -->
-      <div class="profile">
-        <div class="avatar">KA</div>
-        <div class="profile-info">
-          <span class="profile-name">Kirsty Allen</span>
-          <span class="profile-role">Private Workspace · CEO View</span>
+      <div class="profile" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <div class="avatar" id="sidebarAvatar">KA</div>
+          <div class="profile-info" style="min-width: 0;">
+            <span class="profile-name" id="sidebarUserName">Kirsty Allen</span>
+            <span class="profile-role">Private Workspace · CEO View</span>
+          </div>
         </div>
+        <button type="button" class="btn-lock-session" id="sidebarLockBtn" title="Lock CEO Session & Sign Out">
+          🔒 Lock
+        </button>
       </div>
     </aside>
 
@@ -127,6 +244,9 @@
             <button id="trinovaStatusBtn" class="pill neutral" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); margin-left: 10px; font-size: 11px; padding: 2px 8px; transition: all 0.2s; background: var(--panel);" title="Click to view TriNova API integration status & settings">
               <span class="dot" id="trinovaStatusDot" style="width: 6px; height: 6px; background: var(--muted);"></span>
               <span id="trinovaStatusText">Trinova: Connecting...</span>
+            </button>
+            <button type="button" id="headerLockBtn" class="btn-lock-session" style="margin-left: 8px;" title="Lock CEO Session & Sign Out">
+              🔒 Lock
             </button>
           </div>
           <h1>Good morning, Kirsty</h1>
@@ -817,6 +937,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.1.0"></script>
+  <script type="module" src="scripts/app.js?v=2.2.0"></script>
 </body>
 </html>
