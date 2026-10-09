@@ -516,5 +516,207 @@ export const mockDb = {
       storagePath: null,
       createdAt: "2026-09-17T09:30:00.000Z"
     }
+  ],
+
+  // Client Timeline Events (Unified Event Model)
+  timeline_events: [
+    {
+      id: "evt_woof_001",
+      clientId: "cli_woofington_grp",
+      companyId: "comp_woofington_park_01",
+      eventType: "COMPANIES_HOUSE_STATUS_CHANGED",
+      title: "First Gazette Notice for Strike-Off Received",
+      description: "Companies House issued First Gazette notice of compulsory strike-off due to outstanding accounts.",
+      occurredAt: "2026-09-18T08:30:00.000Z",
+      createdAt: "2026-09-18T08:35:00.000Z",
+      actorType: "companies_house",
+      actorId: "ch_system",
+      source: "companies_house",
+      severity: "critical",
+      visibility: "shared",
+      externalId: "ch_gazette_not_20260918",
+      metadata: {
+        companyNumber: "09876543",
+        gazettePublicationDate: "2026-09-18",
+        noticeType: "GAZ1"
+      }
+    },
+    {
+      id: "evt_woof_002",
+      clientId: "cli_woofington_grp",
+      companyId: "comp_woofington_park_01",
+      eventType: "EMAIL_RECEIVED",
+      title: "Client Requested Urgent Accounts Information",
+      description: "Sarah Jenkins inquired: 'Hi Kirsty, we received the notice from Companies House. What do we need to sign?'",
+      occurredAt: "2026-09-18T15:20:00.000Z",
+      createdAt: "2026-09-18T15:20:00.000Z",
+      actorType: "user",
+      actorId: "cnt_sarah_jenkins",
+      source: "outlook",
+      severity: "warning",
+      visibility: "shared",
+      externalId: "msg_woof_01",
+      metadata: {
+        sender: "sarah@woofingtonpark.co.uk",
+        subject: "Urgent: Companies House Notice"
+      }
+    },
+    {
+      id: "evt_woof_003",
+      clientId: "cli_woofington_grp",
+      companyId: "comp_woofington_park_01",
+      eventType: "DOCUMENT_UPLOADED",
+      title: "Draft Balance Sheet Uploaded for Review",
+      description: "Accounts preparation file 'Woofington_Draft_Balance_Sheet_2025.pdf' uploaded by Jessica Taylor.",
+      occurredAt: "2026-09-18T10:00:00.000Z",
+      createdAt: "2026-09-18T10:00:00.000Z",
+      actorType: "user",
+      actorId: "usr_jessica_taylor",
+      source: "document",
+      severity: "normal",
+      visibility: "shared",
+      externalId: "doc_woofington_draft_balance_sheet",
+      metadata: {
+        filename: "Woofington_Draft_Balance_Sheet_2025.pdf",
+        category: "Accounts",
+        sizeBytes: 245000
+      }
+    },
+    {
+      id: "evt_woof_004",
+      clientId: "cli_woofington_grp",
+      companyId: "comp_woofington_park_01",
+      eventType: "TASK_CREATED",
+      title: "Urgent Task: File Objection to Strike-Off",
+      description: "Formal objection and revised accounts submission assigned to Jessica Taylor.",
+      occurredAt: "2026-09-18T09:15:00.000Z",
+      createdAt: "2026-09-18T09:15:00.000Z",
+      actorType: "user",
+      actorId: "actor_kirsty_allen",
+      source: "task",
+      severity: "urgent",
+      visibility: "shared",
+      externalId: "tsk_woofington_emergency",
+      metadata: {
+        dueDate: "2026-09-19",
+        assigneeId: "usr_jessica_taylor"
+      }
+    },
+    {
+      id: "evt_woof_005",
+      clientId: "cli_woofington_grp",
+      companyId: "comp_woofington_park_01",
+      eventType: "NOTE_CREATED",
+      title: "Executive Staff Discussion Note",
+      description: "Spoke with Sarah Jenkins. Strike-off was triggered by delayed filing; bank statements are now with Jessica.",
+      occurredAt: "2026-09-18T12:00:00.000Z",
+      createdAt: "2026-09-18T12:00:00.000Z",
+      actorType: "user",
+      actorId: "actor_kirsty_allen",
+      source: "trinova",
+      severity: "normal",
+      visibility: "shared",
+      externalId: "not_woof_01",
+      metadata: {
+        author: "Kirsty Allen",
+        visibility: "staff_only"
+      }
+    },
+    {
+      id: "evt_woof_006",
+      clientId: "cli_woofington_grp",
+      companyId: null,
+      eventType: "CEO_NOTE_CREATED",
+      title: "Confidential CEO Strategic Assessment",
+      description: "Private note: Consider restructuring Woofington holding entities in Q4 pending resolution.",
+      occurredAt: "2026-09-18T13:00:00.000Z",
+      createdAt: "2026-09-18T13:00:00.000Z",
+      actorType: "user",
+      actorId: "actor_kirsty_allen",
+      source: "user",
+      severity: "normal",
+      visibility: "private",
+      externalId: null,
+      metadata: {
+        category: "CEO Brain Private"
+      }
+    },
+    {
+      id: "evt_rgb_001",
+      clientId: "cli_rgb_elevations",
+      companyId: "comp_rgb_elevations_01",
+      eventType: "STATUTORY_DEADLINE",
+      title: "Statutory Accounts Overdue (50 Days)",
+      description: "Accounts for period ended 2025-10-31 are now 50 days overdue. Penalty tier 2 (£375) active.",
+      occurredAt: "2026-09-10T00:00:00.000Z",
+      createdAt: "2026-09-10T00:01:00.000Z",
+      actorType: "system",
+      actorId: "sys_statutory_monitor",
+      source: "system",
+      severity: "urgent",
+      visibility: "shared",
+      externalId: "stat_rgb_accounts_2025",
+      metadata: {
+        overdueDays: 50,
+        deadline: "2026-07-31"
+      }
+    },
+    {
+      id: "evt_rgb_002",
+      clientId: "cli_rgb_elevations",
+      companyId: "comp_rgb_elevations_01",
+      eventType: "TASK_CREATED",
+      title: "Chased Client for Bank Statements",
+      description: "Robert Brown contacted regarding missing November statements.",
+      occurredAt: "2026-09-16T11:00:00.000Z",
+      createdAt: "2026-09-16T11:00:00.000Z",
+      actorType: "user",
+      actorId: "usr_hamza_malik",
+      source: "task",
+      severity: "normal",
+      visibility: "shared",
+      externalId: "tsk_rgb_chase_statements",
+      metadata: {
+        assignee: "Hamza Malik"
+      }
+    },
+    {
+      id: "evt_alpha_001",
+      clientId: "cli_alpha_delta",
+      companyId: "comp_alpha_delta_01",
+      eventType: "DOCUMENT_UPLOADED",
+      title: "Year End Accounts Draft Uploaded",
+      description: "Alpha Delta Creative accounts draft ready for client sign-off.",
+      occurredAt: "2026-09-17T09:30:00.000Z",
+      createdAt: "2026-09-17T09:30:00.000Z",
+      actorType: "user",
+      actorId: "usr_hamza_malik",
+      source: "document",
+      severity: "normal",
+      visibility: "shared",
+      externalId: "doc_alpha_year_end_accounts",
+      metadata: {
+        filename: "Alpha_Delta_Creative_Accounts_Draft.pdf"
+      }
+    },
+    {
+      id: "evt_cfi_001",
+      clientId: "cli_cfi_awarding",
+      companyId: "comp_cfi_awarding_01",
+      eventType: "VAT_DEADLINE",
+      title: "Q3 Regulated Body VAT Return Due",
+      description: "HMRC VAT submission scheduled for 2026-09-26.",
+      occurredAt: "2026-09-15T14:00:00.000Z",
+      createdAt: "2026-09-15T14:00:00.000Z",
+      actorType: "system",
+      actorId: "sys_vat_monitor",
+      source: "system",
+      severity: "normal",
+      visibility: "shared",
+      externalId: "vat_q3_cfi_2026",
+      metadata: {
+        dueDate: "2026-09-26"
+      }
+    }
   ]
 };

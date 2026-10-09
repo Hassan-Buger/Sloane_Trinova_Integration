@@ -20,8 +20,12 @@ logs/
 # Storage & Backups
 storage/documents/*
 !storage/documents/.gitkeep
+server/storage/documents/*
+!server/storage/documents/.gitkeep
 backups/*.sql
 backups/*.tar.gz
+server/backups/*.sql
+server/backups/*.tar.gz
 
 # OS Files
 .DS_Store

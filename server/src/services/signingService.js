@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { mockDb } from '../data/db.js';
+import { TimelineService } from './timelineService.js';
 import { documentStorage } from './storageDriver.js';
 import { sandboxMailService } from './sandboxMailService.js';
 
@@ -284,6 +285,28 @@ export class SigningService {
         signingRequest.signedDocumentId = signedDocRecord.id;
         signingRequest.auditCertificateId = certDocRecord.id;
         signingRequest.updatedAt = new Date().toISOString();
+
+        // Generate real timeline event (Section 15)
+        const company = (mockDb.companies || []).find(c => c.id === signingRequest.companyId);
+        if (company && company.clientId) {
+          try {
+            TimelineService.createEvent({
+              clientId: company.clientId,
+              companyId: company.id,
+              eventType: 'DOCUMENT_SIGNED',
+              title: `Document Signed: ${signingRequest.documentTitle || 'Document'}`,
+              description: `All signers completed signing for ${signingRequest.documentTitle}. Signed PDF and audit certificate archived.`,
+              occurredAt: signingRequest.completedAt,
+              actorType: 'system',
+              actorId: 'documenso_service',
+              source: 'document',
+              severity: 'normal',
+              visibility: 'shared',
+              externalId: `sign_comp_${signingRequest.id}`,
+              metadata: { signingRequestId: signingRequest.id, documentId: signedDocRecord.id }
+            });
+          } catch (e) {}
+        }
         break;
       }
 

@@ -640,5 +640,81 @@ export const ApiService = {
    */
   async getSignatureAudit(signatureId) {
     return this.request(`/signatures/${signatureId}/audit`);
+  },
+
+  /* ==========================================================================
+     7. Client Timeline API (Feature 1)
+     ========================================================================== */
+
+  /**
+   * Retrieves chronological timeline events for a client.
+   * Adheres to Prompt Section 11-14.
+   */
+  async getClientTimeline(clientId, params = {}) {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params.event_type) searchParams.append('event_type', params.event_type);
+      if (params.severity) searchParams.append('severity', params.severity);
+      if (params.visibility) searchParams.append('visibility', params.visibility);
+      if (params.from) searchParams.append('from', params.from);
+      if (params.to) searchParams.append('to', params.to);
+      if (params.limit) searchParams.append('limit', params.limit);
+      if (params.cursor) searchParams.append('cursor', params.cursor);
+
+      const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+      const res = await this.request(`/clients/${clientId}/timeline${qs}`);
+      return {
+        status: 'success',
+        source: 'trinova_live',
+        data: res.data || [],
+        client: res.client || null,
+        meta: res.meta || {}
+      };
+    } catch (err) {
+      console.warn(`[ApiService] Live timeline fetch failed for ${clientId}:`, err.message);
+      // Fallback: check local storage cache
+      const cacheKey = `sloane_timeline_${clientId}`;
+      const localEvents = (StorageService.get(cacheKey) || []);
+      return {
+        status: 'fallback',
+        source: 'local_cache',
+        data: localEvents,
+        client: null,
+        meta: { total: localEvents.length }
+      };
+    }
+  },
+
+  /**
+   * Logs a new client timeline event with server-side validation.
+   */
+  async createTimelineEvent(clientId, eventData) {
+    return this.request(`/clients/${clientId}/timeline/events`, {
+      method: 'POST',
+      body: eventData
+    });
+  },
+
+  /* ==========================================================================
+     8. Secure Claude AI Assistant API (Feature 2)
+     ========================================================================== */
+
+  /**
+   * Queries Sloane AI (Anthropic Claude backend) with strict privacy boundaries.
+   * Adheres to Prompt Section 25, 28, 29, 36.
+   */
+  async askAi(payload) {
+    return this.request('/ai/ask', {
+      method: 'POST',
+      body: payload
+    });
+  },
+
+  /**
+   * Retrieves morning executive briefing.
+   * Adheres to Prompt Section 42.
+   */
+  async getExecutiveBriefing() {
+    return this.request('/ai/executive-briefing');
   }
 };

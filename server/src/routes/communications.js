@@ -12,6 +12,7 @@
 import { mockDb } from '../data/db.js';
 import { requireIdempotency } from '../middleware/idempotency.js';
 import { documentStorage } from '../services/storageDriver.js';
+import { TimelineService } from '../services/timelineService.js';
 
 export function registerCommunicationRoutes(app, { authenticate, requireScope }) {
   // =========================================================================
@@ -248,6 +249,29 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     req.resourceType = 'company_note';
     req.resourceId = newNote.id;
 
+    // Generate real timeline event (Section 15)
+    if (company && company.clientId) {
+      try {
+        TimelineService.createEvent({
+          clientId: company.clientId,
+          companyId: company.id,
+          eventType: 'NOTE_CREATED',
+          title: `Internal Note Added: ${company.companyName}`,
+          description: newNote.text.substring(0, 160) + (newNote.text.length > 160 ? '...' : ''),
+          occurredAt: newNote.createdAt,
+          actorType: 'user',
+          actorId: newNote.authorId,
+          source: 'trinova',
+          severity: 'normal',
+          visibility: 'shared',
+          externalId: newNote.id,
+          metadata: { noteId: newNote.id, author: newNote.authorName }
+        });
+      } catch (e) {
+        // Non-blocking
+      }
+    }
+
     res.status(201).json({
       status: 'success',
       message: `Internal note created with '${visibility}' visibility.`,
@@ -364,6 +388,29 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     req.auditAction = 'document_uploaded';
     req.resourceType = 'document';
     req.resourceId = newDoc.id;
+
+    // Generate real timeline event (Section 15)
+    if (company && company.clientId) {
+      try {
+        TimelineService.createEvent({
+          clientId: company.clientId,
+          companyId: company.id,
+          eventType: 'DOCUMENT_UPLOADED',
+          title: `Document Uploaded: ${newDoc.filename}`,
+          description: `Uploaded to category ${newDoc.category} by ${newDoc.uploadedBy}.`,
+          occurredAt: newDoc.createdAt,
+          actorType: 'user',
+          actorId: req.actor?.actorId || 'actor_staff',
+          source: 'document',
+          severity: 'normal',
+          visibility: 'shared',
+          externalId: newDoc.id,
+          metadata: { documentId: newDoc.id, filename: newDoc.filename, category: newDoc.category, sizeBytes: newDoc.sizeBytes }
+        });
+      } catch (e) {
+        // Non-blocking
+      }
+    }
 
     res.status(201).json({
       status: 'success',

@@ -27,6 +27,11 @@ class SloaneApp {
     this.searchQuery = '';
     this.selectedBizFilter = 'All';
     this.selectedBrainEntryForTrinova = null;
+    this.activeClient360Id = 'cli_woofington_grp';
+    this.activeClientTab = 'overview';
+    this.timelineEvents = [];
+    this.timelineEventTypeFilter = '';
+    this.timelineSeverityFilter = '';
     this.authEventsBound = false;
     this.appEventsBound = false;
   }
@@ -343,6 +348,77 @@ class SloaneApp {
           this.handleAskSloane(input.value.trim());
           input.value = '';
         }
+      });
+    }
+
+    // Ask Sloane quick suggestion prompt pills
+    document.querySelectorAll('.ask-pill-suggestion').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prompt = btn.getAttribute('data-prompt');
+        const input = document.getElementById('askInput');
+        if (input) input.value = prompt;
+        this.handleAskSloane(prompt);
+      });
+    });
+
+    // Client 360 sub-navigation tabs
+    document.querySelectorAll('.client-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-client-tab');
+        this.switchClientTab(tab);
+      });
+    });
+
+    // Timeline client select dropdown
+    const tlClientSelect = document.getElementById('timelineClientSelect');
+    if (tlClientSelect) {
+      tlClientSelect.addEventListener('change', (e) => {
+        this.activeClient360Id = e.target.value;
+        this.renderTimeline(this.activeClient360Id);
+      });
+    }
+
+    // Timeline filters
+    const tlTypeFilter = document.getElementById('timelineEventTypeFilter');
+    if (tlTypeFilter) {
+      tlTypeFilter.addEventListener('change', (e) => {
+        this.timelineEventTypeFilter = e.target.value;
+        this.renderTimeline(this.activeClient360Id);
+      });
+    }
+
+    const tlSevFilter = document.getElementById('timelineSeverityFilter');
+    if (tlSevFilter) {
+      tlSevFilter.addEventListener('change', (e) => {
+        this.timelineSeverityFilter = e.target.value;
+        this.renderTimeline(this.activeClient360Id);
+      });
+    }
+
+    // Refresh timeline button
+    const btnRefreshTimeline = document.getElementById('btnRefreshTimeline');
+    if (btnRefreshTimeline) {
+      btnRefreshTimeline.addEventListener('click', () => {
+        this.renderTimeline(this.activeClient360Id, true);
+      });
+    }
+
+    // Open log timeline event modal
+    const btnOpenLogEvent = document.getElementById('btnOpenLogTimelineEvent');
+    if (btnOpenLogEvent) {
+      btnOpenLogEvent.addEventListener('click', () => {
+        const select = document.getElementById('modalTimelineClientId');
+        if (select) select.value = this.activeClient360Id;
+        ModalManager.open('logTimelineEventModal', btnOpenLogEvent);
+      });
+    }
+
+    // Submit log timeline event form
+    const logEventForm = document.getElementById('logTimelineEventForm');
+    if (logEventForm) {
+      logEventForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.handleLogTimelineEvent();
       });
     }
 
@@ -719,15 +795,16 @@ class SloaneApp {
     tbody.innerHTML = clients.map(c => {
       const riskClass = c.risk === 'High' ? 'red' : c.risk === 'Medium' ? 'amber' : 'green';
       const chUrl = c.no ? `https://find-and-update.company-information.service.gov.uk/company/${c.no}` : null;
+      const clientId = c.id || c.clientId || 'cli_woofington_grp';
 
       return `
-        <tr>
+        <tr class="client-row" style="cursor: pointer;" title="Click to view full 360 timeline" onclick="app.selectClient360('${clientId}')">
           <td>
             <div style="font-weight: 700; color: var(--text);">${c.name}</div>
             <div style="font-size: 11px; color: var(--muted);">${c.biz || '—'}</div>
           </td>
           <td>
-            ${c.no ? `<a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${c.no} ↗</a>` : '<span style="color: var(--muted);">—</span>'}
+            ${c.no ? `<a href="${chUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${c.no} ↗</a>` : '<span style="color: var(--muted);">—</span>'}
           </td>
           <td>${ReconciliationEngine.formatDate(c.year)}</td>
           <td>${ReconciliationEngine.formatDate(c.accounts)}</td>
@@ -738,10 +815,29 @@ class SloaneApp {
           </td>
           <td style="max-width: 160px; font-size: 11px; color: var(--muted);">${c.dirs || '—'}</td>
           <td><span class="pill ${riskClass}">${c.risk || 'Low'}</span></td>
-          <td style="max-width: 180px; font-size: 11px; color: var(--muted);">${c.notes || '—'}</td>
+          <td style="max-width: 180px; font-size: 11px; color: var(--muted);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span>${c.notes || '—'}</span>
+              <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+            </div>
+          </td>
         </tr>
       `;
     }).join('');
+
+    // Populate timeline client selector dropdowns
+    const clientOptions = clients.map(c => `<option value="${c.id || c.clientId}">${c.name}</option>`).join('');
+    const tlSelect = document.getElementById('timelineClientSelect');
+    if (tlSelect) {
+      const currentVal = tlSelect.value || this.activeClient360Id;
+      tlSelect.innerHTML = clientOptions;
+      if (currentVal) tlSelect.value = currentVal;
+    }
+    const modalTlSelect = document.getElementById('modalTimelineClientId');
+    if (modalTlSelect) {
+      modalTlSelect.innerHTML = clientOptions;
+      if (this.activeClient360Id) modalTlSelect.value = this.activeClient360Id;
+    }
   }
 
   renderPeopleWork() {
@@ -1179,21 +1275,485 @@ class SloaneApp {
     await this.renderCommandCentre();
   }
 
-  handleAskSloane(query) {
-    // Provenance-aware response synthesis
-    let response = `Looking into "${query}" across connected workspaces...`;
+  // =========================================================================
+  // Client 360 Tab Navigation & Subview Controllers (Section 13)
+  // =========================================================================
 
-    if (/woofington/i.test(query)) {
-      response = `Woofington Park Limited has an active Companies House strike-off defense in progress. Overdue accounts must be submitted within 6 days to halt dissolution. Sarah Jenkins is scheduled to sign the balance sheet by 16:00 today.`;
-    } else if (/overdue|statutory/i.test(query)) {
-      response = `There are currently 4 statutory filings requiring urgent verification, led by R GB Elevations Ltd (50d overdue) and Woofington Park. All other clients are within scheduled filing cycles.`;
-    } else if (/hamza/i.test(query)) {
-      response = `Hamza Malik is currently assigned to R GB Elevations and Alpha Delta Creative. You have a compliance check-in with him at 13:30 today.`;
-    } else {
-      response = `Sloane analyzed practice records: your top priority is the Woofington Park strike-off defense due today, followed by R GB Elevations accounts finalization. No other critical blockers detected.`;
+  switchClientTab(tabName) {
+    this.activeClientTab = tabName;
+
+    document.querySelectorAll('.client-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-client-tab') === tabName);
+    });
+
+    document.querySelectorAll('.client-tab-content').forEach(content => {
+      content.classList.add('hidden');
+    });
+
+    const activeContent = document.getElementById(`clientTabContent-${tabName}`);
+    if (activeContent) {
+      activeContent.classList.remove('hidden');
     }
 
-    Toast.info(response, 7000);
+    if (tabName === 'timeline') {
+      this.renderTimeline(this.activeClient360Id);
+    } else if (tabName === 'statutory') {
+      this.renderClientStatutoryDetail(this.activeClient360Id);
+    } else if (tabName === 'documents') {
+      this.renderClientDocumentsDetail(this.activeClient360Id);
+    } else if (tabName === 'notes') {
+      this.renderClientNotesDetail(this.activeClient360Id);
+    }
+  }
+
+  selectClient360(clientId) {
+    if (!clientId) return;
+    this.activeClient360Id = clientId;
+    this.switchView('clients');
+    this.switchClientTab('timeline');
+  }
+
+  async renderTimeline(clientId = this.activeClient360Id, forceToast = false) {
+    if (!clientId) clientId = 'cli_woofington_grp';
+    this.activeClient360Id = clientId;
+
+    const container = document.getElementById('timelineEventsContainer');
+    if (!container) return;
+
+    // Loading State
+    container.innerHTML = `
+      <div class="timeline-loading">
+        <div class="ai-pulse-bar" style="margin: 0 auto 10px auto;"></div>
+        <span>Reviewing chronological practice records...</span>
+      </div>
+    `;
+
+    // Retrieve client metadata to populate header
+    const clientRes = await ApiService.getClients();
+    const clients = clientRes.data || [];
+    const activeClient = clients.find(c => (c.id || c.clientId) === clientId) || {
+      name: 'Woofington Group',
+      biz: 'Trinova Accounting',
+      clientType: 'Corporate Group',
+      status: 'Active'
+    };
+
+    const nameEl = document.getElementById('timelineActiveClientName');
+    if (nameEl) nameEl.textContent = activeClient.name;
+
+    const typeEl = document.getElementById('timelineActiveClientType');
+    if (typeEl) typeEl.textContent = activeClient.clientType || 'Corporate Group';
+
+    const bizEl = document.getElementById('timelineActiveClientBiz');
+    if (bizEl) bizEl.textContent = activeClient.biz || activeClient.businessArea || 'Trinova Accounting';
+
+    const statusEl = document.getElementById('timelineActiveClientStatus');
+    if (statusEl) statusEl.textContent = activeClient.status || 'Active';
+
+    const selectEl = document.getElementById('timelineClientSelect');
+    if (selectEl && selectEl.value !== clientId) {
+      selectEl.value = clientId;
+    }
+
+    try {
+      // Query Timeline API (Section 11)
+      const res = await ApiService.getClientTimeline(clientId, {
+        event_type: this.timelineEventTypeFilter,
+        severity: this.timelineSeverityFilter
+      });
+
+      const events = res.data || [];
+      this.timelineEvents = events;
+
+      // Update badge
+      const countBadge = document.getElementById('clientTimelineCountBadge');
+      if (countBadge) countBadge.textContent = `${events.length} events`;
+
+      if (events.length === 0) {
+        container.innerHTML = `
+          <div class="timeline-empty">
+            <div style="font-size: 24px; margin-bottom: 8px;">⏱️</div>
+            <strong style="color: var(--text);">No timeline records found</strong>
+            <p style="margin: 4px 0 12px 0;">No chronological events match the current filters for ${activeClient.name}.</p>
+            <button type="button" class="btn btn-secondary" style="font-size: 11px;" onclick="app.timelineEventTypeFilter=''; app.timelineSeverityFilter=''; document.getElementById('timelineEventTypeFilter').value=''; document.getElementById('timelineSeverityFilter').value=''; app.renderTimeline('${clientId}')">Clear Filters</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Group Events Chronologically: Today, Yesterday, Earlier This Week, Older
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const groups = {
+        'Today': [],
+        'Yesterday': [],
+        'Earlier This Week': [],
+        'Older': []
+      };
+
+      events.forEach(evt => {
+        const evtDate = new Date(evt.occurredAt);
+        evtDate.setHours(0, 0, 0, 0);
+
+        if (evtDate.getTime() === today.getTime()) {
+          groups['Today'].push(evt);
+        } else if (evtDate.getTime() === yesterday.getTime()) {
+          groups['Yesterday'].push(evt);
+        } else if (evtDate.getTime() >= sevenDaysAgo.getTime()) {
+          groups['Earlier This Week'].push(evt);
+        } else {
+          groups['Older'].push(evt);
+        }
+      });
+
+      let html = '';
+      for (const [groupName, groupEvents] of Object.entries(groups)) {
+        if (groupEvents.length === 0) continue;
+
+        html += `
+          <div class="timeline-date-group">
+            <div class="timeline-date-title">
+              <span>📅 ${groupName}</span>
+              <span style="opacity: 0.7; font-size: 10px;">(${groupEvents.length})</span>
+            </div>
+            ${groupEvents.map(evt => {
+              const timeStr = new Date(evt.occurredAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              const dateStr = new Date(evt.occurredAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+              const nodeClass = evt.severity === 'critical' ? 'node-critical' : evt.severity === 'urgent' ? 'node-urgent' : evt.severity === 'info' ? 'node-info' : '';
+              const sevPillClass = evt.severity === 'critical' ? 'red' : evt.severity === 'urgent' ? 'amber' : evt.severity === 'info' ? 'blue' : 'neutral';
+
+              return `
+                <div class="timeline-item" id="timeline-event-${evt.id}">
+                  <div class="timeline-node ${nodeClass}"></div>
+                  <div class="timeline-card">
+                    <div class="timeline-card-header">
+                      <div>
+                        <div class="timeline-card-title">${evt.title}</div>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
+                          <span class="pill ${sevPillClass}" style="font-size: 9.5px; padding: 1px 6px;">${evt.severity}</span>
+                          <span class="source-badge" style="font-size: 9.5px;">${evt.eventType.replace(/_/g, ' ')}</span>
+                          ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒 Private CEO</span>' : ''}
+                        </div>
+                      </div>
+                      <div class="timeline-card-time">${dateStr} · ${timeStr}</div>
+                    </div>
+                    <div class="timeline-card-body">
+                      ${evt.description || 'No additional narrative recorded.'}
+                    </div>
+                    <div class="timeline-card-footer">
+                      <div class="timeline-card-tags">
+                        <span class="timeline-actor-tag">
+                          <span>👤</span>
+                          <span>${evt.actorId || evt.actorType || 'system'}</span>
+                        </span>
+                        <span class="timeline-actor-tag" style="color: var(--accent);">
+                          <span>🔌</span>
+                          <span>${evt.source}</span>
+                        </span>
+                        ${evt.externalId ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted);">ref:${evt.externalId.substring(0, 16)}</span>` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+      if (forceToast) Toast.success(`Timeline updated: ${events.length} records loaded.`);
+
+    } catch (err) {
+      container.innerHTML = `
+        <div class="timeline-empty" style="border-color: var(--red);">
+          <strong style="color: var(--red);">Unable to retrieve timeline</strong>
+          <p style="margin: 4px 0 12px 0;">Error communicating with TriNova API: ${err.message}</p>
+          <button type="button" class="btn btn-secondary" onclick="app.renderTimeline('${clientId}')">Retry</button>
+        </div>
+      `;
+    }
+  }
+
+  async handleLogTimelineEvent() {
+    const clientId = document.getElementById('modalTimelineClientId').value;
+    const eventType = document.getElementById('modalTimelineEventType').value;
+    const title = document.getElementById('modalTimelineTitle').value.trim();
+    const description = document.getElementById('modalTimelineDesc').value.trim();
+    const severity = document.getElementById('modalTimelineSeverity').value;
+    const visibility = document.getElementById('modalTimelineVisibility').value;
+
+    if (!title) {
+      Toast.error('Event title cannot be empty.');
+      return;
+    }
+
+    try {
+      await ApiService.createTimelineEvent(clientId, {
+        eventType,
+        title,
+        description,
+        severity,
+        visibility,
+        source: 'user'
+      });
+
+      Toast.success('Timeline event logged successfully.');
+      ModalManager.closeAll();
+      const form = document.getElementById('logTimelineEventForm');
+      if (form) form.reset();
+
+      if (this.activeClient360Id === clientId) {
+        await this.renderTimeline(clientId);
+      }
+    } catch (err) {
+      Toast.error(`Could not log timeline event: ${err.message}`);
+    }
+  }
+
+  renderClientStatutoryDetail(clientId) {
+    const card = document.getElementById('clientStatutoryDetailCard');
+    if (!card) return;
+    const companies = StorageService.getBusinesses();
+    card.innerHTML = `
+      <div class="card-header">
+        <h3>Statutory Filings & Obligations</h3>
+        <span class="pill green">Active Filings</span>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+        Synchronized Companies House registers, annual accounts schedules, and confirmation statements.
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+          <span style="font-size: 11px; color: var(--muted); display: block;">Accounts Status</span>
+          <strong style="color: var(--amber);">Due in 6 Days</strong>
+        </div>
+        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+          <span style="font-size: 11px; color: var(--muted); display: block;">Confirmation Statement</span>
+          <strong style="color: var(--green);">Up to Date</strong>
+        </div>
+        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+          <span style="font-size: 11px; color: var(--muted); display: block;">VAT Registration</span>
+          <strong style="color: var(--text);">Active (Quarterly)</strong>
+        </div>
+      </div>
+    `;
+  }
+
+  renderClientDocumentsDetail(clientId) {
+    const card = document.getElementById('clientDocumentsDetailCard');
+    if (!card) return;
+    card.innerHTML = `
+      <div class="card-header">
+        <h3>Corporate Documents & Certificates</h3>
+        <button class="btn btn-secondary" style="font-size: 11px;">+ Upload Document</button>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+        Archived statutory balance sheets, minutes, and tamper-evident Documenso certificates.
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel2); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+          <div>
+            <div style="font-weight: 700; font-size: 13px; color: var(--text);">Draft_Balance_Sheet_2025.pdf</div>
+            <div style="font-size: 11px; color: var(--muted);">Uploaded by Jessica Taylor · Category: Accounts</div>
+          </div>
+          <span class="pill amber">Ready for Sign-off</span>
+        </div>
+      </div>
+    `;
+  }
+
+  renderClientNotesDetail(clientId) {
+    const card = document.getElementById('clientNotesDetailCard');
+    if (!card) return;
+    card.innerHTML = `
+      <div class="card-header">
+        <h3>Internal Operational & Strategic Notes</h3>
+        <button class="btn btn-secondary" style="font-size: 11px;" onclick="document.getElementById('modalTimelineEventType').value='NOTE_CREATED'; ModalManager.open('logTimelineEventModal');">+ New Note</button>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+        Client-specific practitioner communications protected by Solane's strict staff privacy boundary.
+      </p>
+      <div style="background: var(--panel2); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <strong style="font-size: 12.5px; color: var(--text);">Kirsty Allen (CEO)</strong>
+          <span style="font-size: 11px; color: var(--muted);">18 Sep 2026, 12:00</span>
+        </div>
+        <p style="font-size: 12px; color: #c5d1de; margin: 0; line-height: 1.5;">
+          Spoke with Sarah Jenkins. Strike-off was triggered by delayed filing; bank statements are now with Jessica.
+        </p>
+      </div>
+    `;
+  }
+
+  // =========================================================================
+  // Feature 2: Secure Claude AI Assistant ("Ask Sloane") (Section 18-41)
+  // =========================================================================
+
+  async handleAskSloane(query) {
+    if (!query || !query.trim()) return;
+
+    const modalBody = document.getElementById('aiModalBody');
+    const modalSubtitle = document.getElementById('aiModalSubtitle');
+
+    if (modalSubtitle) {
+      modalSubtitle.textContent = `Analyzing: "${query.substring(0, 48)}${query.length > 48 ? '...' : ''}"`;
+    }
+
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div class="ai-loading-container">
+          <div class="ai-pulse-bar"></div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px;">
+            Sloane is reviewing the client timeline...
+          </div>
+          <div style="font-size: 11.5px; color: var(--muted);">
+            Cross-referencing statutory deadlines, timeline provenance, and open deliverables
+          </div>
+        </div>
+      `;
+    }
+
+    ModalManager.open('aiResponseModal');
+
+    // Detect target client from query if mentioned
+    let targetClientId = null;
+    const qLower = query.toLowerCase();
+    if (/woofington/i.test(qLower)) targetClientId = 'cli_woofington_grp';
+    else if (/rgb|elevation/i.test(qLower)) targetClientId = 'cli_rgb_elevations';
+    else if (/alpha|delta/i.test(qLower)) targetClientId = 'cli_alpha_delta';
+    else if (/cfi|awarding/i.test(qLower)) targetClientId = 'cli_cfi_awarding';
+
+    try {
+      const res = await ApiService.askAi({ message: query, clientId: targetClientId });
+      const data = res.data || {};
+      const riskLevel = data.risk_level || 'neutral';
+      const riskClass = riskLevel === 'red' ? 'risk-red' : riskLevel === 'amber' ? 'risk-amber' : riskLevel === 'low' ? 'risk-low' : 'risk-neutral';
+      const riskIcon = riskLevel === 'red' ? '🔴 RED CRITICAL' : riskLevel === 'amber' ? '🟠 AMBER ATTENTION' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ PRACTICE ASSESSMENT';
+
+      const providerBadge = res.source === 'anthropic_claude'
+        ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
+        : `<span class="source-badge" style="font-size: 10px;">🛡️ Grounded Engine</span>`;
+
+      if (modalBody) {
+        modalBody.innerHTML = `
+          <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none;">
+            <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>
+                ${providerBadge}
+              </div>
+              <div style="font-size: 11px; font-family: var(--font-mono); color: var(--muted);">
+                ${res.usage?.durationMs ? `${res.usage.durationMs}ms` : ''}
+              </div>
+            </div>
+
+            <!-- Risk Banner -->
+            <div class="ai-risk-banner ${riskClass}">
+              <span>${riskIcon}</span>
+            </div>
+
+            <!-- Synthesis Paragraph -->
+            <div class="ai-answer-text">
+              ${data.answer || 'Analysis complete.'}
+            </div>
+
+            <!-- Key Reasons -->
+            ${data.key_reasons && data.key_reasons.length > 0 ? `
+              <div class="ai-subheading">Key Drivers & Evidence</div>
+              <ul class="ai-reasons-list">
+                ${data.key_reasons.map(r => `<li>${r}</li>`).join('')}
+              </ul>
+            ` : ''}
+
+            <!-- Recommended Actions -->
+            ${data.recommended_actions && data.recommended_actions.length > 0 ? `
+              <div class="ai-subheading">Recommended Next Actions</div>
+              <div class="ai-actions-grid">
+                ${data.recommended_actions.map(act => `
+                  <div class="ai-action-item">
+                    <span class="ai-action-text">${act.action}</span>
+                    <span class="pill ${act.priority === 'high' ? 'red' : act.priority === 'normal' ? 'amber' : 'neutral'}" style="font-size: 10px; text-transform: uppercase;">
+                      ${act.priority}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <!-- Grounded Evidence Links -->
+            ${data.evidence && data.evidence.length > 0 ? `
+              <div class="ai-subheading">Grounded Provenance Citations</div>
+              <div class="ai-evidence-box">
+                ${data.evidence.map(ev => `
+                  <div class="ai-evidence-item">
+                    <span style="color: #c5d1de;">${ev.reason || 'Record cited'}</span>
+                    ${ev.timeline_event_id ? `
+                      <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${ev.timeline_event_id}', '${targetClientId || 'cli_woofington_grp'}')">
+                        View Event #${ev.timeline_event_id.substring(0, 12)} ↗
+                      </button>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+    } catch (err) {
+      if (modalBody) {
+        modalBody.innerHTML = `
+          <div style="padding: 24px 20px; text-align: center;">
+            <div style="font-size: 28px; margin-bottom: 12px;">⚠️</div>
+            <h4 style="color: var(--text); margin-bottom: 6px;">Sloane Intelligence Unavailable</h4>
+            <p style="font-size: 12.5px; color: var(--muted); max-width: 440px; margin: 0 auto 16px auto; line-height: 1.5;">
+              Sloane could not complete the live analysis right now. Your dashboard data and Client 360 records remain fully operational.
+            </p>
+            <button type="button" class="btn btn-secondary" data-close-modal>Return to Dashboard</button>
+          </div>
+        `;
+      }
+    }
+  }
+
+  async jumpToTimelineEvent(eventId, clientId) {
+    // 1. Close modal
+    ModalManager.closeAll();
+
+    // 2. Switch to Client 360 view
+    this.switchView('clients');
+
+    // 3. Switch to Timeline tab
+    this.switchClientTab('timeline');
+
+    // 4. Select client if provided
+    if (clientId && clientId !== this.activeClient360Id) {
+      this.activeClient360Id = clientId;
+    }
+
+    // 5. Render timeline
+    await this.renderTimeline(this.activeClient360Id);
+
+    // 6. Smoothly scroll to target event and highlight with glow
+    setTimeout(() => {
+      const el = document.getElementById(`timeline-event-${eventId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const card = el.querySelector('.timeline-card');
+        if (card) {
+          card.classList.add('highlighted-event');
+          setTimeout(() => card.classList.remove('highlighted-event'), 4000);
+        }
+      }
+    }, 180);
   }
 }
 

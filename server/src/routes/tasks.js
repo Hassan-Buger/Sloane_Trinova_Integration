@@ -11,6 +11,7 @@
 import { mockDb } from '../data/db.js';
 import { requireIdempotency } from '../middleware/idempotency.js';
 import { WorkflowEngine } from '../services/workflow.js';
+import { TimelineService } from '../services/timelineService.js';
 
 export function registerTaskRoutes(app, { authenticate, requireScope }) {
   /**
@@ -206,6 +207,29 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     req.resourceType = 'task';
     req.resourceId = newTask.id;
 
+    // Generate real timeline event (Section 15: Timeline Data Generation)
+    if (company && company.clientId) {
+      try {
+        TimelineService.createEvent({
+          clientId: company.clientId,
+          companyId: company.id,
+          eventType: 'TASK_CREATED',
+          title: `Task Created: ${newTask.title}`,
+          description: newTask.description || `Task created for ${company.companyName}`,
+          occurredAt: newTask.createdAt,
+          actorType: 'user',
+          actorId: newTask.creatorId,
+          source: 'task',
+          severity: newTask.priority === 'Urgent' ? 'urgent' : 'normal',
+          visibility: 'shared',
+          externalId: newTask.id,
+          metadata: { taskId: newTask.id, dueDate: newTask.dueDate, assignee: newTask.assigneeName }
+        });
+      } catch (e) {
+        // Non-blocking timeline record
+      }
+    }
+
     res.status(201).json({
       status: 'success',
       message: 'Task created successfully.',
@@ -367,6 +391,30 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     task.completionNotes = req.body?.completionNotes || req.body?.resolution || 'Task completed via portal.';
     task.version = (task.version || 1) + 1;
     task.updatedAt = new Date().toISOString();
+
+    // Generate real timeline event for completion (Section 15)
+    const taskCompany = (mockDb.companies || []).find(c => c.id === task.companyId);
+    if (taskCompany && taskCompany.clientId) {
+      try {
+        TimelineService.createEvent({
+          clientId: taskCompany.clientId,
+          companyId: taskCompany.id,
+          eventType: 'TASK_COMPLETED',
+          title: `Task Completed: ${task.title}`,
+          description: `Resolved by ${task.completedBy}: ${task.completionNotes}`,
+          occurredAt: task.completedAt,
+          actorType: 'user',
+          actorId: req.actor?.actorId || 'actor_staff',
+          source: 'task',
+          severity: 'normal',
+          visibility: 'shared',
+          externalId: `comp_${task.id}_${task.version}`,
+          metadata: { taskId: task.id, completedBy: task.completedBy }
+        });
+      } catch (e) {
+        // Non-blocking timeline record
+      }
+    }
 
     res.status(200).json({
       status: 'success',

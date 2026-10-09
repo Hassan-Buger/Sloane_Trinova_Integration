@@ -47,11 +47,13 @@ describe('Production Schema Migrations & Rollback Verification', () => {
 
   it('Applies all pending migrations in ascending order and records state', async () => {
     const upResults = await testMigrator.up();
-    assert.equal(upResults.length, 2);
+    assert.equal(upResults.length, 3);
     assert.equal(upResults[0].id, '001_initial_schema');
     assert.equal(upResults[0].status, 'APPLIED');
     assert.equal(upResults[1].id, '002_signing_schema');
     assert.equal(upResults[1].status, 'APPLIED');
+    assert.equal(upResults[2].id, '003_timeline_schema');
+    assert.equal(upResults[2].status, 'APPLIED');
 
     const status = testMigrator.getStatus();
     assert.ok(status.every(s => s.isApplied));
@@ -60,7 +62,7 @@ describe('Production Schema Migrations & Rollback Verification', () => {
   it('Idempotent execution: Running up() twice safely skips already-applied migrations', async () => {
     await testMigrator.up();
     const secondRun = await testMigrator.up();
-    assert.equal(secondRun.length, 2);
+    assert.equal(secondRun.length, 3);
     assert.ok(secondRun.every(r => r.status === 'ALREADY_APPLIED'));
   });
 
@@ -70,12 +72,14 @@ describe('Production Schema Migrations & Rollback Verification', () => {
 
     // 2. Rollback down
     const downResults = await testMigrator.down();
-    assert.equal(downResults.length, 2);
-    // 002 must be reverted before 001
-    assert.equal(downResults[0].id, '002_signing_schema');
+    assert.equal(downResults.length, 3);
+    // 003 reverted, then 002, then 001
+    assert.equal(downResults[0].id, '003_timeline_schema');
     assert.equal(downResults[0].status, 'REVERTED');
-    assert.equal(downResults[1].id, '001_initial_schema');
+    assert.equal(downResults[1].id, '002_signing_schema');
     assert.equal(downResults[1].status, 'REVERTED');
+    assert.equal(downResults[2].id, '001_initial_schema');
+    assert.equal(downResults[2].status, 'REVERTED');
 
     const finalStatus = testMigrator.getStatus();
     assert.ok(finalStatus.every(s => !s.isApplied));

@@ -11,6 +11,8 @@ import { registerStatutoryRoutes } from './routes/statutory.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
+import { registerTimelineRoutes } from './routes/timeline.js';
+import { registerAiRoutes } from './routes/ai.js';
 import { telemetry } from './services/telemetry.js';
 
 function matchRoute(routePath, requestPath) {
@@ -207,6 +209,9 @@ export function createApp(options = {}) {
         documentDownload: 'GET /api/v1/documents/download?token=:token',
         signingRequests: 'POST /api/v1/companies/:id/signing-requests',
         signingWebhooks: 'POST /api/v1/signing/webhooks (HMAC-SHA256 Verified)',
+        clientTimeline: 'GET /api/v1/clients/:id/timeline',
+        aiAsk: 'POST /api/v1/ai/ask (Claude Reasoning & Grounded Insights)',
+        executiveBriefing: 'GET /api/v1/ai/executive-briefing',
         auditTrail: 'GET /api/v1/audit/logs'
       }
     });
@@ -284,6 +289,12 @@ export function createApp(options = {}) {
 
   // --- Mount Unit 06 Trinova Document Signing Routes ---
   registerSigningRoutes(app, { authenticate, requireScope });
+
+  // --- Mount Feature 01 Client Timeline Routes ---
+  registerTimelineRoutes(app, { authenticate, requireScope });
+
+  // --- Mount Feature 02 Claude AI Routes ---
+  registerAiRoutes(app, { authenticate, requireScope });
 
   return app;
 }

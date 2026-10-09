@@ -67,5 +67,16 @@ export const config = {
     webhookSecret: process.env.SIGNING_WEBHOOK_SECRET || 'documenso_webhook_secret_hmac_2026',
     timeoutMs: 5000,
     maxRetries: 2
+  },
+
+  // Anthropic Claude Integration Settings
+  // Key held strictly server-side per Prompt Section 19 & 30
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+    model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
+    timeoutMs: parseInt(process.env.ANTHROPIC_TIMEOUT_MS || '15000', 10),
+    maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '1500', 10),
+    rateLimitMaxRequests: parseInt(process.env.AI_RATE_LIMIT_MAX || '60', 10),
+    rateLimitWindowMs: parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || '60000', 10)
   }
 };

@@ -14,8 +14,16 @@
     "deploy": "node -e \"const p = process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\deploy.ps1' : 'bash ./scripts/deploy.sh'; import('node:child_process').then(cp => cp.execSync(p, { stdio: 'inherit' }));\"",
     "rollback": "node -e \"const p = process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\rollback.ps1' : 'bash ./scripts/rollback.sh'; import('node:child_process').then(cp => cp.execSync(p, { stdio: 'inherit' }));\""
   },
-  "keywords": ["trinova", "sloane", "integration", "api"],
+  "keywords": [
+    "trinova",
+    "sloane",
+    "integration",
+    "api"
+  ],
   "author": "Trinova Engineering",
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  }
 }

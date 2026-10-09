@@ -255,8 +255,16 @@
         <div class="ask-wrapper">
           <form class="ask-form" id="askForm">
             <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane anything about your businesses, tasks, filings..." autocomplete="off">
-            <button type="submit" class="ask-btn">Ask</button>
+            <button type="submit" class="ask-btn" id="askSubmitBtn">Ask</button>
           </form>
+          <div class="ask-suggestions" id="askSuggestions">
+            <span style="font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-right: 2px;">Ask:</span>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Why is Woofington Park high risk and amber?">Why is Woofington amber?</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="What happened with Woofington recently? Summarise timeline.">Woofington Timeline</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Summarise R GB Elevations overdue statutory filings.">Summarise R GB</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="What statutory deadlines need immediate attention today?">Deadlines due</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="What should I focus on today?">Today's focus</button>
+          </div>
         </div>
       </div>
 
@@ -410,7 +418,7 @@
               <span id="clientDataSourceBadge" class="source-badge" style="font-size: 11px;">Cached Local</span>
             </div>
             <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-              Consolidated corporate records, statutory dates, and tax obligations across all practice entities.
+              Consolidated corporate records, statutory dates, and chronological timeline across all practice entities.
             </p>
           </div>
           <div style="display: flex; gap: 8px;">
@@ -419,39 +427,140 @@
           </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="toolbar">
-          <div class="toolbar-left">
-            <input type="text" class="search-input" id="clientSearchInput" placeholder="Search name, CRN, directors, notes...">
-            <select class="select-input" id="clientBizFilter">
-              <option value="All">All Business Areas</option>
-            </select>
+        <!-- Client 360 Sub-Navigation Tabs (Prompt Section 13) -->
+        <div class="client-tabs-bar" id="clientTabsBar">
+          <button type="button" class="client-tab-btn active" data-client-tab="overview" id="clientTabBtn-overview">
+            <span>📋 Overview</span>
+          </button>
+          <button type="button" class="client-tab-btn" data-client-tab="timeline" id="clientTabBtn-timeline">
+            <span>⏱️ Timeline</span>
+            <span class="pill blue" id="clientTimelineCountBadge" style="font-size: 10px; padding: 1px 6px;">Live</span>
+          </button>
+          <button type="button" class="client-tab-btn" data-client-tab="statutory" id="clientTabBtn-statutory">
+            <span>⚖️ Statutory Detail</span>
+          </button>
+          <button type="button" class="client-tab-btn" data-client-tab="documents" id="clientTabBtn-documents">
+            <span>📄 Documents</span>
+          </button>
+          <button type="button" class="client-tab-btn" data-client-tab="notes" id="clientTabBtn-notes">
+            <span>📝 Notes</span>
+          </button>
+        </div>
+
+        <!-- Tab 1: Overview Grid (Existing table) -->
+        <div class="client-tab-content" id="clientTabContent-overview">
+          <!-- Toolbar -->
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input type="text" class="search-input" id="clientSearchInput" placeholder="Search name, CRN, directors, notes...">
+              <select class="select-input" id="clientBizFilter">
+                <option value="All">All Business Areas</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <span class="syncmeta" id="clientCountMeta">Showing client records</span>
+            </div>
           </div>
-          <div class="toolbar-right">
-            <span class="syncmeta" id="clientCountMeta">Showing client records</span>
+
+          <!-- Clients Table -->
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Company / Client</th>
+                  <th>Company No</th>
+                  <th>Year End</th>
+                  <th>Accounts Due</th>
+                  <th>Confirm Stmt</th>
+                  <th>VAT Status</th>
+                  <th>Officers / Directors</th>
+                  <th>Risk</th>
+                  <th>Private Notes</th>
+                </tr>
+              </thead>
+              <tbody id="clientTableBody">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Clients Table -->
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Company / Client</th>
-                <th>Company No</th>
-                <th>Year End</th>
-                <th>Accounts Due</th>
-                <th>Confirm Stmt</th>
-                <th>VAT Status</th>
-                <th>Officers / Directors</th>
-                <th>Risk</th>
-                <th>Private Notes</th>
-              </tr>
-            </thead>
-            <tbody id="clientTableBody">
-              <!-- Dynamically Populated -->
-            </tbody>
-          </table>
+        <!-- Tab 2: Client Timeline Feed (Feature 1) -->
+        <div class="client-tab-content hidden" id="clientTabContent-timeline">
+          <!-- Client Header & Quick Switcher -->
+          <div class="client-detail-header">
+            <div class="client-detail-title-row">
+              <div>
+                <h3 class="client-detail-name" id="timelineActiveClientName">Woofington Group</h3>
+                <div class="client-detail-meta" id="timelineActiveClientMeta">
+                  <span id="timelineActiveClientType">Corporate Group</span> ·
+                  <span id="timelineActiveClientBiz">Trinova Accounting</span> ·
+                  <span class="pill green" id="timelineActiveClientStatus">Active</span>
+                </div>
+              </div>
+            </div>
+            <div class="client-selector-wrap">
+              <label for="timelineClientSelect" style="font-size: 11px; color: var(--muted); font-weight: 600;">Client:</label>
+              <select class="select-input" id="timelineClientSelect" style="font-size: 12px; min-width: 200px;">
+                <!-- Populated dynamically with all clients -->
+              </select>
+              <button type="button" class="btn btn-primary" id="btnOpenLogTimelineEvent" style="font-size: 12px; padding: 6px 12px;">+ Log Event</button>
+            </div>
+          </div>
+
+          <!-- Timeline Filter Bar -->
+          <div class="timeline-filter-bar">
+            <div class="timeline-filter-group">
+              <label style="font-size: 11px; color: var(--muted); font-weight: 600;">Filter:</label>
+              <select class="select-input" id="timelineEventTypeFilter" style="font-size: 11.5px;">
+                <option value="">All Event Types</option>
+                <option value="COMPANIES_HOUSE_STATUS_CHANGED">Companies House Status</option>
+                <option value="STATUTORY_DEADLINE">Statutory Deadlines</option>
+                <option value="TASK_CREATED">Task Created</option>
+                <option value="TASK_COMPLETED">Task Completed</option>
+                <option value="EMAIL_RECEIVED">Email Communications</option>
+                <option value="DOCUMENT_UPLOADED">Documents Uploaded</option>
+                <option value="DOCUMENT_SIGNED">Documents Signed</option>
+                <option value="NOTE_CREATED">Internal Notes</option>
+                <option value="VAT_DEADLINE">VAT Deadlines</option>
+              </select>
+              <select class="select-input" id="timelineSeverityFilter" style="font-size: 11.5px;">
+                <option value="">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="urgent">Urgent</option>
+                <option value="normal">Normal</option>
+              </select>
+            </div>
+            <div class="timeline-filter-group">
+              <button type="button" class="btn btn-secondary" id="btnRefreshTimeline" style="font-size: 11.5px; padding: 4px 10px;">↻ Refresh Timeline</button>
+            </div>
+          </div>
+
+          <!-- Chronological Timeline Stream Container -->
+          <div id="timelineEventsContainer" class="timeline-container">
+            <!-- Dynamically Rendered with date grouping -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Statutory Detail -->
+        <div class="client-tab-content hidden" id="clientTabContent-statutory">
+          <div class="card" style="padding: 20px;" id="clientStatutoryDetailCard">
+            <!-- Dynamically Populated -->
+          </div>
+        </div>
+
+        <!-- Tab 4: Documents -->
+        <div class="client-tab-content hidden" id="clientTabContent-documents">
+          <div class="card" style="padding: 20px;" id="clientDocumentsDetailCard">
+            <!-- Dynamically Populated -->
+          </div>
+        </div>
+
+        <!-- Tab 5: Notes -->
+        <div class="client-tab-content hidden" id="clientTabContent-notes">
+          <div class="card" style="padding: 20px;" id="clientNotesDetailCard">
+            <!-- Dynamically Populated -->
+          </div>
         </div>
       </section>
 
@@ -930,6 +1039,101 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-close-modal>Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Sloane Executive AI Intelligence Modal (Feature 2) -->
+  <div class="modal" id="aiResponseModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="ai-brand-mark">S</div>
+          <div>
+            <h3 id="aiModalTitle" style="margin: 0; font-size: 15px;">Sloane — Executive Intelligence</h3>
+            <span style="font-size: 11px; color: var(--muted);" id="aiModalSubtitle">Grounded Practice Analysis</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body" id="aiModalBody">
+        <!-- Rendered dynamically: Loading state or Structured Response -->
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11px; color: var(--muted);" id="aiModalFooterMeta">🔒 Private CEO Brain excluded · Zero client leakage</span>
+        <button type="button" class="btn btn-secondary" data-close-modal>Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Log Timeline Event Modal (Feature 1) -->
+  <div class="modal" id="logTimelineEventModal" role="dialog" aria-modal="true" aria-labelledby="logTimelineEventTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="logTimelineEventTitle" style="margin: 0; font-size: 15px;">Log Client Timeline Event</h3>
+          <span style="font-size: 11px; color: var(--muted);">Record structured operational provenance</span>
+        </div>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <form id="logTimelineEventForm">
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="modalTimelineClientId" style="font-size: 12px; font-weight: 600;">Target Client</label>
+            <select class="form-control select-input" id="modalTimelineClientId" required style="width: 100%;">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="modalTimelineEventType" style="font-size: 12px; font-weight: 600;">Event Type</label>
+            <select class="form-control select-input" id="modalTimelineEventType" required style="width: 100%;">
+              <option value="NOTE_CREATED">Internal Note</option>
+              <option value="TASK_CREATED">Task Created</option>
+              <option value="EMAIL_RECEIVED">Email Received</option>
+              <option value="EMAIL_SENT">Email Sent</option>
+              <option value="DOCUMENT_UPLOADED">Document Uploaded</option>
+              <option value="STATUTORY_DEADLINE">Statutory Deadline</option>
+              <option value="RISK_CHANGED">Risk Level Changed</option>
+              <option value="CEO_NOTE_CREATED">CEO Private Observation</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="modalTimelineTitle" style="font-size: 12px; font-weight: 600;">Event Title</label>
+            <input type="text" class="form-control" id="modalTimelineTitle" required placeholder="e.g. Discussed strike-off defense with Sarah Jenkins" style="width: 100%;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="modalTimelineDesc" style="font-size: 12px; font-weight: 600;">Description & Details</label>
+            <textarea class="form-control" id="modalTimelineDesc" rows="3" placeholder="Context, decisions, or follow-ups..." style="width: 100%;"></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label for="modalTimelineSeverity" style="font-size: 12px; font-weight: 600;">Severity</label>
+              <select class="form-control select-input" id="modalTimelineSeverity" style="width: 100%;">
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+                <option value="critical">Critical</option>
+                <option value="info">Info</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="modalTimelineVisibility" style="font-size: 12px; font-weight: 600;">Visibility</label>
+              <select class="form-control select-input" id="modalTimelineVisibility" style="width: 100%;">
+                <option value="shared">Shared (Staff & AI)</option>
+                <option value="private">Private (CEO Only · Exclude from AI)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSubmitTimelineEvent">Save to Timeline</button>
+        </div>
+      </form>
     </div>
   </div>
 
