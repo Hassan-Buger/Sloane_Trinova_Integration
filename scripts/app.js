@@ -1660,16 +1660,6 @@ class SloaneApp {
   async handleAskSloane(query, isFollowUp = false) {
     if (!query || !query.trim()) return;
 
-    // Auto-detect Anthropic key if user pasted it into query or follow-up
-    const keyMatch = query.match(/sk-ant-[a-zA-Z0-9_\-]{20,}/);
-    if (keyMatch) {
-      const extractedKey = keyMatch[0].trim();
-      ApiService.configure({ anthropicApiKey: extractedKey });
-      Toast.success('Claude API Key detected and saved successfully!');
-      query = query.replace(keyMatch[0], '').replace(/^(api\s*key|key|here\s+is\s+my\s+key)[:=\s]*/i, '').trim();
-      if (!query) query = "What are the active practice risks?";
-    }
-
     const modalBody = document.getElementById('aiModalBody');
     const modalSubtitle = document.getElementById('aiModalSubtitle');
 
@@ -1699,10 +1689,10 @@ class SloaneApp {
           <div class="ai-loading-container">
             <div class="ai-pulse-bar"></div>
             <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px;">
-              Sloane is reviewing practice intelligence...
+              Sloane is analyzing your query...
             </div>
             <div style="font-size: 11.5px; color: var(--muted);">
-              Cross-referencing statutory deadlines, timeline provenance, and open deliverables
+              Connecting to secure executive reasoning engine
             </div>
           </div>
         `;
@@ -1737,7 +1727,7 @@ class SloaneApp {
     try {
       res = await ApiService.askAi({ message: query, history: this.aiConversationHistory, clientId: targetClientId });
     } catch (err) {
-      console.warn('[app] ApiService.askAi error, triggering local fallback:', err);
+      console.warn('[app] ApiService.askAi error, triggering fallback:', err);
       if (ApiService && typeof ApiService.runGroundedFallback === 'function') {
         res = await ApiService.runGroundedFallback({ message: query, history: this.aiConversationHistory, clientId: targetClientId });
       }
@@ -1748,69 +1738,45 @@ class SloaneApp {
       this.aiConversationHistory.push({ role: 'assistant', content: res.data.answer });
     }
 
-    // Ultimate fallback safeguard so the CEO never encounters a dead screen
+    // Safeguard error response if backend failed completely
     if (!res || !res.data) {
-      const isWoof = targetClientId === 'cli_woofington_grp' || /woofington/i.test(query);
       res = {
-        ok: true,
-        source: 'grounded_rules_engine',
+        ok: false,
+        source: 'error',
         data: {
-          answer: isWoof
-            ? "Woofington Park Limited is currently flagged at critical statutory risk because an active proposal to strike off has been registered at Companies House, and statutory accounts for year ended 30/11/2025 are overdue since 31/08/2026."
-            : `Sloane has analyzed "${query}". Practice statutory records and open deliverables have been cross-referenced.`,
-          risk_level: isWoof ? 'red' : 'amber',
-          key_reasons: isWoof ? [
-            "Active proposal to strike off registered at Companies House (Immediate action required).",
-            "Statutory accounts overdue since 31/08/2026 for year ended 30/11/2025.",
-            "Draft accounts were sent to client; awaiting signed balance sheet from Sarah Jenkins."
-          ] : [
-            "Practice statutory tracker review indicates active attention items.",
-            "Nearest statutory deadline cross-referenced across Companies House records."
-          ],
-          recommended_actions: isWoof ? [
-            { action: "Submit urgent objection to strike-off with Companies House", priority: "high", reason: "Halt dissolution" },
-            { action: "Contact Sarah Jenkins to obtain signed balance sheet today", priority: "high", reason: "Filing requirement" }
-          ] : [
-            { action: "Review statutory obligations in Client 360", priority: "normal", reason: "Practice oversight" }
-          ],
-          evidence: isWoof ? [
-            { timeline_event_id: "evt_woof_004", reason: "Active strike-off notice served at Companies House" }
-          ] : []
+          response_type: 'conversational',
+          answer: 'Sloane was temporarily unable to process the query. Please ensure the backend service is running or check server connection.',
+          risk_level: null,
+          key_reasons: [],
+          recommended_actions: [],
+          evidence: []
         }
       };
     }
 
     try {
       const data = res.data || {};
-      const riskLevel = data.risk_level || 'neutral';
+      const isConversational = data.response_type === 'conversational' || data.response_type === 'general_knowledge' || (!data.risk_level && (!data.key_reasons || data.key_reasons.length === 0));
+
+      const riskLevel = data.risk_level;
       const riskClass = riskLevel === 'red' ? 'risk-red' : riskLevel === 'amber' ? 'risk-amber' : riskLevel === 'low' ? 'risk-low' : 'risk-neutral';
       const riskIcon = riskLevel === 'red' ? '🔴 RED CRITICAL' : riskLevel === 'amber' ? '🟠 AMBER ATTENTION' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ PRACTICE ASSESSMENT';
 
-      const providerBadge = res.source === 'anthropic_claude'
+      const isClaude = res.source === 'anthropic_claude';
+      const providerBadge = isClaude
         ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
-        : `<span class="source-badge" style="font-size: 10px;">🛡️ Grounded Engine</span>`;
+        : `<span class="source-badge" style="font-size: 10px; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">🛡️ Offline Grounded Fallback</span>`;
 
       // Remove inline loading if present
       const inlineLoadingEl = document.getElementById('aiInlineLoading');
       if (inlineLoadingEl) inlineLoadingEl.remove();
 
+      if (modalSubtitle) {
+        modalSubtitle.textContent = isConversational ? 'Executive Dialogue' : 'Grounded Practice Analysis';
+      }
+
       const cardHtml = `
         <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none; ${isFollowUp ? 'margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);' : ''}">
-          ${res.claudeError ? `
-            <div class="ai-claude-error-banner" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: #fbbf24;">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                <strong>⚠️ Claude AI Connection Notice</strong>
-                <button type="button" class="btn btn-secondary" onclick="ModalManager.open('trinovaConfigModal')" style="font-size: 11px; padding: 2px 8px; height: auto;">Configure Key</button>
-              </div>
-              <div style="font-size: 11.5px; color: #fde68a;">
-                ${res.claudeError}
-              </div>
-              <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
-                Local Grounded Practice Engine handled this query. To test or update your Claude key, click 'Configure Key'.
-              </div>
-            </div>
-          ` : ''}
-
           <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>
@@ -1821,17 +1787,19 @@ class SloaneApp {
             </div>
           </div>
 
-          <!-- Risk Banner -->
-          <div class="ai-risk-banner ${riskClass}">
-            <span>${riskIcon}</span>
-          </div>
+          <!-- Risk Banner (Only shown for practice assessments when risk level is present) -->
+          ${!isConversational && riskLevel ? `
+            <div class="ai-risk-banner ${riskClass}">
+              <span>${riskIcon}</span>
+            </div>
+          ` : ''}
 
-          <!-- Synthesis Paragraph -->
-          <div class="ai-answer-text">
+          <!-- Response Text -->
+          <div class="ai-answer-text" style="line-height: 1.6; font-size: 13.5px; color: var(--text);">
             ${data.answer || 'Analysis complete.'}
           </div>
 
-          <!-- Key Reasons -->
+          <!-- Key Drivers (Only if present) -->
           ${data.key_reasons && data.key_reasons.length > 0 ? `
             <div class="ai-subheading">Key Drivers & Evidence</div>
             <ul class="ai-reasons-list">
@@ -1839,7 +1807,7 @@ class SloaneApp {
             </ul>
           ` : ''}
 
-          <!-- Recommended Actions -->
+          <!-- Recommended Actions (Only if present) -->
           ${data.recommended_actions && data.recommended_actions.length > 0 ? `
             <div class="ai-subheading">Recommended Next Actions</div>
             <div class="ai-actions-grid">
@@ -1854,7 +1822,7 @@ class SloaneApp {
             </div>
           ` : ''}
 
-          <!-- Grounded Evidence Links -->
+          <!-- Grounded Evidence Links (Only if present) -->
           ${data.evidence && data.evidence.length > 0 ? `
             <div class="ai-subheading">Grounded Provenance Citations</div>
             <div class="ai-evidence-box">

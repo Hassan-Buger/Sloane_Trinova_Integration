@@ -12,37 +12,20 @@ import { ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER } from '../data/seed.js';
 const DEFAULT_BASE_URL = 'https://testnova-production-7b65.up.railway.app/api/v1';
 const DEFAULT_API_KEY = 'tn_sec_live_sloane_readwrite_2026';
 
-// Helper to cleanly extract Anthropic key from any string (handles quotes, Bearer, whitespace)
-function extractAnthropicKey(str) {
-  if (!str || typeof str !== 'string') return null;
-  const match = str.match(/sk-ant-[a-zA-Z0-9_\-]{20,}/);
-  return match ? match[0] : null;
+// Server-side secret protection: purge any legacy client-stored Anthropic keys from localStorage
+if (typeof localStorage !== 'undefined') {
+  try {
+    localStorage.removeItem('sloane_anthropic_api_key');
+  } catch (_) {}
 }
 
-// Auto-recover if user entered an Anthropic key into TriNova token slot
-let initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || DEFAULT_API_KEY;
-let initialAnthropicKey = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_anthropic_api_key')) || '';
-
-// Clean up stored keys
-const foundInToken = extractAnthropicKey(initialToken);
-if (foundInToken) {
-  initialAnthropicKey = foundInToken;
-  initialToken = DEFAULT_API_KEY;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('sloane_trinova_api_token', DEFAULT_API_KEY);
-    localStorage.setItem('sloane_anthropic_api_key', initialAnthropicKey);
-  }
-} else {
-  const cleanedAnthropic = extractAnthropicKey(initialAnthropicKey);
-  if (cleanedAnthropic) initialAnthropicKey = cleanedAnthropic;
-}
+const initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || DEFAULT_API_KEY;
 
 export const ApiService = {
   // Current in-memory configuration
   config: {
     baseUrl: (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_base_url')) || DEFAULT_BASE_URL,
     token: initialToken,
-    anthropicApiKey: initialAnthropicKey,
     status: 'unknown', // 'online' | 'offline' | 'checking'
     lastChecked: null,
     latencyMs: null,
@@ -52,7 +35,7 @@ export const ApiService = {
   /**
    * Updates configuration and persists to localStorage.
    */
-  configure({ baseUrl, token, anthropicApiKey }) {
+  configure({ baseUrl, token }) {
     if (baseUrl !== undefined) {
       this.config.baseUrl = baseUrl.trim().replace(/\/+$/, '');
       if (typeof localStorage !== 'undefined') {
@@ -60,27 +43,9 @@ export const ApiService = {
       }
     }
     if (token !== undefined) {
-      const cleanToken = token.trim();
-      const extractedAnthropic = extractAnthropicKey(cleanToken);
-      if (extractedAnthropic) {
-        this.config.anthropicApiKey = extractedAnthropic;
-        this.config.token = DEFAULT_API_KEY;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('sloane_anthropic_api_key', extractedAnthropic);
-          localStorage.setItem('sloane_trinova_api_token', DEFAULT_API_KEY);
-        }
-      } else {
-        this.config.token = cleanToken;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('sloane_trinova_api_token', this.config.token);
-        }
-      }
-    }
-    if (anthropicApiKey !== undefined) {
-      const cleanKey = extractAnthropicKey(anthropicApiKey) || anthropicApiKey.trim();
-      this.config.anthropicApiKey = cleanKey;
+      this.config.token = token.trim();
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('sloane_anthropic_api_key', this.config.anthropicApiKey);
+        localStorage.setItem('sloane_trinova_api_token', this.config.token);
       }
     }
     return this.config;
@@ -741,223 +706,83 @@ export const ApiService = {
 
   /* ==========================================================================
      8. Secure Claude AI Assistant API (Feature 2)
-     ========================================================================== */
-
-  /**
-   * Tests an Anthropic Claude API key with a fast ping request.
+     ==========================================================================   /**
+   * Tests AI assistant connectivity via secure backend endpoint.
    */
-  async testAnthropicKey(apiKey) {
-    const key = (apiKey || this.config.anthropicApiKey || '').trim();
-    if (!key) {
-      return { ok: false, message: 'No Anthropic API key provided.' };
-    }
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 20,
-          messages: [{ role: 'user', content: 'Ping. Reply OK.' }]
-        })
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        let errMsg = `HTTP ${res.status}`;
-        try {
-          const errObj = JSON.parse(errBody);
-          errMsg = errObj?.error?.message || errMsg;
-        } catch (_) {}
-        return { ok: false, message: errMsg, status: res.status };
-      }
-
-      const data = await res.json();
-      return { ok: true, message: 'Connected successfully to Claude 3.5 Sonnet!', data };
-    } catch (err) {
-      return { ok: false, message: err.message || 'Network error reaching api.anthropic.com.' };
-    }
-  },
-
-  /**
-   * Queries Sloane AI (Anthropic Claude backend) with strict privacy boundaries.
-   * Adheres to Prompt Section 25, 28, 29, 36.
-   * 1. Attempts remote backend endpoint /ai/ask
-   * 2. If client supplied Claude API key, calls Anthropic API directly with multi-turn conversation context
-   * 3. Seamlessly falls back to local grounded reasoning engine without crashing
-   */
-  async askAi(payload) {
-    // 1. Try remote Node.js backend if available
+  async testAnthropicKey() {
     try {
       const res = await this.request('/ai/ask', {
         method: 'POST',
-        body: payload
+        body: { message: 'Ping. Confirm AI assistant status.' }
       });
-      if (res && res.ok && res.data) return res;
-    } catch (_) {
-      // Remote Node endpoint offline/unavailable
-    }
-
-    // 2. If user configured Anthropic API key, execute Claude directly with conversational history
-    const rawKey = this.config.anthropicApiKey || (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_anthropic_api_key'));
-    const anthropicKey = (rawKey && typeof rawKey === 'string' && rawKey.trim()) || '';
-
-    if (anthropicKey && anthropicKey.includes('sk-ant')) {
-      try {
-        const directRes = await this.callAnthropicDirect(payload, anthropicKey);
-        if (directRes && directRes.ok) return directRes;
-      } catch (directErr) {
-        console.warn('[ApiService] Direct Claude call failed, engaging grounded engine:', directErr.message);
-        const fallbackRes = await this.runGroundedFallback(payload);
-        fallbackRes.claudeError = directErr.message;
-        return fallbackRes;
+      if (res && res.ok) {
+        const isClaude = res.data?.source === 'anthropic_claude';
+        return {
+          ok: true,
+          source: res.data?.source || 'backend_ai',
+          message: isClaude
+            ? 'Connected successfully to Anthropic Claude 3.5 Sonnet via secure server backend!'
+            : 'Connected to Sloane backend (Operating under deterministic practice rules engine).'
+        };
       }
+      return { ok: false, message: 'Backend AI returned non-200 status.' };
+    } catch (err) {
+      return { ok: false, message: `Could not reach backend AI endpoint: ${err.message}` };
     }
-
-    // 3. Fallback to Grounded Practice Reasoning Engine
-    return this.runGroundedFallback(payload);
   },
 
   /**
-   * Direct browser client for Anthropic Claude API supporting multi-turn conversational history.
+   * Queries Sloane AI via secure backend endpoint with strict server-side credentials.
+   * Adheres to Prompt Section 25, 28, 29, 36, 44:
+   * 1. Submits query and multi-turn history to backend POST /api/v1/ai/ask
+   * 2. Falls back to verified local practice rules engine if server is unreachable
+   * 3. Accurately reports provenance (never claims fallback is live Claude)
    */
-  async callAnthropicDirect(payload, apiKey) {
-    const message = (payload.message || '').trim();
-    const clientId = payload.clientId || '';
-    const cleanKey = apiKey.trim();
+  async askAi(payload) {
+    const startTime = performance.now();
 
-    const clients = StorageService.getClients() || [];
-    const client = clients.find(c => c.id === clientId || c.id === `cli_${clientId}` || (c.name && c.name.toLowerCase().includes(clientId.toLowerCase())));
-
-    const systemPrompt = `You are Sloane, an elite executive intelligence assistant inside Solane for CEO Kirsty Allen.
-You are in a live conversational session with the CEO.
-Ground all reasoning strictly in the provided practice context and ongoing conversation.
-Do NOT invent facts or hallucinate.
-
-Practice Context:
-${client ? `Current Focused Client: ${JSON.stringify(client)}` : 'Practice Portfolio Overview: Woofington Park Limited (strike-off active, director Sarah Jenkins), R GB Elevations Ltd (accounts overdue, director Robert Brown), Alpha Delta Creative Ltd (VAT pending), CFI Awarding Body Ltd.'}
-
-Response Contract:
-Format your response STRICTLY as valid JSON matching this schema:
-{
-  "answer": "Clear, direct executive response addressing the CEO's query in context of the ongoing conversation.",
-  "risk_level": "red" | "amber" | "low" | "neutral",
-  "key_reasons": ["Key evidence or driver 1", "Key evidence or driver 2"],
-  "recommended_actions": [{"action": "Action description", "priority": "high"|"normal", "reason": "Rationale"}],
-  "evidence": [{"timeline_event_id": "evt_...", "reason": "Citation"}]
-}
-If the CEO is greeting or giving conversational instructions, answer naturally and you may leave key_reasons and recommended_actions empty or minimal.`;
-
-    // Construct multi-turn messages array from payload.history
-    let messages = [];
-    if (Array.isArray(payload.history) && payload.history.length > 0) {
-      for (const item of payload.history) {
-        const role = item.role === 'assistant' ? 'assistant' : 'user';
-        const content = typeof item.content === 'string' ? item.content : String(item.content || '');
-        if (!content.trim()) continue;
-        if (messages.length > 0 && messages[messages.length - 1].role === role) {
-          messages[messages.length - 1].content += '\n\n' + content;
-        } else {
-          messages.push({ role, content });
+    // 1. Call secure server-side AI endpoint
+    try {
+      const res = await this.request('/ai/ask', {
+        method: 'POST',
+        body: {
+          message: (payload.message || '').trim(),
+          clientId: payload.clientId || null,
+          history: Array.isArray(payload.history) ? payload.history : []
         }
-      }
-    }
+      });
 
-    // Ensure the latest user message is present and last message is from 'user'
-    if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
-      messages.push({ role: 'user', content: message || 'Hello Sloane' });
-    }
-
-    const modelsToTry = ['claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-latest', 'claude-3-haiku-20240307'];
-    let lastError = null;
-
-    for (const model of modelsToTry) {
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': cleanKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'content-type': 'application/json'
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: 1200,
-            system: systemPrompt,
-            messages
-          })
-        });
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          let parsedErrMsg = `HTTP ${res.status}: ${errBody}`;
-          try {
-            const errJson = JSON.parse(errBody);
-            parsedErrMsg = errJson?.error?.message || parsedErrMsg;
-          } catch (_) {}
-
-          if (res.status === 404 || parsedErrMsg.includes('model')) {
-            lastError = new Error(parsedErrMsg);
-            continue; // try next model
-          }
-          throw new Error(parsedErrMsg);
-        }
-
-        const data = await res.json();
-        const content = data.content?.[0]?.text || '';
-        let parsed = null;
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try { parsed = JSON.parse(jsonMatch[0]); } catch (_) {}
-        }
-
-        if (!parsed) {
-          parsed = {
-            answer: content,
-            risk_level: 'neutral',
-            key_reasons: [],
-            recommended_actions: [],
-            evidence: []
-          };
-        }
-
+      if (res && res.ok && res.data) {
+        const payloadData = res.data.data !== undefined ? res.data.data : res.data;
         return {
           ok: true,
-          source: 'anthropic_claude',
-          modelUsed: model,
-          data: parsed,
-          usage: { durationMs: 400 }
+          status: res.data.status || 'success',
+          source: res.data.source || 'anthropic_claude',
+          model: res.data.model || 'claude-3-5-sonnet',
+          data: payloadData,
+          privacy: res.data.privacy,
+          usage: res.data.usage || { durationMs: Math.round(performance.now() - startTime) },
+          reason: res.data.reason || null
         };
-      } catch (err) {
-        lastError = err;
-        // Do not retry models on auth error or credit failure
-        if (err.message && (err.message.includes('401') || err.message.includes('credit') || err.message.includes('api_key') || err.message.includes('balance'))) {
-          throw err;
-        }
       }
+    } catch (err) {
+      console.warn('[ApiService] Secure backend /ai/ask call failed, engaging local grounded engine:', err.message);
     }
 
-    throw lastError || new Error('Failed to connect to Claude models');
+    // 2. Truthful local grounded reasoning fallback
+    return this.runGroundedFallback(payload, startTime);
   },
 
   /**
    * Grounded Client-Side Reasoning Engine.
    * Adheres strictly to Prompt Principles 6, 7, 8, 32, 33:
-   * Grounded strictly in Solane's actual stored practice data without inventing facts.
+   * Answers greetings conversationally, math directly, and grounds practice questions
+   * in Solane's actual stored practice data without inventing facts.
    */
-  async runGroundedFallback(payload) {
+  async runGroundedFallback(payload, startTimeMs = performance.now()) {
     const message = (payload.message || '').trim();
     const mLower = message.toLowerCase();
     const clientId = payload.clientId || '';
-
-    // Simulate minor network/reasoning latency for executive feel
-    await new Promise(r => setTimeout(r, 450));
 
     // 1. Resolve client from StorageService or seed trackers
     const clients = StorageService.getClients() || [];
@@ -1014,57 +839,93 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
     if (!targetClient && Array.isArray(payload.history)) {
       const historyText = payload.history.map(h => (typeof h.content === 'string' ? h.content : '')).join(' ').toLowerCase();
       if (/woofington/i.test(historyText)) {
-        targetClient = clients.find(c => /woofington/i.test(c.name)) || {
-          id: 'cli_woofington_grp',
-          name: 'Woofington Park Limited',
-          risk: 'High',
-          dirs: 'Sarah Jenkins, Mark Jenkins',
-          owner: 'Kirsty Allen',
-          fee: '£1,850',
-          no: '12345678'
-        };
+        targetClient = clients.find(c => /woofington/i.test(c.name));
       } else if (/rgb|elevation/i.test(historyText)) {
-        targetClient = clients.find(c => /rgb|elevation/i.test(c.name)) || {
-          id: 'cli_rgb_elevations',
-          name: 'R GB Elevations Ltd',
-          risk: 'High',
-          dirs: 'Robert Brown',
-          owner: 'Hamza Malik',
-          fee: '£2,400',
-          no: '08923412'
-        };
+        targetClient = clients.find(c => /rgb|elevation/i.test(c.name));
       }
     }
 
     let responseData = null;
-    const isGreeting = /^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening)\b/i.test(mLower);
 
+    // A. Casual Greeting
+    const isGreeting = /^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy|greetings|hiya|what'?s\s+up|how\s+are\s+you)\b/i.test(mLower);
     if (isGreeting) {
-      const contextClientMsg = targetClient
-        ? `We are currently discussing ${targetClient.name}.`
-        : `Active monitoring is in effect across 33 practice entities.`;
       responseData = {
-        answer: `Hello Kirsty. I am Sloane, your Executive Command Centre assistant. ${contextClientMsg} How can I assist you with practice intelligence, statutory obligations, or director instructions right now?`,
-        risk_level: "neutral",
-        key_reasons: [
-          "Session active with CEO Kirsty Allen.",
-          targetClient ? `Current focused client: ${targetClient.name} (Risk: ${targetClient.risk || 'High'})` : "Practice radar: 4 entities flagged RED requiring action."
-        ],
-        recommended_actions: targetClient ? [
-          { action: `Review ${targetClient.name} statutory file in Client 360`, priority: "high", reason: "Active context" }
-        ] : [
-          { action: "Review Woofington Park strike-off defense", priority: "high", reason: "Compulsory strike-off active" },
-          { action: "Check overdue statutory accounts in Statutory Monitor", priority: "normal", reason: "Filing penalty mitigation" }
-        ],
+        response_type: 'conversational',
+        answer: 'Hello Kirsty. I am Sloane, your Executive Command Centre assistant. How can I assist you with practice intelligence, statutory obligations, or director instructions right now?',
+        risk_level: null,
+        key_reasons: [],
+        recommended_actions: [],
         evidence: []
       };
-    } else if (targetClient && (/woofington/i.test(targetClient.name) || /woofington/i.test(mLower))) {
-      const isNextAction = /what should|next|action|todo|recommend|step|do\b/i.test(mLower);
-      const isTimeline = /timeline|recent|happened|event|history/i.test(mLower);
+    }
+
+    // B. Arithmetic / Math Questions (e.g. "What is 2 + 2?")
+    else if (/(\d+)\s*([\+\-\*\/])\s*(\d+)/.test(mLower)) {
+      const mathMatch = mLower.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+      const a = parseInt(mathMatch[1], 10);
+      const op = mathMatch[2];
+      const b = parseInt(mathMatch[3], 10);
+      let resVal = 0;
+      if (op === '+') resVal = a + b;
+      else if (op === '-') resVal = a - b;
+      else if (op === '*') resVal = a * b;
+      else if (op === '/') resVal = b !== 0 ? Math.round((a / b) * 100) / 100 : 'undefined';
+
+      responseData = {
+        response_type: 'general_knowledge',
+        answer: `${a} ${op} ${b} = ${resVal}.`,
+        risk_level: null,
+        key_reasons: [],
+        recommended_actions: [],
+        evidence: []
+      };
+    }
+
+    // C. Capability / Identity Inquiries
+    else if (/^(who\s+are\s+you|what\s+can\s+you\s+help|what\s+do\s+you\s+do|explain\s+what\s+you\s+can)\b/i.test(mLower)) {
+      responseData = {
+        response_type: 'general_knowledge',
+        answer: 'I am Sloane, your executive assistant for TriNova Group. I monitor statutory obligations and filing deadlines, cross-reference Companies House records, track client timelines with immutable provenance, manage Documenso digital signing workflows, and brief you on high-risk practice entities.',
+        risk_level: null,
+        key_reasons: [],
+        recommended_actions: [],
+        evidence: []
+      };
+    }
+
+    // D. Red-Flagged Company Count
+    else if (/how\s+many.*(red|flagged)/i.test(mLower) || /count.*(red|high)/i.test(mLower)) {
+      const redList = clients.filter(c => c.risk === 'High' || /woofington|rgb|monarch|artemis/i.test(c.name));
+      const redNames = redList.length > 0 ? redList.map(c => c.name).slice(0, 4) : ['Woofington Park Limited', 'R GB Elevations Ltd', 'Monarch Craft Brewers Ltd', 'Artemis BioHealth Labs Ltd'];
+
+      responseData = {
+        response_type: 'practice_assessment',
+        answer: `According to practice records, there are ${redNames.length} entities flagged RED at high statutory risk: ${redNames.join(', ')}.`,
+        risk_level: 'red',
+        key_reasons: [
+          `${redNames.length} practice entities require immediate intervention to prevent penalties or dissolution.`,
+          "Woofington Park Limited: Active strike-off notice on Companies House register.",
+          "R GB Elevations Ltd: Statutory accounts overdue since 31/07/2026."
+        ],
+        recommended_actions: [
+          { action: "Submit strike-off defense objection for Woofington Park Limited", priority: "high", reason: "Dissolution defense" },
+          { action: "Chase Robert Brown for R GB bank records", priority: "high", reason: "Filing penalty mitigation" }
+        ],
+        evidence: [
+          { timeline_event_id: "evt_woof_004", reason: "Active strike-off notice registered at Companies House" }
+        ]
+      };
+    }
+
+    // E. Focused Client: Woofington Park
+    else if (targetClient && (/woofington/i.test(targetClient.name) || /woofington/i.test(mLower))) {
       const isDirector = /director|who|contact|email|sarah|mark|call/i.test(mLower);
+      const isTimeline = /timeline|recent|happened|event|history/i.test(mLower);
 
       if (isDirector) {
         responseData = {
+          response_type: 'practice_assessment',
           answer: "The registered directors for Woofington Park Limited are Sarah Jenkins and Mark Jenkins. Sarah Jenkins is the primary operational director handling the accounts sign-off and banking records.",
           risk_level: "neutral",
           key_reasons: [
@@ -1079,27 +940,9 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
             { timeline_event_id: "evt_woof_003", reason: "Draft accounts prepared and dispatched to Sarah Jenkins" }
           ]
         };
-      } else if (isNextAction) {
-        responseData = {
-          answer: "For Woofington Park Limited, the highest priority is filing a formal objection against the Companies House active strike-off notice to prevent compulsory dissolution, followed by obtaining Sarah Jenkins' signature on the prepared accounts.",
-          risk_level: "red",
-          key_reasons: [
-            "Compulsory strike-off active at Companies House due to overdue statutory accounts for period ended 30/11/2025.",
-            "Draft accounts were prepared (£1,850 fee) and dispatched to director Sarah Jenkins.",
-            "Objection window requires immediate action to protect client's trading status."
-          ],
-          recommended_actions: [
-            { action: "Submit formal objection to strike off with Companies House registrar", priority: "high", reason: "Prevents compulsory dissolution" },
-            { action: "Contact Sarah Jenkins to obtain signed balance sheet today", priority: "high", reason: "Accounts already drafted" },
-            { action: "Brief Kirsty Allen & Hamza Malik on timeline defense", priority: "normal", reason: "Practice oversight" }
-          ],
-          evidence: [
-            { timeline_event_id: "evt_woof_004", reason: "Active strike-off notice recorded on Companies House" },
-            { timeline_event_id: "evt_woof_003", reason: "Draft accounts prepared and sent to director" }
-          ]
-        };
       } else if (isTimeline) {
         responseData = {
+          response_type: 'practice_assessment',
           answer: "Woofington Park's chronological timeline shows an urgent escalation: an active strike-off notice was registered at Companies House following overdue accounts, while accounts preparation was completed and draft sent to the director.",
           risk_level: "red",
           key_reasons: [
@@ -1113,13 +956,12 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
           ],
           evidence: [
             { timeline_event_id: "evt_woof_004", reason: "Companies House strike-off notice registered" },
-            { timeline_event_id: "evt_woof_003", reason: "Accounts draft sent to client" },
-            { timeline_event_id: "evt_woof_002", reason: "Task completed: Accounts preparation" }
+            { timeline_event_id: "evt_woof_003", reason: "Accounts draft sent to client" }
           ]
         };
       } else {
-        // Default / Risk query
         responseData = {
+          response_type: 'practice_assessment',
           answer: "Woofington Park Limited is currently flagged at critical statutory risk because an active proposal to strike off has been registered at Companies House, and statutory accounts for year ended 30/11/2025 are overdue since 31/08/2026.",
           risk_level: "red",
           key_reasons: [
@@ -1137,8 +979,12 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
           ]
         };
       }
-    } else if (targetClient && (/rgb|elevation/i.test(targetClient.name) || /rgb/i.test(mLower))) {
+    }
+
+    // F. Focused Client: R GB Elevations
+    else if (targetClient && (/rgb|elevation/i.test(targetClient.name) || /rgb/i.test(mLower))) {
       responseData = {
+        response_type: 'practice_assessment',
         answer: "R GB Elevations Ltd is currently rated RED due to overdue statutory accounts since 31/07/2026 and missing Q4 bank statements from director Robert Brown.",
         risk_level: "red",
         key_reasons: [
@@ -1154,26 +1000,13 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
           { timeline_event_id: "evt_rgb_001", reason: "Statutory tracker: Accounts overdue since 31/07/2026" }
         ]
       };
-    } else if (targetClient && (/alpha|delta/i.test(targetClient.name) || /alpha/i.test(mLower))) {
+    }
+
+    // G. Practice Morning Priorities / Executive Review
+    else if (/deadline|focus|today|morning|priorit|urgent\s+statutory/i.test(mLower)) {
       responseData = {
-        answer: "Alpha Delta Creative Ltd is currently AMBER. Year-end accounts for 31/12/2025 are in progress, due on 30/09/2026, alongside an upcoming VAT return deadline.",
-        risk_level: "amber",
-        key_reasons: [
-          "Accounts filing deadline due within practice tolerance.",
-          "VAT return for Aug 2026 period due on 07/10/2026.",
-          "Draft accounts awaiting director Amanda Smith's confirmation."
-        ],
-        recommended_actions: [
-          { action: "Follow up with Amanda Smith for accounts confirmation", priority: "normal", reason: "Filing timeline" },
-          { action: "Prepare August VAT submission for client portal sign-off", priority: "high", reason: "HMRC deadline" }
-        ],
-        evidence: [
-          { timeline_event_id: "evt_ad_001", reason: "Accounts in progress status on statutory register" }
-        ]
-      };
-    } else if (/deadline|focus|today|morning|priorit/i.test(mLower)) {
-      responseData = {
-        answer: "Practice morning priorities indicate 4 high-urgency companies requiring immediate CEO attention, led by strike-off defense for Woofington Park and overdue accounts for R GB Elevations.",
+        response_type: 'practice_assessment',
+        answer: "Practice morning priorities indicate critical statutory risks requiring immediate CEO attention, led by strike-off defense for Woofington Park and overdue accounts for R GB Elevations.",
         risk_level: "red",
         key_reasons: [
           "Woofington Park Limited: Active strike-off notice on Companies House record.",
@@ -1184,21 +1017,25 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
         recommended_actions: [
           { action: "Halt Woofington Park strike-off with Companies House", priority: "high", reason: "Immediate dissolution risk" },
           { action: "Instruct team to chase Robert Brown for RGB Elevations bank records", priority: "high", reason: "Penalty mitigation" },
-          { action: "Review VAT submission queue for 07/10/2026 obligations", priority: "normal", reason: "Upcoming deadline" }
+          { action: "Review VAT submission queue for upcoming obligations", priority: "normal", reason: "Upcoming deadline" }
         ],
         evidence: [
           { timeline_event_id: "evt_woof_004", reason: "Companies House register strike-off proposal" }
         ]
       };
-    } else {
+    }
+
+    // H. Default Practice Context
+    else {
       responseData = {
+        response_type: 'practice_assessment',
         answer: targetClient
           ? `${targetClient.name} is currently managed under ${targetClient.biz || 'Trinova Accounting'} with assigned director(s) ${targetClient.dirs || 'on file'}. Practice risk rating is ${targetClient.risk || 'Medium'}.`
-          : "Sloane has analyzed the active practice portfolio. 33 companies are tracked across Companies House and TriNova with 4 critical action items requiring immediate attention.",
+          : "Sloane has analyzed the active practice portfolio. Practice statutory monitors indicate 4 critical action items requiring CEO attention.",
         risk_level: targetClient?.risk === 'High' ? 'red' : 'amber',
         key_reasons: [
           targetClient ? `Client entity: ${targetClient.name} (${targetClient.no || 'Active'})` : "Active portfolio monitoring across statutory deadlines.",
-          targetClient ? `Assigned partner/owner: ${targetClient.owner || 'Kirsty Allen'}` : "4 companies currently marked RED in the Statutory Radar."
+          targetClient ? `Assigned partner/owner: ${targetClient.owner || 'Kirsty Allen'}` : "Entities flagged for review in Statutory Radar."
         ],
         recommended_actions: [
           { action: "Review statutory obligations in Client 360", priority: "normal", reason: "Portfolio review" }
@@ -1207,11 +1044,15 @@ If the CEO is greeting or giving conversational instructions, answer naturally a
       };
     }
 
+    const elapsed = Math.round(performance.now() - startTimeMs);
+
     return {
       ok: true,
-      source: 'grounded_rules_engine',
+      status: 'fallback',
+      source: 'offline_rules_engine',
+      model: 'deterministic_grounded_fallback',
       data: responseData,
-      usage: { durationMs: 95 }
+      usage: { durationMs: elapsed }
     };
   },
 

@@ -72,7 +72,18 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       });
     }
 
-    // 3. Client Authorization & Existence Check (Section 24)
+    // 3. Extract and Sanitize Multi-Turn History
+    const rawHistory = Array.isArray(body.history) ? body.history : [];
+    const sanitizedHistory = rawHistory
+      .slice(-10)
+      .filter(turn => turn && typeof turn === 'object')
+      .map(turn => ({
+        role: turn.role === 'assistant' ? 'assistant' : 'user',
+        content: typeof turn.content === 'string' ? turn.content.substring(0, 1000) : ''
+      }))
+      .filter(turn => turn.content.trim().length > 0);
+
+    // 4. Client Authorization & Existence Check (Section 24)
     if (clientId) {
       const client = (mockDb.clients || []).find(c => c.id === clientId);
       if (!client) {
@@ -86,20 +97,21 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
     }
 
     try {
-      // 4. Build Context with Strict Privacy Boundary (Section 21-23)
+      // 5. Build Context with Strict Privacy Boundary (Section 21-23)
       const { allowedContext, privacyAudit } = ContextBuilder.buildContext({
         clientId,
         query: message,
         actor: req.actor
       });
 
-      // 5. Query Claude or Grounded Fallback (Section 20 & 33)
+      // 6. Query Claude or Grounded Fallback (Section 20 & 33)
       const aiResponse = await claudeService.ask({
         query: message,
-        context: allowedContext
+        context: allowedContext,
+        history: sanitizedHistory
       });
 
-      // 6. Usage & Audit Logging (Section 39)
+      // 7. Usage & Audit Logging (Section 39)
       req.auditAction = 'ai_query_processed';
       req.resourceType = clientId ? `client:${clientId}` : 'executive_ai';
       req.resourceId = aiResponse.requestId;
@@ -112,7 +124,8 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
         data: aiResponse.data,
         privacy: privacyAudit,
         usage: aiResponse.usage,
-        reason: aiResponse.reason || null
+        reason: aiResponse.reason || null,
+        errorMessage: aiResponse.errorMessage || null
       });
 
     } catch (err) {
