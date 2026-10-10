@@ -1041,3 +1041,24 @@
   0%, 100% { transform: scaleX(0.4); opacity: 0.5; }
   50% { transform: scaleX(1.4); opacity: 1; box-shadow: 0 0 12px var(--accent); }
 }
+
+.ai-user-bubble {
+  background: rgba(201, 166, 107, 0.12);
+  border: 1px solid rgba(201, 166, 107, 0.3);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin: 12px 0 10px auto;
+  max-width: 85%;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ai-user-bubble-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

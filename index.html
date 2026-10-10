@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="styles/tokens.css">
   <link rel="stylesheet" href="styles/layout.css">
   <link rel="stylesheet" href="styles/components.css">
-  <link rel="stylesheet" href="styles/views.css">
-  <link rel="stylesheet" href="styles/auth.css?v=2.2.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.3.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.3.0">
 </head>
 <body>
 
@@ -1043,7 +1043,7 @@
   </div>
 
   <!-- Modal: Sloane Executive AI Intelligence Modal (Feature 2) -->
-  <div class="modal" id="aiResponseModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+  <div class="modal modal-overlay" id="aiResponseModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-content" style="max-width: 680px;">
       <div class="modal-header">
@@ -1056,9 +1056,14 @@
         </div>
         <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
       </div>
-      <div class="modal-body" id="aiModalBody">
+      <div class="modal-body" id="aiModalBody" style="max-height: 480px; overflow-y: auto;">
         <!-- Rendered dynamically: Loading state or Structured Response -->
       </div>
+      <!-- Interactive Executive Reply Bar -->
+      <form id="aiModalReplyForm" class="ai-modal-reply-form" style="padding: 12px 20px; background: rgba(0, 0, 0, 0.25); border-top: 1px solid var(--line); display: flex; gap: 8px;">
+        <input type="text" id="aiModalReplyInput" class="form-control" placeholder="Ask Sloane a follow-up or reply with instructions..." style="flex: 1; font-size: 13px; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 8px 12px; border-radius: var(--radius-sm);" autocomplete="off" />
+        <button type="submit" class="btn btn-primary" id="aiModalReplyBtn" style="padding: 8px 18px; font-size: 12px; font-weight: 700;">Reply</button>
+      </form>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11px; color: var(--muted);" id="aiModalFooterMeta">🔒 Private CEO Brain excluded · Zero client leakage</span>
         <button type="button" class="btn btn-secondary" data-close-modal>Dismiss</button>
@@ -1141,6 +1146,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.2.0"></script>
+  <script type="module" src="scripts/app.js?v=2.3.0"></script>
 </body>
 </html>

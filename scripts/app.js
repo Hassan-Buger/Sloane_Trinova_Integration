@@ -351,6 +351,20 @@ class SloaneApp {
       });
     }
 
+    // Ask Sloane modal reply form (enables ongoing dialogue inside modal)
+    const aiModalReplyForm = document.getElementById('aiModalReplyForm');
+    if (aiModalReplyForm) {
+      aiModalReplyForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('aiModalReplyInput');
+        if (input && input.value.trim()) {
+          const replyText = input.value.trim();
+          input.value = '';
+          this.handleAskSloane(replyText, true);
+        }
+      });
+    }
+
     // Ask Sloane quick suggestion prompt pills
     document.querySelectorAll('.ask-pill-suggestion').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1597,7 +1611,7 @@ class SloaneApp {
   // Feature 2: Secure Claude AI Assistant ("Ask Sloane") (Section 18-41)
   // =========================================================================
 
-  async handleAskSloane(query) {
+  async handleAskSloane(query, isFollowUp = false) {
     if (!query || !query.trim()) return;
 
     const modalBody = document.getElementById('aiModalBody');
@@ -1607,29 +1621,54 @@ class SloaneApp {
       modalSubtitle.textContent = `Analyzing: "${query.substring(0, 48)}${query.length > 48 ? '...' : ''}"`;
     }
 
-    if (modalBody) {
-      modalBody.innerHTML = `
-        <div class="ai-loading-container">
-          <div class="ai-pulse-bar"></div>
-          <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px;">
-            Sloane is reviewing the client timeline...
-          </div>
-          <div style="font-size: 11.5px; color: var(--muted);">
-            Cross-referencing statutory deadlines, timeline provenance, and open deliverables
-          </div>
-        </div>
-      `;
-    }
-
-    ModalManager.open('aiResponseModal');
-
-    // Detect target client from query if mentioned
-    let targetClientId = null;
+    // Detect target client from query if mentioned, or preserve active conversational context
     const qLower = query.toLowerCase();
-    if (/woofington/i.test(qLower)) targetClientId = 'cli_woofington_grp';
-    else if (/rgb|elevation/i.test(qLower)) targetClientId = 'cli_rgb_elevations';
-    else if (/alpha|delta/i.test(qLower)) targetClientId = 'cli_alpha_delta';
-    else if (/cfi|awarding/i.test(qLower)) targetClientId = 'cli_cfi_awarding';
+    if (/woofington/i.test(qLower)) this.activeAiClientId = 'cli_woofington_grp';
+    else if (/rgb|elevation/i.test(qLower)) this.activeAiClientId = 'cli_rgb_elevations';
+    else if (/alpha|delta/i.test(qLower)) this.activeAiClientId = 'cli_alpha_delta';
+    else if (/cfi|awarding/i.test(qLower)) this.activeAiClientId = 'cli_cfi_awarding';
+
+    const targetClientId = this.activeAiClientId || null;
+
+    if (!isFollowUp) {
+      if (modalBody) {
+        modalBody.innerHTML = `
+          <div class="ai-loading-container">
+            <div class="ai-pulse-bar"></div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px;">
+              Sloane is reviewing practice intelligence...
+            </div>
+            <div style="font-size: 11.5px; color: var(--muted);">
+              Cross-referencing statutory deadlines, timeline provenance, and open deliverables
+            </div>
+          </div>
+        `;
+      }
+      ModalManager.open('aiResponseModal');
+    } else {
+      // For follow-up replies, append the user bubble and show inline loading
+      if (modalBody) {
+        const safeUserText = String(query).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        const userBubble = document.createElement('div');
+        userBubble.className = 'ai-user-bubble';
+        userBubble.innerHTML = `
+          <div class="ai-user-bubble-label">Kirsty Allen (CEO)</div>
+          <div>${safeUserText}</div>
+        `;
+        modalBody.appendChild(userBubble);
+
+        const inlineLoading = document.createElement('div');
+        inlineLoading.id = 'aiInlineLoading';
+        inlineLoading.className = 'ai-loading-container';
+        inlineLoading.style.padding = '16px 10px';
+        inlineLoading.innerHTML = `
+          <div class="ai-pulse-bar" style="width: 40px; height: 3px;"></div>
+          <div style="font-size: 11.5px; color: var(--muted);">Sloane is analyzing follow-up instructions...</div>
+        `;
+        modalBody.appendChild(inlineLoading);
+        modalBody.scrollTop = modalBody.scrollHeight;
+      }
+    }
 
     try {
       const res = await ApiService.askAi({ message: query, clientId: targetClientId });
@@ -1642,84 +1681,112 @@ class SloaneApp {
         ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
         : `<span class="source-badge" style="font-size: 10px;">🛡️ Grounded Engine</span>`;
 
-      if (modalBody) {
-        modalBody.innerHTML = `
-          <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none;">
-            <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>
-                ${providerBadge}
-              </div>
-              <div style="font-size: 11px; font-family: var(--font-mono); color: var(--muted);">
-                ${res.usage?.durationMs ? `${res.usage.durationMs}ms` : ''}
-              </div>
+      // Remove inline loading if present
+      const inlineLoadingEl = document.getElementById('aiInlineLoading');
+      if (inlineLoadingEl) inlineLoadingEl.remove();
+
+      const cardHtml = `
+        <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none; ${isFollowUp ? 'margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);' : ''}">
+          <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>
+              ${providerBadge}
             </div>
-
-            <!-- Risk Banner -->
-            <div class="ai-risk-banner ${riskClass}">
-              <span>${riskIcon}</span>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--muted);">
+              ${res.usage?.durationMs ? `${res.usage.durationMs}ms` : ''}
             </div>
-
-            <!-- Synthesis Paragraph -->
-            <div class="ai-answer-text">
-              ${data.answer || 'Analysis complete.'}
-            </div>
-
-            <!-- Key Reasons -->
-            ${data.key_reasons && data.key_reasons.length > 0 ? `
-              <div class="ai-subheading">Key Drivers & Evidence</div>
-              <ul class="ai-reasons-list">
-                ${data.key_reasons.map(r => `<li>${r}</li>`).join('')}
-              </ul>
-            ` : ''}
-
-            <!-- Recommended Actions -->
-            ${data.recommended_actions && data.recommended_actions.length > 0 ? `
-              <div class="ai-subheading">Recommended Next Actions</div>
-              <div class="ai-actions-grid">
-                ${data.recommended_actions.map(act => `
-                  <div class="ai-action-item">
-                    <span class="ai-action-text">${act.action}</span>
-                    <span class="pill ${act.priority === 'high' ? 'red' : act.priority === 'normal' ? 'amber' : 'neutral'}" style="font-size: 10px; text-transform: uppercase;">
-                      ${act.priority}
-                    </span>
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-
-            <!-- Grounded Evidence Links -->
-            ${data.evidence && data.evidence.length > 0 ? `
-              <div class="ai-subheading">Grounded Provenance Citations</div>
-              <div class="ai-evidence-box">
-                ${data.evidence.map(ev => `
-                  <div class="ai-evidence-item">
-                    <span style="color: #c5d1de;">${ev.reason || 'Record cited'}</span>
-                    ${ev.timeline_event_id ? `
-                      <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${ev.timeline_event_id}', '${targetClientId || 'cli_woofington_grp'}')">
-                        View Event #${ev.timeline_event_id.substring(0, 12)} ↗
-                      </button>
-                    ` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
           </div>
-        `;
+
+          <!-- Risk Banner -->
+          <div class="ai-risk-banner ${riskClass}">
+            <span>${riskIcon}</span>
+          </div>
+
+          <!-- Synthesis Paragraph -->
+          <div class="ai-answer-text">
+            ${data.answer || 'Analysis complete.'}
+          </div>
+
+          <!-- Key Reasons -->
+          ${data.key_reasons && data.key_reasons.length > 0 ? `
+            <div class="ai-subheading">Key Drivers & Evidence</div>
+            <ul class="ai-reasons-list">
+              ${data.key_reasons.map(r => `<li>${r}</li>`).join('')}
+            </ul>
+          ` : ''}
+
+          <!-- Recommended Actions -->
+          ${data.recommended_actions && data.recommended_actions.length > 0 ? `
+            <div class="ai-subheading">Recommended Next Actions</div>
+            <div class="ai-actions-grid">
+              ${data.recommended_actions.map(act => `
+                <div class="ai-action-item">
+                  <span class="ai-action-text">${act.action}</span>
+                  <span class="pill ${act.priority === 'high' ? 'red' : act.priority === 'normal' ? 'amber' : 'neutral'}" style="font-size: 10px; text-transform: uppercase;">
+                    ${act.priority}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          <!-- Grounded Evidence Links -->
+          ${data.evidence && data.evidence.length > 0 ? `
+            <div class="ai-subheading">Grounded Provenance Citations</div>
+            <div class="ai-evidence-box">
+              ${data.evidence.map(ev => `
+                <div class="ai-evidence-item">
+                  <span style="color: #c5d1de;">${ev.reason || 'Record cited'}</span>
+                  ${ev.timeline_event_id ? `
+                    <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${ev.timeline_event_id}', '${targetClientId || 'cli_woofington_grp'}')">
+                      View Event #${ev.timeline_event_id.substring(0, 12)} ↗
+                    </button>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      if (modalBody) {
+        if (!isFollowUp) {
+          modalBody.innerHTML = cardHtml;
+        } else {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = cardHtml;
+          modalBody.appendChild(wrapper);
+        }
+        modalBody.scrollTop = modalBody.scrollHeight;
       }
 
+      // Re-focus reply input for fast conversational turnaround
+      const replyInput = document.getElementById('aiModalReplyInput');
+      if (replyInput) replyInput.focus();
+
     } catch (err) {
+      const inlineLoadingEl = document.getElementById('aiInlineLoading');
+      if (inlineLoadingEl) inlineLoadingEl.remove();
+
       if (modalBody) {
-        modalBody.innerHTML = `
-          <div style="padding: 24px 20px; text-align: center;">
-            <div style="font-size: 28px; margin-bottom: 12px;">⚠️</div>
+        const errorCard = document.createElement('div');
+        errorCard.innerHTML = `
+          <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
             <h4 style="color: var(--text); margin-bottom: 6px;">Sloane Intelligence Unavailable</h4>
-            <p style="font-size: 12.5px; color: var(--muted); max-width: 440px; margin: 0 auto 16px auto; line-height: 1.5;">
-              Sloane could not complete the live analysis right now. Your dashboard data and Client 360 records remain fully operational.
+            <p style="font-size: 12.5px; color: var(--muted); max-width: 440px; margin: 0 auto 12px auto; line-height: 1.5;">
+              Sloane could not complete this specific analysis. Your dashboard data and Client 360 records remain fully operational.
             </p>
-            <button type="button" class="btn btn-secondary" data-close-modal>Return to Dashboard</button>
+            <div style="display: flex; justify-content: center; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="app.handleAskSloane('${query}', false)">Retry Analysis</button>
+            </div>
           </div>
         `;
+        if (!isFollowUp) {
+          modalBody.innerHTML = '';
+        }
+        modalBody.appendChild(errorCard);
+        modalBody.scrollTop = modalBody.scrollHeight;
       }
     }
   }
