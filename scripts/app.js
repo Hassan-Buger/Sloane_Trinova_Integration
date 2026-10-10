@@ -32,6 +32,7 @@ class SloaneApp {
     this.timelineEvents = [];
     this.timelineEventTypeFilter = '';
     this.timelineSeverityFilter = '';
+    this.aiConversationHistory = [];
     this.authEventsBound = false;
     this.appEventsBound = false;
   }
@@ -551,6 +552,46 @@ class SloaneApp {
         await this.checkTrinovaBackend();
         await this.renderClients();
         Toast.success('TriNova & AI configuration saved.');
+      });
+    }
+
+    // Claude API Key Verification Button
+    const btnTestClaudeKey = document.getElementById('btnTestClaudeKey');
+    const claudeStatusEl = document.getElementById('claudeKeyTestStatus');
+    if (btnTestClaudeKey) {
+      btnTestClaudeKey.addEventListener('click', async () => {
+        const keyInput = document.getElementById('configAnthropicKey');
+        const keyVal = keyInput?.value?.trim() || ApiService.config.anthropicApiKey || '';
+        if (!keyVal) {
+          if (claudeStatusEl) {
+            claudeStatusEl.style.display = 'block';
+            claudeStatusEl.style.color = '#ef4444';
+            claudeStatusEl.textContent = '❌ Please enter an Anthropic API key first (starts with sk-ant-).';
+          }
+          return;
+        }
+        btnTestClaudeKey.disabled = true;
+        btnTestClaudeKey.textContent = 'Testing...';
+        if (claudeStatusEl) {
+          claudeStatusEl.style.display = 'block';
+          claudeStatusEl.style.color = 'var(--accent)';
+          claudeStatusEl.textContent = 'Testing connection to Claude 3.5 Sonnet...';
+        }
+        const result = await ApiService.testAnthropicKey(keyVal);
+        btnTestClaudeKey.disabled = false;
+        btnTestClaudeKey.textContent = '⚡ Test Key';
+        if (claudeStatusEl) {
+          claudeStatusEl.style.display = 'block';
+          if (result.ok) {
+            claudeStatusEl.style.color = '#10b981';
+            claudeStatusEl.textContent = '✅ Connected! Claude 3.5 Sonnet is verified and active.';
+            Toast.success('Claude API Key verified successfully!');
+          } else {
+            claudeStatusEl.style.color = '#ef4444';
+            claudeStatusEl.textContent = `❌ Anthropic Error: ${result.message}`;
+            Toast.error(`Claude Key Error: ${result.message}`);
+          }
+        }
       });
     }
 
@@ -1619,6 +1660,16 @@ class SloaneApp {
   async handleAskSloane(query, isFollowUp = false) {
     if (!query || !query.trim()) return;
 
+    // Auto-detect Anthropic key if user pasted it into query or follow-up
+    const keyMatch = query.match(/sk-ant-[a-zA-Z0-9_\-]{20,}/);
+    if (keyMatch) {
+      const extractedKey = keyMatch[0].trim();
+      ApiService.configure({ anthropicApiKey: extractedKey });
+      Toast.success('Claude API Key detected and saved successfully!');
+      query = query.replace(keyMatch[0], '').replace(/^(api\s*key|key|here\s+is\s+my\s+key)[:=\s]*/i, '').trim();
+      if (!query) query = "What are the active practice risks?";
+    }
+
     const modalBody = document.getElementById('aiModalBody');
     const modalSubtitle = document.getElementById('aiModalSubtitle');
 
@@ -1634,6 +1685,13 @@ class SloaneApp {
     else if (/cfi|awarding/i.test(qLower)) this.activeAiClientId = 'cli_cfi_awarding';
 
     const targetClientId = this.activeAiClientId || null;
+
+    // Maintain multi-turn conversational history
+    if (!this.aiConversationHistory) this.aiConversationHistory = [];
+    if (!isFollowUp) {
+      this.aiConversationHistory = [];
+    }
+    this.aiConversationHistory.push({ role: 'user', content: query });
 
     if (!isFollowUp) {
       if (modalBody) {
@@ -1677,12 +1735,17 @@ class SloaneApp {
 
     let res = null;
     try {
-      res = await ApiService.askAi({ message: query, clientId: targetClientId });
+      res = await ApiService.askAi({ message: query, history: this.aiConversationHistory, clientId: targetClientId });
     } catch (err) {
       console.warn('[app] ApiService.askAi error, triggering local fallback:', err);
       if (ApiService && typeof ApiService.runGroundedFallback === 'function') {
-        res = await ApiService.runGroundedFallback({ message: query, clientId: targetClientId });
+        res = await ApiService.runGroundedFallback({ message: query, history: this.aiConversationHistory, clientId: targetClientId });
       }
+    }
+
+    // Record assistant turn in multi-turn conversation history
+    if (res?.data?.answer) {
+      this.aiConversationHistory.push({ role: 'assistant', content: res.data.answer });
     }
 
     // Ultimate fallback safeguard so the CEO never encounters a dead screen
@@ -1733,6 +1796,21 @@ class SloaneApp {
 
       const cardHtml = `
         <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none; ${isFollowUp ? 'margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);' : ''}">
+          ${res.claudeError ? `
+            <div class="ai-claude-error-banner" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: #fbbf24;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <strong>⚠️ Claude AI Connection Notice</strong>
+                <button type="button" class="btn btn-secondary" onclick="ModalManager.open('trinovaConfigModal')" style="font-size: 11px; padding: 2px 8px; height: auto;">Configure Key</button>
+              </div>
+              <div style="font-size: 11.5px; color: #fde68a;">
+                ${res.claudeError}
+              </div>
+              <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+                Local Grounded Practice Engine handled this query. To test or update your Claude key, click 'Configure Key'.
+              </div>
+            </div>
+          ` : ''}
+
           <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>

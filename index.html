@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="styles/tokens.css">
   <link rel="stylesheet" href="styles/layout.css">
   <link rel="stylesheet" href="styles/components.css">
-  <link rel="stylesheet" href="styles/views.css?v=2.4.0">
-  <link rel="stylesheet" href="styles/auth.css?v=2.4.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.5.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.5.0">
 </head>
 <body>
 
@@ -1010,7 +1010,11 @@
               <span>Claude AI API Key (Anthropic)</span>
               <span style="font-size: 10px; color: var(--accent); font-weight: normal;">(Optional · Live Claude 3.5)</span>
             </label>
-            <input type="password" class="form-control" id="configAnthropicKey" style="font-family: var(--font-mono); font-size: 12px;" placeholder="sk-ant-api03-... (paste your Claude key here)">
+            <div style="display: flex; gap: 8px;">
+              <input type="password" class="form-control" id="configAnthropicKey" style="font-family: var(--font-mono); font-size: 12px; flex: 1;" placeholder="sk-ant-api03-... (paste your Claude key here)">
+              <button type="button" class="btn btn-secondary" id="btnTestClaudeKey" style="font-size: 11px; padding: 7px 12px; white-space: nowrap;">⚡ Test Key</button>
+            </div>
+            <div id="claudeKeyTestStatus" style="font-size: 11px; margin-top: 6px; padding: 4px 8px; border-radius: 4px; display: none;"></div>
           </div>
 
           <div style="display: flex; gap: 8px; margin-bottom: 16px;">
@@ -1154,6 +1158,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.4.0"></script>
+  <script type="module" src="scripts/app.js?v=2.5.0"></script>
 </body>
 </html>
