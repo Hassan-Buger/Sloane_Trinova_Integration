@@ -73,6 +73,7 @@ export const config = {
   // Key held strictly server-side per Prompt Section 19 & 30
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
+    workspaceId: process.env.ANTHROPIC_WORKSPACE_ID || '',
     model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
     timeoutMs: parseInt(process.env.ANTHROPIC_TIMEOUT_MS || '15000', 10),
     maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '1500', 10),

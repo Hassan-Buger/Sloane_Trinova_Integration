@@ -209,7 +209,7 @@ export class ContextBuilder {
     }
 
     // Greetings & pleasantries
-    if (/^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy|greetings|hiya|what'?s\s+up|how\s+are\s+you)\b/i.test(q)) {
+    if (/^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy|greetings|hiya|what'?s\s*up|whats?up|wassup|sup|how\s+are\s+you)\b/i.test(q)) {
       return 'GREETING';
     }
 

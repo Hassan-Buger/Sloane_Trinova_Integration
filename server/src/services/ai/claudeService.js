@@ -12,6 +12,7 @@ import { mockDb } from '../../data/db.js';
 export class ClaudeService {
   constructor(options = {}) {
     this.apiKey = options.apiKey !== undefined ? options.apiKey : (config.anthropic?.apiKey || process.env.ANTHROPIC_API_KEY || '');
+    this.workspaceId = options.workspaceId !== undefined ? options.workspaceId : (config.anthropic?.workspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '');
     this.model = options.model || config.anthropic?.model || 'claude-3-5-sonnet-20241022';
     this.timeoutMs = options.timeoutMs || config.anthropic?.timeoutMs || 15000;
     this.maxTokens = options.maxTokens || config.anthropic?.maxTokens || 1500;
@@ -19,7 +20,13 @@ export class ClaudeService {
     this.client = null;
     if (this.apiKey && this.apiKey.trim() !== '') {
       try {
-        this.client = new Anthropic({ apiKey: this.apiKey.trim() });
+        const clientConfig = { apiKey: this.apiKey.trim() };
+        if (this.workspaceId && this.workspaceId.trim() !== '') {
+          clientConfig.defaultHeaders = {
+            'anthropic-workspace-id': this.workspaceId.trim()
+          };
+        }
+        this.client = new Anthropic(clientConfig);
       } catch (err) {
         console.warn('[ClaudeService] Failed to initialize Anthropic SDK:', err.message);
       }
@@ -222,7 +229,7 @@ ${query}`;
     const q = (query || '').trim().toLowerCase();
 
     // 1. Check for Casual Greeting
-    const isGreeting = /^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy|greetings|hiya|what'?s\s+up|how\s+are\s+you)\b/i.test(q);
+    const isGreeting = /^(hi|hello|hey|good\s+(morning|afternoon|evening)|howdy|greetings|hiya|what'?s\s*up|whats?up|wassup|sup|how\s+are\s+you)\b/i.test(q);
     if (isGreeting) {
       return {
         status: 'fallback',
