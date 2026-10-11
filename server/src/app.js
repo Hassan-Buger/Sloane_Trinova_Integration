@@ -4,6 +4,9 @@
  */
 
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { authenticate, requireScope } from './middleware/auth.js';
 import { auditMiddleware, auditStore } from './middleware/audit.js';
 import { registerClientRoutes } from './routes/clients.js';
@@ -14,6 +17,37 @@ import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { telemetry } from './services/telemetry.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Identify root directory containing frontend assets (index.html, styles, scripts)
+const CANDIDATE_STATIC_ROOTS = [
+  path.resolve(__dirname, '../../'),
+  path.resolve(__dirname, '../public'),
+  path.resolve(process.cwd(), './'),
+  path.resolve(process.cwd(), '../')
+];
+const STATIC_ROOT = CANDIDATE_STATIC_ROOTS.find(r => fs.existsSync(path.join(r, 'index.html'))) || path.resolve(__dirname, '../../');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.txt': 'text/plain; charset=utf-8'
+};
+
 
 function matchRoute(routePath, requestPath) {
   const routeParts = routePath.split('/');
@@ -104,6 +138,39 @@ export function createApp(options = {}) {
         res.end();
         return;
       }
+
+      // Static file serving for full-stack deployment (Railway, Render, standalone)
+      if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        let relativePath = req.path === '/' ? 'index.html' : req.path.replace(/^\/+/, '');
+        const targetPath = path.resolve(STATIC_ROOT, relativePath);
+
+        // Security check: prevent directory traversal
+        if (!targetPath.startsWith(STATIC_ROOT)) {
+          res.writeHead(403, { 'Content-Type': 'text/plain' });
+          res.end('Forbidden');
+          return;
+        }
+
+        fs.stat(targetPath, (err, stats) => {
+          if (err || !stats.isFile()) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+            return;
+          }
+
+          const ext = path.extname(targetPath).toLowerCase();
+          const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Content-Length': stats.size,
+            'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600'
+          });
+          const stream = fs.createReadStream(targetPath);
+          stream.pipe(res);
+        });
+        return;
+      }
+
 
       // Parse JSON body if applicable
       let bodyData = '';

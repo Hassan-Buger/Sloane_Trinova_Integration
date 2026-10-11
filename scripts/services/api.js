@@ -9,15 +9,28 @@ import { ReconciliationEngine } from './reconciliation.js';
 import { ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER } from '../data/seed.js';
 
 // Default production endpoint and fallback key
-const DEFAULT_BASE_URL = 'https://testnova-production-7b65.up.railway.app/api/v1';
+// If running in browser, connect to origin/api/v1 automatically (seamless full-stack Railway / domain support)
+const getDynamicDefaultBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file:')) {
+    return `${window.location.origin}/api/v1`;
+  }
+  return 'https://testnova-production-7b65.up.railway.app/api/v1';
+};
+
+const DEFAULT_BASE_URL = getDynamicDefaultBaseUrl();
 const DEFAULT_API_KEY = 'tn_sec_live_sloane_readwrite_2026';
 
-// Server-side secret protection: purge any legacy client-stored Anthropic keys from localStorage
+// Server-side secret protection: purge legacy client-stored keys and stale testnova base URLs
 if (typeof localStorage !== 'undefined') {
   try {
     localStorage.removeItem('sloane_anthropic_api_key');
+    const storedUrl = localStorage.getItem('sloane_trinova_base_url');
+    if (storedUrl && storedUrl.includes('testnova-production-7b65.up.railway.app')) {
+      localStorage.removeItem('sloane_trinova_base_url');
+    }
   } catch (_) {}
 }
+
 
 const initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || DEFAULT_API_KEY;
 
