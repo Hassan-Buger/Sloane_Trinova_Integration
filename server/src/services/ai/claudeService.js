@@ -17,6 +17,11 @@ export class ClaudeService {
     this.timeoutMs = options.timeoutMs || config.anthropic?.timeoutMs || 15000;
     this.maxTokens = options.maxTokens || config.anthropic?.maxTokens || 1500;
 
+    // Google Gemini Configuration
+    this.geminiApiKey = options.geminiApiKey !== undefined ? options.geminiApiKey : (config.gemini?.apiKey || process.env.GEMINI_API_KEY || '');
+    this.geminiModel = options.geminiModel || config.gemini?.model || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    this.aiProvider = options.aiProvider || config.aiProvider || process.env.AI_PROVIDER || 'auto';
+
     this.client = null;
     if (this.apiKey && this.apiKey.trim() !== '') {
       try {
@@ -34,21 +39,29 @@ export class ClaudeService {
   }
 
   /**
-   * Check if Anthropic client is configured with active API key.
+   * Check if any AI provider is configured with an active API key.
    */
   isConfigured() {
+    return this.isAnthropicConfigured() || this.isGeminiConfigured();
+  }
+
+  isAnthropicConfigured() {
     return Boolean(this.client && this.apiKey && this.apiKey.trim() !== '');
   }
 
+  isGeminiConfigured() {
+    return Boolean(this.geminiApiKey && this.geminiApiKey.trim() !== '');
+  }
+
   /**
-   * Queries Claude with context, user message, and multi-turn history.
+   * Queries configured AI provider (Anthropic Claude or Google Gemini) with context, user message, and multi-turn history.
    * Returns validated structured output adhering to the API contract.
    */
   async ask({ query, context = {}, history = [], systemPrompt = SLOANE_SYSTEM_PROMPT }) {
     const startTime = Date.now();
     const requestId = `ai_req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    // If client is not configured or in testing/fallback mode
+    // If neither Anthropic nor Gemini is configured
     if (!this.isConfigured()) {
       return this._generateGracefulFallback({
         query,
@@ -56,11 +69,99 @@ export class ClaudeService {
         durationMs: Date.now() - startTime,
         requestId,
         reason: 'ANTHROPIC_API_KEY_NOT_CONFIGURED',
-        errorMessage: 'Anthropic API key is not configured on the server. Utilizing verified local rules engine.'
+        errorMessage: 'Neither Anthropic API key nor Gemini API key is configured on the server. Utilizing verified local rules engine.'
       });
     }
 
-    // Prepare context prompt message for the user query
+    // Determine preference:
+    // If aiProvider === 'gemini', or if only Gemini is configured, use Gemini.
+    const preferGemini = this.aiProvider === 'gemini' || (this.aiProvider === 'auto' && this.isGeminiConfigured() && !this.isAnthropicConfigured());
+
+    if (preferGemini && this.isGeminiConfigured()) {
+      try {
+        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
+      } catch (geminiErr) {
+        console.warn('[AIService] Gemini API call failed:', geminiErr.message);
+        if (this.isAnthropicConfigured()) {
+          try {
+            return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
+          } catch (anthropicErr) {
+            console.warn('[AIService] Secondary Anthropic call also failed:', anthropicErr.message);
+          }
+        }
+        const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
+        return this._generateGracefulFallback({
+          query,
+          context,
+          durationMs: Date.now() - startTime,
+          requestId,
+          reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
+          errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (geminiErr.message || 'Gemini service temporarily unreachable')
+        });
+      }
+    }
+
+    // Otherwise try Anthropic first (with automatic Gemini failover if Anthropic fails with auth/key errors)
+    if (this.isAnthropicConfigured()) {
+      try {
+        return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
+      } catch (anthropicErr) {
+        console.warn('[AIService] Anthropic API call failed:', anthropicErr.message);
+
+        // Seamless Dual-Redundancy Failover:
+        // If Gemini is also configured and Anthropic fails (e.g. 401 invalid key, 400 unscoped), try Gemini!
+        if (this.isGeminiConfigured()) {
+          console.info('[AIService] Seamlessly failing over to Google Gemini...');
+          try {
+            return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
+          } catch (geminiErr) {
+            console.warn('[AIService] Gemini fallback also failed:', geminiErr.message);
+          }
+        }
+
+        const isTimeout = anthropicErr.name === 'AbortError' || anthropicErr.message?.includes('aborted');
+        return this._generateGracefulFallback({
+          query,
+          context,
+          durationMs: Date.now() - startTime,
+          requestId,
+          reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
+          errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (anthropicErr.message || 'Claude service temporarily unreachable')
+        });
+      }
+    }
+
+    // Gemini fallback if only Gemini is configured
+    if (this.isGeminiConfigured()) {
+      try {
+        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
+      } catch (geminiErr) {
+        const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
+        return this._generateGracefulFallback({
+          query,
+          context,
+          durationMs: Date.now() - startTime,
+          requestId,
+          reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
+          errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (geminiErr.message || 'Gemini service temporarily unreachable')
+        });
+      }
+    }
+
+    return this._generateGracefulFallback({
+      query,
+      context,
+      durationMs: Date.now() - startTime,
+      requestId,
+      reason: 'NO_ACTIVE_AI_PROVIDER',
+      errorMessage: 'No active AI provider could process the query.'
+    });
+  }
+
+  /**
+   * Internal Anthropic Claude Execution
+   */
+  async _askAnthropic({ query, context, history, systemPrompt, startTime, requestId }) {
     let latestUserContent = query;
     if (context.client || context.executiveOverview) {
       latestUserContent = `SOLANE PRACTICE CONTEXT:
@@ -70,21 +171,15 @@ EXECUTIVE USER QUERY:
 ${query}`;
     }
 
-    // Build multi-turn messages array adhering to Anthropic API specification
     const messages = [];
-
     if (Array.isArray(history) && history.length > 0) {
       for (const turn of history) {
         const role = turn.role === 'assistant' ? 'assistant' : 'user';
         const content = typeof turn.content === 'string' ? turn.content.trim() : String(turn.content || '').trim();
         if (!content) continue;
 
-        // Anthropic requires strictly alternating user/assistant turns starting with user
         if (messages.length === 0) {
-          if (role === 'user') {
-            messages.push({ role, content });
-          }
-          // If first turn in history was assistant, skip it to ensure array starts with user
+          if (role === 'user') messages.push({ role, content });
         } else if (messages[messages.length - 1].role === role) {
           messages[messages.length - 1].content += `\n\n${content}`;
         } else {
@@ -93,14 +188,12 @@ ${query}`;
       }
     }
 
-    // Append the latest user query
     if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
       messages[messages.length - 1].content = latestUserContent;
     } else {
       messages.push({ role: 'user', content: latestUserContent });
     }
 
-    // Set up timeout controller (Section 37)
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -118,7 +211,6 @@ ${query}`;
       clearTimeout(timeoutHandle);
       const durationMs = Date.now() - startTime;
 
-      // Extract raw text response from text content blocks
       let rawText = '';
       if (Array.isArray(response.content)) {
         rawText = response.content
@@ -142,22 +234,95 @@ ${query}`;
           durationMs
         }
       };
-
     } catch (err) {
+      clearTimeout(timeoutHandle);
+      throw err;
+    }
+  }
+
+  /**
+   * Internal Google Gemini Execution
+   */
+  async _askGemini({ query, context, history, systemPrompt, startTime, requestId }) {
+    let latestUserContent = query;
+    if (context.client || context.executiveOverview) {
+      latestUserContent = `SLOANE PRACTICE CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+EXECUTIVE USER QUERY:
+${query}`;
+    }
+
+    const contents = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const turn of history) {
+        const role = turn.role === 'assistant' ? 'model' : 'user';
+        const text = typeof turn.content === 'string' ? turn.content.trim() : String(turn.content || '').trim();
+        if (!text) continue;
+        if (contents.length === 0 && role === 'model') continue;
+        if (contents.length > 0 && contents[contents.length - 1].role === role) {
+          contents[contents.length - 1].parts[0].text += `\n\n${text}`;
+        } else {
+          contents.push({ role, parts: [{ text }] });
+        }
+      }
+    }
+
+    if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+      contents[contents.length - 1].parts[0].text = latestUserContent;
+    } else {
+      contents.push({ role: 'user', parts: [{ text: latestUserContent }] });
+    }
+
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), this.timeoutMs);
+    const modelName = (this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          contents,
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: this.maxTokens
+          }
+        })
+      });
+
       clearTimeout(timeoutHandle);
       const durationMs = Date.now() - startTime;
 
-      const isTimeout = err.name === 'AbortError' || err.message?.includes('aborted');
-      console.warn(`[ClaudeService] Claude API call failed (${isTimeout ? 'TIMEOUT' : err.message}). Falling back to grounded rule engine.`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+      }
 
-      return this._generateGracefulFallback({
-        query,
-        context,
-        durationMs,
+      const resJson = await response.json();
+      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const structuredResult = this._parseAndValidateStructuredResponse(rawText, context, query);
+
+      return {
+        status: 'success',
+        source: 'google_gemini',
+        model: modelName,
         requestId,
-        reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
-        errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (err.message || 'Claude service temporarily unreachable')
-      });
+        data: structuredResult,
+        usage: {
+          inputTokens: resJson.usageMetadata?.promptTokenCount || null,
+          outputTokens: resJson.usageMetadata?.candidatesTokenCount || null,
+          durationMs
+        }
+      };
+    } catch (err) {
+      clearTimeout(timeoutHandle);
+      throw err;
     }
   }
 

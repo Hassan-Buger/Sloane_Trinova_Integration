@@ -1763,8 +1763,11 @@ class SloaneApp {
       const riskIcon = riskLevel === 'red' ? '🔴 RED CRITICAL' : riskLevel === 'amber' ? '🟠 AMBER ATTENTION' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ PRACTICE ASSESSMENT';
 
       const isClaude = res.source === 'anthropic_claude';
+      const isGemini = res.source === 'google_gemini';
       const providerBadge = isClaude
         ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
+        : isGemini
+        ? `<span class="source-badge ch-live" style="font-size: 10px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">✨ Google Gemini</span>`
         : `<span class="source-badge" style="font-size: 10px; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">🛡️ Offline Grounded Fallback</span>`;
 
       // Remove inline loading if present

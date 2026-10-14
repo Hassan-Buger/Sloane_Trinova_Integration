@@ -79,5 +79,17 @@ export const config = {
     maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '1500', 10),
     rateLimitMaxRequests: parseInt(process.env.AI_RATE_LIMIT_MAX || '60', 10),
     rateLimitWindowMs: parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || '60000', 10)
-  }
+  },
+
+  // Google Gemini AI Integration Settings
+  // Key held strictly server-side
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    timeoutMs: parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10),
+    maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || '1500', 10)
+  },
+
+  // Primary AI Provider Selection: 'auto' | 'gemini' | 'anthropic'
+  aiProvider: process.env.AI_PROVIDER || 'auto'
 };
