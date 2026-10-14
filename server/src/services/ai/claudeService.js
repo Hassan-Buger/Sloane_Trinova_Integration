@@ -531,9 +531,81 @@ ${query}`;
       };
     }
 
-    // 4. Practice-Wide Query (Compute directly from authentic mockDb records)
+    // 3.5 Specific Client / Company Existence or Lookup Query
     const allCompanies = mockDb.companies || [];
     const redCompanies = allCompanies.filter(c => c.riskLevel === 'High');
+
+    const mentionsClientOrCompany = /(client|company|entities|portfolio)/i.test(q);
+    const mentionsSearchOrQuery = /(is there|are there|do we have|any|find|search|lookup|named|name)/i.test(q);
+
+    if (mentionsClientOrCompany && mentionsSearchOrQuery) {
+      const candidates = [];
+      const regexes = [
+        /client\s+(?:name\s+|named\s+)?["']?([a-z0-9\s\-]+?)["']?(?:\s+(?:and|or|with)|[\?,\.]|$)/gi,
+        /company\s+(?:name\s+|named\s+)?["']?([a-z0-9\s\-]+?)["']?(?:\s+(?:and|or|with)|[\?,\.]|$)/gi
+      ];
+      for (const rx of regexes) {
+        let match;
+        while ((match = rx.exec(q)) !== null) {
+          const val = match[1].trim();
+          if (val && !['any', 'the', 'a', 'an', 'is', 'there'].includes(val.toLowerCase())) {
+            candidates.push(val);
+          }
+        }
+      }
+
+      if (candidates.length > 0) {
+        const allClients = mockDb.clients || [];
+        const foundClients = [];
+        const notFound = [];
+
+        for (const cand of candidates) {
+          const cleanCand = cand.toLowerCase();
+          const matchClient = allClients.find(c => c.name.toLowerCase().includes(cleanCand));
+          const matchComp = allCompanies.find(c => c.companyName.toLowerCase().includes(cleanCand));
+          if (matchClient) {
+            foundClients.push(`Client: ${matchClient.name}`);
+          } else if (matchComp) {
+            foundClients.push(`Company: ${matchComp.companyName}`);
+          } else {
+            notFound.push(cand);
+          }
+        }
+
+        if (notFound.length > 0) {
+          let answer = `No practice records found for: ${notFound.map(n => `"${n}"`).join(', ')}. `;
+          if (foundClients.length > 0) {
+            answer += `However, found matching entities: ${foundClients.join(', ')}.`;
+          } else {
+            answer += `They are not registered in TriNova's active portfolio. Across your connected records, ${redCompanies.map(c => c.companyName).join(' and ')} require priority attention today.`;
+          }
+
+          return {
+            status: 'fallback',
+            source: 'sloane_rules_engine',
+            model: 'deterministic_grounded_fallback',
+            requestId,
+            reason,
+            errorMessage,
+            data: {
+              response_type: 'practice_assessment',
+              answer,
+              risk_level: notFound.length > 0 && foundClients.length === 0 ? 'neutral' : 'amber',
+              key_reasons: [
+                ...notFound.map(n => `"${n}" does not exist in practice database.`),
+                ...foundClients.map(f => `${f} is actively tracked.`)
+              ],
+              recommended_actions: [],
+              evidence: []
+            },
+            usage: { durationMs }
+          };
+        }
+      }
+    }
+
+    // 4. Practice-Wide Query (Compute directly from authentic mockDb records)
+
     const isRedCountQuery = /how\s+many.*(red|flagged)/i.test(q) || /count.*(red|high)/i.test(q);
     const isUrgentPriorityQuery = /which.*(most\s+urgent|priority|attention)/i.test(q) || /highest\s+priority/i.test(q);
 
