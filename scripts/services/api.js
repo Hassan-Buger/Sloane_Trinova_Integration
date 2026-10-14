@@ -744,12 +744,23 @@ export const ApiService = {
     }
   },
 
+  getAiProvider() {
+    return localStorage.getItem('sloane_ai_provider') || 'auto';
+  },
+
+  setAiProvider(provider) {
+    if (['auto', 'gemini', 'anthropic'].includes(provider)) {
+      localStorage.setItem('sloane_ai_provider', provider);
+    }
+  },
+
   /**
    * Queries Sloane AI via secure backend endpoint with strict server-side credentials.
    * Adheres to Prompt Section 25, 28, 29, 36, 44:
    * 1. Submits query and multi-turn history to backend POST /api/v1/ai/ask
-   * 2. Falls back to verified local practice rules engine if server is unreachable
-   * 3. Accurately reports provenance (never claims fallback is live Claude)
+   * 2. Supports provider selection ('auto', 'gemini', 'anthropic')
+   * 3. Falls back to verified local practice rules engine if server is unreachable
+   * 4. Accurately reports provenance (never claims fallback is live Claude or Gemini)
    */
   async askAi(payload) {
     const startTime = performance.now();
@@ -761,7 +772,9 @@ export const ApiService = {
         body: {
           message: (payload.message || '').trim(),
           clientId: payload.clientId || null,
-          history: Array.isArray(payload.history) ? payload.history : []
+          history: Array.isArray(payload.history) ? payload.history : [],
+          provider: payload.provider || this.getAiProvider(),
+          model: payload.model || null
         }
       });
 

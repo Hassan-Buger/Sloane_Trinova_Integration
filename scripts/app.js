@@ -59,6 +59,9 @@ class SloaneApp {
       this.appEventsBound = true;
     }
 
+    // Synchronize active AI provider selector
+    this.syncProviderDropdowns();
+
     // Initial render of all view pipelines
     await this.renderAll();
 
@@ -531,9 +534,11 @@ class SloaneApp {
         const baseUrlInput = document.getElementById('configBaseUrl');
         const tokenInput = document.getElementById('configToken');
         const anthropicInput = document.getElementById('configAnthropicKey');
+        const providerInput = document.getElementById('configAiProviderSelect');
         if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
         if (tokenInput) tokenInput.value = ApiService.config.token;
         if (anthropicInput) anthropicInput.value = ApiService.config.anthropicApiKey || '';
+        if (providerInput) providerInput.value = ApiService.getAiProvider();
         ModalManager.open('trinovaConfigModal', trinovaStatusBtn);
       });
     }
@@ -546,6 +551,11 @@ class SloaneApp {
         const baseUrl = document.getElementById('configBaseUrl').value.trim();
         const token = document.getElementById('configToken').value.trim();
         const anthropicApiKey = document.getElementById('configAnthropicKey')?.value.trim();
+        const chosenProvider = document.getElementById('configAiProviderSelect')?.value;
+        if (chosenProvider) {
+          ApiService.setAiProvider(chosenProvider);
+          this.syncProviderDropdowns(chosenProvider);
+        }
         ApiService.configure({ baseUrl, token, anthropicApiKey });
         Toast.info('Connecting to updated TriNova endpoint...');
         this.logToTrinovaConsole(`Configuration saved. Re-testing endpoint ${baseUrl}...`);
@@ -554,6 +564,23 @@ class SloaneApp {
         Toast.success('TriNova & AI configuration saved.');
       });
     }
+
+    // Interactive AI Provider Switchers (Header, Chat Modal, & Config)
+    const topAiSelect = document.getElementById('topAiProviderSelect');
+    const modalAiSelect = document.getElementById('modalAiProviderSelect');
+    const configAiSelect = document.getElementById('configAiProviderSelect');
+
+    const handleProviderChange = (e) => {
+      const selected = e.target.value;
+      ApiService.setAiProvider(selected);
+      this.syncProviderDropdowns(selected);
+      const name = selected === 'gemini' ? 'Google Gemini' : selected === 'anthropic' ? 'Anthropic Claude 3.5' : 'Auto Failover';
+      Toast.info(`AI Engine switched to: ${name}`);
+    };
+
+    if (topAiSelect) topAiSelect.addEventListener('change', handleProviderChange);
+    if (modalAiSelect) modalAiSelect.addEventListener('change', handleProviderChange);
+    if (configAiSelect) configAiSelect.addEventListener('change', handleProviderChange);
 
     // Claude API Key Verification Button
     const btnTestClaudeKey = document.getElementById('btnTestClaudeKey');
@@ -1894,6 +1921,16 @@ class SloaneApp {
         }
       }
     }, 180);
+  }
+
+  syncProviderDropdowns(provider) {
+    const p = provider || ApiService.getAiProvider();
+    const topSelect = document.getElementById('topAiProviderSelect');
+    const modalSelect = document.getElementById('modalAiProviderSelect');
+    const configSelect = document.getElementById('configAiProviderSelect');
+    if (topSelect) topSelect.value = p;
+    if (modalSelect) modalSelect.value = p;
+    if (configSelect) configSelect.value = p;
   }
 }
 

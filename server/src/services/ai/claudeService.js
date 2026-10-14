@@ -57,9 +57,12 @@ export class ClaudeService {
    * Queries configured AI provider (Anthropic Claude or Google Gemini) with context, user message, and multi-turn history.
    * Returns validated structured output adhering to the API contract.
    */
-  async ask({ query, context = {}, history = [], systemPrompt = SLOANE_SYSTEM_PROMPT }) {
+  async ask({ query, context = {}, history = [], systemPrompt = SLOANE_SYSTEM_PROMPT, provider = null, model = null }) {
     const startTime = Date.now();
     const requestId = `ai_req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Resolve active AI provider preference (request parameter overrides server default)
+    const effectiveProvider = (provider || this.aiProvider || 'auto').toLowerCase();
 
     // If neither Anthropic nor Gemini is configured
     if (!this.isConfigured()) {
@@ -73,52 +76,82 @@ export class ClaudeService {
       });
     }
 
-    // Determine preference:
-    // If aiProvider === 'gemini', or if only Gemini is configured, use Gemini.
-    const preferGemini = this.aiProvider === 'gemini' || (this.aiProvider === 'auto' && this.isGeminiConfigured() && !this.isAnthropicConfigured());
-
-    if (preferGemini && this.isGeminiConfigured()) {
-      try {
-        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
-      } catch (geminiErr) {
-        console.warn('[AIService] Gemini API call failed:', geminiErr.message);
-        if (this.isAnthropicConfigured()) {
-          try {
-            return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
-          } catch (anthropicErr) {
-            console.warn('[AIService] Secondary Anthropic call also failed:', anthropicErr.message);
+    // 1. Explicit Gemini Preference
+    if (effectiveProvider === 'gemini') {
+      if (this.isGeminiConfigured()) {
+        try {
+          return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
+        } catch (geminiErr) {
+          console.warn('[AIService] Primary Gemini call failed:', geminiErr.message);
+          if (this.isAnthropicConfigured()) {
+            console.info('[AIService] Failing over to Anthropic Claude...');
+            try {
+              return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
+            } catch (anthropicErr) {
+              console.warn('[AIService] Secondary Anthropic call also failed:', anthropicErr.message);
+            }
           }
+          const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
+          return this._generateGracefulFallback({
+            query,
+            context,
+            durationMs: Date.now() - startTime,
+            requestId,
+            reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
+            errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (geminiErr.message || 'Gemini service temporarily unreachable')
+          });
         }
-        const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
-        return this._generateGracefulFallback({
-          query,
-          context,
-          durationMs: Date.now() - startTime,
-          requestId,
-          reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
-          errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (geminiErr.message || 'Gemini service temporarily unreachable')
-        });
+      } else if (this.isAnthropicConfigured()) {
+        console.warn('[AIService] Gemini requested but not configured. Using Anthropic Claude.');
+        return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
       }
     }
 
-    // Otherwise try Anthropic first (with automatic Gemini failover if Anthropic fails with auth/key errors)
+    // 2. Explicit Anthropic Preference
+    if (effectiveProvider === 'anthropic') {
+      if (this.isAnthropicConfigured()) {
+        try {
+          return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
+        } catch (anthropicErr) {
+          console.warn('[AIService] Anthropic API call failed:', anthropicErr.message);
+          if (this.isGeminiConfigured()) {
+            console.info('[AIService] Seamlessly failing over to Google Gemini...');
+            try {
+              return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
+            } catch (geminiErr) {
+              console.warn('[AIService] Gemini fallback also failed:', geminiErr.message);
+            }
+          }
+          const isTimeout = anthropicErr.name === 'AbortError' || anthropicErr.message?.includes('aborted');
+          return this._generateGracefulFallback({
+            query,
+            context,
+            durationMs: Date.now() - startTime,
+            requestId,
+            reason: isTimeout ? 'TIMEOUT_EXCEEDED' : 'API_ERROR',
+            errorMessage: isTimeout ? `Request timed out after ${this.timeoutMs}ms` : (anthropicErr.message || 'Claude service temporarily unreachable')
+          });
+        }
+      } else if (this.isGeminiConfigured()) {
+        console.warn('[AIService] Anthropic requested but not configured. Using Google Gemini.');
+        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
+      }
+    }
+
+    // 3. Default 'auto' Mode (Claude primary with instant Gemini failover; or Gemini if only Gemini is configured)
     if (this.isAnthropicConfigured()) {
       try {
         return await this._askAnthropic({ query, context, history, systemPrompt, startTime, requestId });
       } catch (anthropicErr) {
-        console.warn('[AIService] Anthropic API call failed:', anthropicErr.message);
-
-        // Seamless Dual-Redundancy Failover:
-        // If Gemini is also configured and Anthropic fails (e.g. 401 invalid key, 400 unscoped), try Gemini!
+        console.warn('[AIService] Anthropic API call failed in auto mode:', anthropicErr.message);
         if (this.isGeminiConfigured()) {
           console.info('[AIService] Seamlessly failing over to Google Gemini...');
           try {
-            return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
+            return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
           } catch (geminiErr) {
             console.warn('[AIService] Gemini fallback also failed:', geminiErr.message);
           }
         }
-
         const isTimeout = anthropicErr.name === 'AbortError' || anthropicErr.message?.includes('aborted');
         return this._generateGracefulFallback({
           query,
@@ -131,10 +164,9 @@ export class ClaudeService {
       }
     }
 
-    // Gemini fallback if only Gemini is configured
     if (this.isGeminiConfigured()) {
       try {
-        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId });
+        return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
       } catch (geminiErr) {
         const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
         return this._generateGracefulFallback({
@@ -243,7 +275,7 @@ ${query}`;
   /**
    * Internal Google Gemini Execution
    */
-  async _askGemini({ query, context, history, systemPrompt, startTime, requestId }) {
+  async _askGemini({ query, context, history, systemPrompt, startTime, requestId, model = null }) {
     let latestUserContent = query;
     if (context.client || context.executiveOverview) {
       latestUserContent = `SLOANE PRACTICE CONTEXT:
@@ -276,7 +308,7 @@ ${query}`;
 
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), this.timeoutMs);
-    const modelName = (this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
+    const modelName = (model || this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
 
     try {

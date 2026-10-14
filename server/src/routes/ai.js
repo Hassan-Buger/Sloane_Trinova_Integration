@@ -53,6 +53,8 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
     const body = req.body || {};
     const message = (body.message || body.query || '').trim();
     const clientId = body.clientId ? String(body.clientId).trim() : null;
+    const provider = body.provider ? String(body.provider).trim().toLowerCase() : null;
+    const model = body.model ? String(body.model).trim() : null;
 
     if (!message) {
       return res.status(422).json({
@@ -104,11 +106,13 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
         actor: req.actor
       });
 
-      // 6. Query Claude or Grounded Fallback (Section 20 & 33)
+      // 6. Query Configured AI Provider or Grounded Fallback (Section 20 & 33)
       const aiResponse = await claudeService.ask({
         query: message,
         context: allowedContext,
-        history: sanitizedHistory
+        history: sanitizedHistory,
+        provider,
+        model
       });
 
       // 7. Usage & Audit Logging (Section 39)

@@ -316,6 +316,27 @@ h1 {
   transform: translateY(-1px);
 }
 
+.ask-provider-select {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-right: 6px;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.ask-provider-select:hover,
+.ask-provider-select:focus {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
 /* View Sections */
 .view {
   animation: fadeIn 0.18s cubic-bezier(0.4, 0, 0.2, 1);

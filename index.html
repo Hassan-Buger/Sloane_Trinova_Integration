@@ -255,6 +255,11 @@
         <div class="ask-wrapper">
           <form class="ask-form" id="askForm">
             <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane anything about your businesses, tasks, filings..." autocomplete="off">
+            <select id="topAiProviderSelect" class="ask-provider-select" title="Switch AI Engine: Auto (Dual Failover), Google Gemini, or Claude 3.5">
+              <option value="auto">⚡ Auto</option>
+              <option value="gemini">✨ Gemini</option>
+              <option value="anthropic">🤖 Claude</option>
+            </select>
             <button type="submit" class="ask-btn" id="askSubmitBtn">Ask</button>
           </form>
           <div class="ask-suggestions" id="askSuggestions">
@@ -1017,6 +1022,21 @@
             <div id="claudeKeyTestStatus" style="font-size: 11px; margin-top: 6px; padding: 4px 8px; border-radius: 4px; display: none;"></div>
           </div>
 
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="configAiProviderSelect" style="font-weight: 600; font-size: 12px; display: flex; justify-content: space-between;">
+              <span>Active AI Intelligence Provider</span>
+              <span style="font-size: 10px; color: var(--accent); font-weight: normal;">(Dynamic Switching)</span>
+            </label>
+            <select class="form-control select-input" id="configAiProviderSelect" style="font-size: 12px;">
+              <option value="auto">⚡ Auto (Claude primary with instant Gemini failover)</option>
+              <option value="gemini">✨ Google Gemini (Active)</option>
+              <option value="anthropic">🤖 Anthropic Claude 3.5 Sonnet</option>
+            </select>
+            <span style="font-size: 10.5px; color: var(--muted); display: block; margin-top: 4px;">
+              Toggle instantly here or set default on Railway via <code>AI_PROVIDER=gemini</code> / <code>AI_PROVIDER=anthropic</code>.
+            </span>
+          </div>
+
           <div style="display: flex; gap: 8px; margin-bottom: 16px;">
             <button type="submit" class="btn btn-primary" style="flex: 1; font-size: 12px; padding: 7px 12px;">Save & Reconnect</button>
             <button type="button" class="btn btn-secondary" id="configResetDefaultsBtn" style="font-size: 12px; padding: 7px 12px;">Reset Defaults</button>
@@ -1065,6 +1085,14 @@
             <h3 id="aiModalTitle" style="margin: 0; font-size: 15px;">Sloane — Executive Intelligence</h3>
             <span style="font-size: 11px; color: var(--muted);" id="aiModalSubtitle">Grounded Practice Analysis</span>
           </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-left: auto; margin-right: 12px;">
+          <label for="modalAiProviderSelect" style="font-size: 11px; color: var(--muted); font-weight: 600;">Engine:</label>
+          <select id="modalAiProviderSelect" class="ask-provider-select" style="margin-right: 0;" title="Switch AI Engine for active conversation">
+            <option value="auto">⚡ Auto (Redundant)</option>
+            <option value="gemini">✨ Google Gemini</option>
+            <option value="anthropic">🤖 Claude 3.5 Sonnet</option>
+          </select>
         </div>
         <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
       </div>
