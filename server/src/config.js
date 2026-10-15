@@ -85,8 +85,8 @@ export const config = {
   // Key held strictly server-side
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-    timeoutMs: parseInt(process.env.GEMINI_TIMEOUT_MS || '15000', 10),
+    model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+    timeoutMs: parseInt(process.env.GEMINI_TIMEOUT_MS || '25000', 10),
     maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || '1500', 10)
   },
 

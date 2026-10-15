@@ -309,50 +309,75 @@ ${query}`;
 
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), this.geminiTimeoutMs || 25000);
-    const modelName = (model || this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
+
+    const primaryModel = (model || this.geminiModel || 'gemini-3.1-flash-lite').replace(/^models\//, '');
+    const candidateModels = [primaryModel];
+    const resilientFallbacks = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+    for (const fb of resilientFallbacks) {
+      if (!candidateModels.includes(fb)) candidateModels.push(fb);
+    }
+
+    let lastError = null;
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          contents,
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: this.maxTokens
+      for (const modelName of candidateModels) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemPrompt }]
+              },
+              contents,
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: this.maxTokens
+              }
+            })
+          });
+
+          // If current model is 404 (deprecated/not found) or 503 (high demand), try next candidate
+          if (response.status === 404 || response.status === 503) {
+            const errorText = await response.text();
+            console.warn(`[AIService] Gemini model ${modelName} returned HTTP ${response.status}. Trying next resilient candidate...`);
+            lastError = new Error(`Gemini API error ${response.status}: ${errorText}`);
+            continue;
           }
-        })
-      });
 
-      clearTimeout(timeoutHandle);
-      const durationMs = Date.now() - startTime;
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+          }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+          clearTimeout(timeoutHandle);
+          const durationMs = Date.now() - startTime;
+          const resJson = await response.json();
+          const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const structuredResult = this._parseAndValidateStructuredResponse(rawText, context, query);
+
+          return {
+            status: 'success',
+            source: 'google_gemini',
+            model: modelName,
+            requestId,
+            data: structuredResult,
+            usage: {
+              inputTokens: resJson.usageMetadata?.promptTokenCount || null,
+              outputTokens: resJson.usageMetadata?.candidatesTokenCount || null,
+              durationMs
+            }
+          };
+        } catch (fetchErr) {
+          if (fetchErr.name === 'AbortError') throw fetchErr;
+          lastError = fetchErr;
+        }
       }
 
-      const resJson = await response.json();
-      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const structuredResult = this._parseAndValidateStructuredResponse(rawText, context, query);
-
-      return {
-        status: 'success',
-        source: 'google_gemini',
-        model: modelName,
-        requestId,
-        data: structuredResult,
-        usage: {
-          inputTokens: resJson.usageMetadata?.promptTokenCount || null,
-          outputTokens: resJson.usageMetadata?.candidatesTokenCount || null,
-          durationMs
-        }
-      };
+      clearTimeout(timeoutHandle);
+      throw lastError || new Error('All configured Gemini models failed.');
     } catch (err) {
       clearTimeout(timeoutHandle);
       throw err;
