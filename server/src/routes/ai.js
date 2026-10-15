@@ -33,6 +33,52 @@ function checkRateLimit(actorId) {
 
 export function registerAiRoutes(app, { authenticate, requireScope }) {
   /**
+   * GET /api/v1/ai/models
+   * Inspect available AI models and active provider status
+   */
+  app.get('/api/v1/ai/models', authenticate, requireScope('sloane:read'), async (req, res) => {
+    try {
+      const geminiConfigured = claudeService.isGeminiConfigured();
+      const anthropicConfigured = claudeService.isAnthropicConfigured();
+      let geminiModels = [];
+      let geminiError = null;
+
+      if (geminiConfigured && claudeService.geminiApiKey) {
+        try {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(claudeService.geminiApiKey.trim())}`, { signal: AbortSignal.timeout(8000) });
+          if (resp.ok) {
+            const data = await resp.json();
+            geminiModels = (data.models || [])
+              .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+              .map(m => m.name.replace(/^models\//, ''));
+          } else {
+            geminiError = `Google API HTTP ${resp.status}: ${await resp.text()}`;
+          }
+        } catch (e) {
+          geminiError = e.message;
+        }
+      }
+
+      return res.status(200).json({
+        status: 'success',
+        activeProvider: claudeService.aiProvider,
+        configured: {
+          gemini: geminiConfigured,
+          anthropic: anthropicConfigured
+        },
+        models: {
+          gemini: geminiModels,
+          geminiCurrent: claudeService.geminiModel,
+          geminiError,
+          anthropicCurrent: claudeService.model
+        }
+      });
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  /**
    * POST /api/v1/ai/ask
    * Sloane AI Executive Assistant Query Endpoint
    */

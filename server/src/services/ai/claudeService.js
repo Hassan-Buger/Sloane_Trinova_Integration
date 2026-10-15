@@ -20,6 +20,7 @@ export class ClaudeService {
     // Google Gemini Configuration
     this.geminiApiKey = options.geminiApiKey !== undefined ? options.geminiApiKey : (config.gemini?.apiKey || process.env.GEMINI_API_KEY || '');
     this.geminiModel = options.geminiModel || config.gemini?.model || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    this.geminiTimeoutMs = options.geminiTimeoutMs || config.gemini?.timeoutMs || parseInt(process.env.GEMINI_TIMEOUT_MS || '25000', 10);
     this.aiProvider = options.aiProvider || config.aiProvider || process.env.AI_PROVIDER || 'auto';
 
     this.client = null;
@@ -307,7 +308,7 @@ ${query}`;
     }
 
     const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeoutHandle = setTimeout(() => controller.abort(), this.geminiTimeoutMs || 25000);
     const modelName = (model || this.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
 
