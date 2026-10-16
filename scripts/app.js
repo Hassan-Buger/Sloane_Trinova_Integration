@@ -73,8 +73,9 @@ class SloaneApp {
     // Bind authentication UI events
     this.bindAuthEvents();
 
-    // Verify session
-    if (!AuthService.isAuthenticated()) {
+    // Verify session strictly with the backend server
+    const isSessionValid = await AuthService.verifySession();
+    if (!isSessionValid) {
       this.showLoginView();
       return;
     }

@@ -19,22 +19,50 @@ export const AuthService = {
     businessesCount: 6
   },
 
+  _serverVerified: false,
+
   /**
-   * Validates whether an active authenticated session exists.
+   * Validates whether an active, server-verified session exists.
+   * Strictly disallows treating cached localStorage as proof of authentication.
    */
   isAuthenticated() {
-    const session = this.getSession();
-    if (!session || !session.token) {
-      return false;
-    }
+    return this._serverVerified === true;
+  },
 
-    // Check expiration (7-day sliding session)
-    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-      this.logout();
-      return false;
-    }
+  /**
+   * Actively validates the session cookie against the backend /api/v1/auth/session endpoint.
+   * Purges all local session caches if the server rejects authentication.
+   */
+  async verifySession() {
+    try {
+      const resp = await fetch('/api/v1/auth/session', { credentials: 'same-origin' });
+      if (resp.ok) {
+        const data = await resp.json();
+        const user = data.user || this.defaultUser;
+        const sessionData = {
+          token: 'slon_cookie_session',
+          user,
+          createdAt: new Date().toISOString()
+        };
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sessionData));
+        this._serverVerified = true;
+        return true;
+      }
+    } catch (_) {}
 
-    return true;
+    this.clearClientSession();
+    return false;
+  },
+
+  /**
+   * Purges all client-side authentication tokens and session caches.
+   */
+  clearClientSession() {
+    this._serverVerified = false;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch (_) {}
   },
 
   /**
@@ -42,11 +70,11 @@ export const AuthService = {
    */
   getSession() {
     try {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local) return JSON.parse(local);
-
       const session = sessionStorage.getItem(STORAGE_KEY);
       if (session) return JSON.parse(session);
+
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local) return JSON.parse(local);
     } catch (e) {
       console.error('Failed to parse auth session:', e);
     }
@@ -87,8 +115,11 @@ export const AuthService = {
     const result = await response.json();
 
     if (!response.ok) {
+      this.clearClientSession();
       throw new Error(result.error?.message || 'Invalid email or password.');
     }
+
+    this._serverVerified = true;
 
     const user = result.user || {
       name: 'Kirsty Allen',
@@ -119,6 +150,7 @@ export const AuthService = {
    * Terminates active session on the server and locks the portal.
    */
   async logout() {
+    this._serverVerified = false;
     try {
       await fetch('/api/v1/auth/logout', {
         method: 'POST',
@@ -126,8 +158,7 @@ export const AuthService = {
       });
     } catch (_) {}
 
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
+    this.clearClientSession();
   },
 
   /**

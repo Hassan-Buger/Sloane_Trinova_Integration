@@ -141,6 +141,11 @@ export const ApiService = {
       }
 
       if (!response.ok) {
+        if (response.status === 401 && !endpoint.includes('/auth/login') && !options.skipAuthRedirect) {
+          if (typeof window !== 'undefined' && window.app && typeof window.app.showLoginView === 'function') {
+            window.app.showLoginView();
+          }
+        }
         const errorMsg = data?.error?.message || data?.message || `HTTP ${response.status} ${response.statusText}`;
         const error = new Error(errorMsg);
         error.status = response.status;

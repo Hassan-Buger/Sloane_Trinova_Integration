@@ -170,6 +170,31 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     assert.equal(postLogoutRes.status, 401);
   });
 
+  test('1.1.6 An existing browser session cannot make an invalid password appear to succeed in a fresh login attempt', async () => {
+    // Establish valid session first
+    const loginRes = await request('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.20' },
+      body: { email: 'kirsty@trinova.com', password: 'password123' }
+    });
+    assert.equal(loginRes.status, 200);
+    const setCookie = loginRes.headers['set-cookie'];
+    const sessionCookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie).split(';')[0];
+
+    // Attempt second login with incorrect password while passing existing session cookie
+    const badAttemptRes = await request('/api/v1/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': '198.51.100.21',
+        Cookie: sessionCookie
+      },
+      body: { email: 'kirsty@trinova.com', password: 'incorrect_random_password' }
+    });
+    assert.equal(badAttemptRes.status, 401);
+    assert.equal(badAttemptRes.body.error?.code, 'INVALID_CREDENTIALS');
+  });
+
   // 1.3 Static File Serving Whitelist & Dotfile Denial
   test('1.3.1 Serving sensitive files (config.js, .env.example, package.json) returns 404', async () => {
     const paths = [
