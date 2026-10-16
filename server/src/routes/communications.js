@@ -14,6 +14,15 @@ import { requireIdempotency } from '../middleware/idempotency.js';
 import { documentStorage } from '../services/storageDriver.js';
 import { TimelineService } from '../services/timelineService.js';
 
+/**
+ * Strips sensitive internal server storage paths and disk IDs from API responses per Section 1.5.
+ */
+function sanitizeDocument(doc) {
+  if (!doc || typeof doc !== 'object') return doc;
+  const { storagePath, diskId, ...safe } = doc;
+  return safe;
+}
+
 export function registerCommunicationRoutes(app, { authenticate, requireScope }) {
   // =========================================================================
   // 1. Messages & Conversations Endpoints
@@ -165,8 +174,12 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     req.auditAction = 'read_company_notes';
     req.resourceType = 'company_note';
     req.resourceId = companyId;
+    const allNotes = (mockDb.notes || []).filter(n => n.companyId === companyId);
 
-    const notes = (mockDb.notes || []).filter(n => n.companyId === companyId);
+    // Enforce visibility by actor role (Section 1.5)
+    // Only staff actors or actors with write scope can view staff_only notes
+    const isStaff = req.actor?.role === 'staff' || req.actor?.scopes?.includes('sloane:write');
+    const notes = isStaff ? allNotes : allNotes.filter(n => n.visibility !== 'staff_only');
 
     res.status(200).json({
       status: 'success',
@@ -293,7 +306,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     req.resourceType = 'document';
     req.resourceId = companyId;
 
-    const documents = (mockDb.documents || []).filter(d => d.companyId === companyId);
+    const documents = (mockDb.documents || []).filter(d => d.companyId === companyId).map(sanitizeDocument);
 
     res.status(200).json({
       status: 'success',
@@ -415,7 +428,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     res.status(201).json({
       status: 'success',
       message: 'Document uploaded and validated successfully.',
-      data: newDoc
+      data: sanitizeDocument(newDoc)
     });
   });
 
@@ -529,7 +542,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
     res.status(200).json({
       status: 'success',
-      data: doc
+      data: sanitizeDocument(doc)
     });
   });
 }

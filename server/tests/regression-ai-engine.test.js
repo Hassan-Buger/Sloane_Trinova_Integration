@@ -16,14 +16,15 @@ import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
 import { ClaudeService } from '../src/services/ai/claudeService.js';
 import { ContextBuilder } from '../src/services/ai/contextBuilder.js';
+import { TEST_API_KEY, TEST_READONLY_KEY } from './fixtures.js';
 
 describe('Regression Suite: Sloane AI Intelligence Engine Lifecycle', () => {
   let server;
   let baseUrl;
   const PORT = 4995;
 
-  const READ_ONLY_KEY = 'tn_sec_live_sloane_readonly_2026';
-  const READ_WRITE_KEY = 'tn_sec_live_sloane_readwrite_2026';
+  const READ_ONLY_KEY = TEST_READONLY_KEY;
+  const READ_WRITE_KEY = TEST_API_KEY;
 
   before(async () => {
     const app = createApp();

@@ -14,6 +14,7 @@ import { createApp } from '../src/app.js';
 import { CompaniesHouseService } from '../src/services/companiesHouse.js';
 import { StatutoryReconciliationEngine } from '../src/services/reconciliation.js';
 import { auditStore } from '../src/middleware/audit.js';
+import { TEST_API_KEY } from './fixtures.js';
 
 describe('Unit 03: Companies House Service & Statutory Reconciliation Engine', () => {
   const TEST_PORT = 4997;
@@ -124,7 +125,7 @@ describe('Unit 03: Companies House Service & Statutory Reconciliation Engine', (
   };
 
   const AUTH_HEADER = {
-    'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026',
+    'Authorization': `Bearer ${TEST_API_KEY}`,
     'Content-Type': 'application/json'
   };
 

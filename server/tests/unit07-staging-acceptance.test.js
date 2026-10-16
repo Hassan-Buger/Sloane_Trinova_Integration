@@ -19,6 +19,7 @@ import { auditStore } from '../src/middleware/audit.js';
 import { sandboxMailService } from '../src/services/sandboxMailService.js';
 import { documentStorage } from '../src/services/storageDriver.js';
 import { CompaniesHouseService } from '../src/services/companiesHouse.js';
+import { TEST_API_KEY, TEST_READONLY_KEY, TEST_WEBHOOK_SECRET } from './fixtures.js';
 
 describe('Unit 07: Staging Validation & Acceptance Testing', () => {
   let server;
@@ -26,9 +27,9 @@ describe('Unit 07: Staging Validation & Acceptance Testing', () => {
   let testApp;
   const PORT = 4999;
 
-  const LIVE_READWRITE_KEY = 'tn_sec_live_sloane_readwrite_2026';
-  const LIVE_READONLY_KEY = 'tn_sec_live_sloane_readonly_2026';
-  const WEBHOOK_SECRET = 'documenso_webhook_secret_hmac_2026';
+  const LIVE_READWRITE_KEY = TEST_API_KEY;
+  const LIVE_READONLY_KEY = TEST_READONLY_KEY;
+  const WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
 
   // Dedicated staging test fixture IDs
   const STAGING_CLIENT_ID = 'cli_staging_test_01';

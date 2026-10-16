@@ -321,11 +321,14 @@ ${query}`;
 
     try {
       for (const modelName of candidateModels) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.geminiApiKey.trim())}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
         try {
           const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': this.geminiApiKey.trim()
+            },
             signal: controller.signal,
             body: JSON.stringify({
               systemInstruction: {

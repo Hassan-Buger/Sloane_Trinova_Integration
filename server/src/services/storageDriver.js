@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename);
 export class DocumentStorageDriver {
   constructor(options = {}) {
     this.storageDir = options.storageDir || path.resolve(__dirname, '../../storage/documents');
-    this.tokenSecret = options.tokenSecret || 'tn_doc_presigned_secret_2026';
+    this.tokenSecret = options.tokenSecret || process.env.STORAGE_PRESIGNED_TOKEN_SECRET || process.env.SLON_TOKEN_SECRET || '';
     this.maxFileSizeBytes = options.maxFileSizeBytes || 15 * 1024 * 1024; // 15MB ceiling
     
     this.whitelistedMimeTypes = new Set([

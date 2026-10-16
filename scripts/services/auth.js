@@ -62,14 +62,10 @@ export const AuthService = {
   },
 
   /**
-   * Authenticates the CEO credentials.
-   * Accepts standard practice test password 'password123'
-   * or any password starting with 'password' / 'admin' / 'sloane'.
+   * Authenticates owner credentials against the server-side API.
+   * Receives HttpOnly session cookie from the backend per Section 1.1.
    */
   async login({ email, password, remember = true }) {
-    // Artificial small delay for security feel & UX feedback
-    await new Promise(resolve => setTimeout(resolve, 350));
-
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPass = (password || '').trim();
 
@@ -81,32 +77,30 @@ export const AuthService = {
       throw new Error('Please enter your executive password.');
     }
 
-    // Flexible practice authentication rule:
-    // 1. Exact match: password123
-    // 2. Or matches 'sloane2026' or 'admin123'
-    // 3. Or password length >= 6
-    const isValidPass = cleanPass === 'password123' || 
-                        cleanPass === 'sloane2026' || 
-                        cleanPass.length >= 6;
+    const response = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
+      credentials: 'same-origin'
+    });
 
-    if (!isValidPass) {
-      throw new Error('Invalid executive password. Default test password is: password123');
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'Invalid email or password.');
     }
 
-    const displayName = cleanEmail.includes('kirsty') 
-      ? 'Kirsty Allen' 
-      : cleanEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const user = result.user || {
+      name: 'Kirsty Allen',
+      email: cleanEmail,
+      role: 'CEO & Managing Partner',
+      avatar: 'KA'
+    };
 
     const sessionData = {
-      token: `sloane_sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      user: {
-        name: displayName,
-        email: cleanEmail,
-        role: 'CEO & Managing Partner',
-        avatar: displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-      },
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      token: 'slon_cookie_session',
+      user,
+      createdAt: new Date().toISOString()
     };
 
     if (remember) {
@@ -122,11 +116,32 @@ export const AuthService = {
   },
 
   /**
-   * Terminates active session and locks the portal.
+   * Terminates active session on the server and locks the portal.
    */
-  logout() {
+  async logout() {
+    try {
+      await fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin'
+      });
+    } catch (_) {}
+
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
+  },
+
+  /**
+   * Checks whether the server session is still valid.
+   */
+  async checkServerSession() {
+    try {
+      const resp = await fetch('/api/v1/auth/session', { credentials: 'same-origin' });
+      if (resp.ok) {
+        const data = await resp.json();
+        return data.user || true;
+      }
+    } catch (_) {}
+    return null;
   },
 
   /**

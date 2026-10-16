@@ -366,12 +366,15 @@ h1 {
   .side {
     display: none;
     position: fixed;
-    top: 54px;
+    top: 56px;
     left: 0;
     width: 280px;
-    height: calc(100vh - 54px);
-    box-shadow: var(--shadow-lg);
+    height: calc(100vh - 56px);
+    background-color: var(--panel);
+    border-right: 1px solid var(--line);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
     z-index: 1000;
+    overflow-y: auto;
   }
 
   .side.mobile-open {
@@ -380,6 +383,8 @@ h1 {
 
   .mobile-nav-bar {
     display: flex;
+    height: 56px;
+    box-sizing: border-box;
   }
 
   main {

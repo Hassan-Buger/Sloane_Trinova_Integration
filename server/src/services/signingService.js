@@ -32,13 +32,9 @@ export class SigningService {
 
   /**
    * Verifies incoming webhook HMAC signature.
-   * Supports X-Documenso-Signature (HMAC-SHA256) and X-Documenso-Secret headers.
+   * Strictly enforces X-Documenso-Signature (HMAC-SHA256). Plain secret header bypass is removed per Section 1.5.
    */
-  verifyWebhookSignature(rawBody, signatureHeader, secretHeader) {
-    if (secretHeader && secretHeader === this.webhookSecret) {
-      return true;
-    }
-
+  verifyWebhookSignature(rawBody, signatureHeader) {
     if (!signatureHeader || typeof rawBody !== 'string') {
       return false;
     }

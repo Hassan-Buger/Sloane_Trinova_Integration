@@ -136,7 +136,7 @@
       <div class="brand-mark">S</div>
       <span style="font-weight: 850; font-size: 15px; letter-spacing: 0.1em;">SLOANE</span>
     </div>
-    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mainNavSidebar">
       ☰ Menu
     </button>
   </header>
@@ -145,7 +145,7 @@
   <div class="shell">
     
     <!-- Sticky Sidebar -->
-    <aside class="side" role="navigation" aria-label="Main Navigation">
+    <aside class="side" id="mainNavSidebar" role="navigation" aria-label="Main Navigation">
       <div class="brand">
         <div class="brand-mark">S</div>
         <div class="brand-text">
@@ -500,7 +500,8 @@
                 <div class="client-detail-meta" id="timelineActiveClientMeta">
                   <span id="timelineActiveClientType">Corporate Group</span> ·
                   <span id="timelineActiveClientBiz">Trinova Accounting</span> ·
-                  <span class="pill green" id="timelineActiveClientStatus">Active</span>
+                  <span class="pill green" id="timelineActiveClientStatus">Active</span> ·
+                  <span class="pill green" id="timelineConnectionBadge" title="TriNova Timeline Integration Status">⚡ Live API</span>
                 </div>
               </div>
             </div>
@@ -1112,7 +1113,7 @@
   </div>
 
   <!-- Modal: Log Timeline Event Modal (Feature 1) -->
-  <div class="modal" id="logTimelineEventModal" role="dialog" aria-modal="true" aria-labelledby="logTimelineEventTitle">
+  <div class="modal modal-overlay" id="logTimelineEventModal" role="dialog" aria-modal="true" aria-labelledby="logTimelineEventTitle">
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-content" style="max-width: 520px;">
       <div class="modal-header">

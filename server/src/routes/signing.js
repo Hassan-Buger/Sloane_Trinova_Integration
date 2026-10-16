@@ -118,11 +118,10 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
    */
   app.post('/api/v1/signing/webhooks', (req, res) => {
     const signatureHeader = req.headers['x-documenso-signature'];
-    const secretHeader = req.headers['x-documenso-secret'];
     const rawBody = req.rawBody || JSON.stringify(req.body || {});
 
-    // Cryptographic verification (context/04_backend_integration_context.md §10c)
-    const isSignatureValid = signingService.verifyWebhookSignature(rawBody, signatureHeader, secretHeader);
+    // Cryptographic HMAC verification (Section 1.5)
+    const isSignatureValid = signingService.verifyWebhookSignature(rawBody, signatureHeader);
     if (!isSignatureValid) {
       return res.status(401).json({
         error: {

@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import { createApp } from '../src/app.js';
 import { mockDb } from '../src/data/db.js';
 import { auditStore } from '../src/middleware/audit.js';
+import { TEST_API_KEY, TEST_READONLY_KEY } from './fixtures.js';
 
 describe('Unit 05: Messages, Internal Notes & Document Management API', () => {
   const TEST_PORT = 4995;
@@ -21,12 +22,12 @@ describe('Unit 05: Messages, Internal Notes & Document Management API', () => {
   let baseUrl;
 
   const READWRITE_HEADER = {
-    'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026',
+    'Authorization': `Bearer ${TEST_API_KEY}`,
     'Content-Type': 'application/json'
   };
 
   const READONLY_HEADER = {
-    'Authorization': 'Bearer tn_sec_live_sloane_readonly_2026',
+    'Authorization': `Bearer ${TEST_READONLY_KEY}`,
     'Content-Type': 'application/json'
   };
 

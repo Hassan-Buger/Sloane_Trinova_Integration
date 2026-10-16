@@ -18,12 +18,15 @@ const getDynamicDefaultBaseUrl = () => {
 };
 
 const DEFAULT_BASE_URL = getDynamicDefaultBaseUrl();
-const DEFAULT_API_KEY = 'tn_sec_live_sloane_readwrite_2026';
 
-// Server-side secret protection: purge legacy client-stored keys and stale testnova base URLs
+// Server-side secret protection: purge legacy client-stored keys and stale credentials
 if (typeof localStorage !== 'undefined') {
   try {
     localStorage.removeItem('sloane_anthropic_api_key');
+    const storedToken = localStorage.getItem('sloane_trinova_api_token');
+    if (storedToken && storedToken.includes('tn_sec_live_sloane_readwrite_2026')) {
+      localStorage.removeItem('sloane_trinova_api_token');
+    }
     const storedUrl = localStorage.getItem('sloane_trinova_base_url');
     if (storedUrl && storedUrl.includes('testnova-production-7b65.up.railway.app')) {
       localStorage.removeItem('sloane_trinova_base_url');
@@ -31,8 +34,7 @@ if (typeof localStorage !== 'undefined') {
   } catch (_) {}
 }
 
-
-const initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || DEFAULT_API_KEY;
+const initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || '';
 
 export const ApiService = {
   // Current in-memory configuration
@@ -70,7 +72,7 @@ export const ApiService = {
   resetToDefaults() {
     return this.configure({
       baseUrl: DEFAULT_BASE_URL,
-      token: DEFAULT_API_KEY
+      token: ''
     });
   },
 
@@ -118,7 +120,8 @@ export const ApiService = {
         method,
         headers,
         body: options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : undefined,
-        signal: controller.signal
+        signal: controller.signal,
+        credentials: 'same-origin'
       });
       clearTimeout(timer);
 

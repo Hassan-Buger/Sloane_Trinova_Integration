@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authenticate, requireScope } from './middleware/auth.js';
 import { auditMiddleware, auditStore } from './middleware/audit.js';
+import { registerAuthRoutes } from './routes/auth.js';
 import { registerClientRoutes } from './routes/clients.js';
 import { registerStatutoryRoutes } from './routes/statutory.js';
 import { registerTaskRoutes } from './routes/tasks.js';
@@ -106,10 +107,38 @@ export function createApp(options = {}) {
         res.end(JSON.stringify(data));
       };
 
-      // CORS & Preflight handling for seamless frontend ⇄ API integration
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      // CORS handling with explicit origin whitelist (Section 1.5)
+      const allowedOrigins = [
+        'http://localhost:4000',
+        'http://localhost:8088',
+        'http://127.0.0.1:4000',
+        'http://127.0.0.1:8088',
+        'https://sloanetrinovaintegration-production.up.railway.app'
+      ];
+      if (process.env.CORS_ALLOWED_ORIGINS) {
+        process.env.CORS_ALLOWED_ORIGINS.split(',').forEach(o => {
+          const trimmed = o.trim();
+          if (trimmed && !allowedOrigins.includes(trimmed)) allowedOrigins.push(trimmed);
+        });
+      }
+
+      const requestOrigin = req.headers.origin;
+      if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trinova-API-Key, Idempotency-Key, If-Match, X-Documenso-Signature, X-Documenso-Secret');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trinova-API-Key, Idempotency-Key, If-Match, X-Documenso-Signature');
+
+      // Security Headers: Content-Security-Policy & Defensive Headers (Section 1.4)
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://testnova-production-7b65.up.railway.app;"
+      );
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
 
       // Parse URL and Query parameters
       const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -139,15 +168,51 @@ export function createApp(options = {}) {
         return;
       }
 
-      // Static file serving for full-stack deployment (Railway, Render, standalone)
+      // Static file serving: Serve ONLY explicit public directories, deny dotfiles and server source (Section 1.3)
       if (req.method === 'GET' && !req.path.startsWith('/api')) {
         let relativePath = req.path === '/' ? 'index.html' : req.path.replace(/^\/+/, '');
+
+        // 1. Deny dotfiles
+        if (relativePath.startsWith('.') || relativePath.includes('/.') || relativePath.includes('\\.')) {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Not Found');
+          return;
+        }
+
+        // 2. Strict public file/directory whitelist: only index.html, favicon.ico, styles/, scripts/, assets/
+        const isExplicitPublic =
+          relativePath === 'index.html' ||
+          relativePath === 'favicon.ico' ||
+          relativePath.startsWith('styles/') ||
+          relativePath.startsWith('scripts/') ||
+          relativePath.startsWith('assets/');
+
+        if (!isExplicitPublic) {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Not Found');
+          return;
+        }
+
+        // 3. Explicitly deny server source, storage, documents, config, package files
+        const lower = relativePath.toLowerCase();
+        if (
+          lower.startsWith('server') ||
+          lower.startsWith('storage') ||
+          lower.includes('config.js') ||
+          lower.includes('package') ||
+          lower.includes('.env')
+        ) {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Not Found');
+          return;
+        }
+
         const targetPath = path.resolve(STATIC_ROOT, relativePath);
 
         // Security check: prevent directory traversal
         if (!targetPath.startsWith(STATIC_ROOT)) {
-          res.writeHead(403, { 'Content-Type': 'text/plain' });
-          res.end('Forbidden');
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Not Found');
           return;
         }
 
@@ -341,6 +406,9 @@ export function createApp(options = {}) {
       actor: req.actor
     });
   });
+
+  // --- Mount Section 1.1 Auth Routes ---
+  registerAuthRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 02 Client & Company Read Routes ---
   registerClientRoutes(app, { authenticate, requireScope });

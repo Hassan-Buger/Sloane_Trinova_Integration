@@ -555,6 +555,50 @@
   .stat-top-actions {
     grid-template-columns: 1fr;
   }
+
+  .client-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+  }
+
+  .client-selector-wrap {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .client-selector-wrap select {
+    flex: 1 1 140px;
+    min-width: 0 !important;
+  }
+
+  .timeline-container {
+    padding-left: 20px;
+  }
+
+  .timeline-node {
+    left: -18px;
+  }
+
+  .timeline-container::before {
+    left: 7px;
+  }
+
+  .timeline-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .timeline-filter-group {
+    width: 100%;
+  }
+
+  .timeline-filter-group select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 /* ==========================================================================

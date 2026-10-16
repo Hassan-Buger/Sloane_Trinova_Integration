@@ -17,9 +17,9 @@ export const ModalManager = {
     });
 
     // Close buttons & backdrop click
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    document.querySelectorAll('.modal-overlay, .modal').forEach(overlay => {
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
+        if (e.target === overlay || (e.target && e.target.classList && e.target.classList.contains('modal-backdrop'))) {
           this.close(overlay.id);
         }
       });
@@ -45,6 +45,9 @@ export const ModalManager = {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
 
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+
     // Focus first focusable element
     const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (focusable.length > 0) {
@@ -62,11 +65,26 @@ export const ModalManager = {
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
 
+    // Unlock body scroll if no modals remain open
+    const remainingOpen = document.querySelectorAll('.modal-overlay.open, .modal.open');
+    if (remainingOpen.length === 0) {
+      document.body.style.overflow = '';
+    }
+
     if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
       this.lastFocusedElement.focus();
     }
 
+    if (this.activeModal && this.activeModal.id === modalId) {
+      this.activeModal = null;
+    }
+  },
+
+  closeAll() {
+    const openModals = document.querySelectorAll('.modal-overlay.open, .modal.open');
+    openModals.forEach(m => this.close(m.id));
     this.activeModal = null;
+    document.body.style.overflow = '';
   },
 
   _bindFocusTrap(modal) {

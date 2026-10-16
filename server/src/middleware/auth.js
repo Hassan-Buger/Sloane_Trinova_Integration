@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { logger } from './sanitizer.js';
+import { sessionStore } from '../services/sessionStore.js';
 
 /**
  * Performs a timing-safe constant-time string comparison.
@@ -27,6 +28,7 @@ function timingSafeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+
 /**
  * Extracts credential from Authorization: Bearer <token> or X-Trinova-API-Key.
  */
@@ -45,16 +47,36 @@ function extractToken(req) {
 }
 
 /**
- * Authenticates incoming request.
+ * Authenticates incoming request via HttpOnly session cookie or server-to-server API credentials.
  */
 export function authenticate(req, res, next) {
+  // 1. Check for valid server-side session cookie
+  const cookies = sessionStore.parseCookies(req.headers.cookie);
+  const sessionId = cookies.slon_session;
+
+  if (sessionId) {
+    const session = sessionStore.getSession(sessionId);
+    if (session) {
+      req.session = session;
+      req.actor = {
+        actorId: 'actor_kirsty_allen',
+        actorName: session.user?.name || 'Kirsty Allen (CEO Command Centre)',
+        scopes: ['sloane:read', 'sloane:write'],
+        role: 'staff'
+      };
+      if (typeof next === 'function') return next();
+      return;
+    }
+  }
+
+  // 2. Check for server-to-server API token / key
   const token = extractToken(req);
 
   if (!token) {
     return res.status(401).json({
       error: {
         code: 'UNAUTHORIZED',
-        message: 'Missing server-to-server credentials. Provide Authorization: Bearer <token> or X-Trinova-API-Key.'
+        message: 'Missing credentials. Provide an active session cookie, Authorization: Bearer <token>, or X-Trinova-API-Key.'
       }
     });
   }

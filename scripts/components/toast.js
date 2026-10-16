@@ -25,10 +25,16 @@ export const Toast = {
     if (type === 'success') icon = '✓';
     if (type === 'error') icon = '⚠';
 
-    toast.innerHTML = `
-      <span style="font-weight: bold; color: ${type === 'success' ? 'var(--green)' : type === 'error' ? 'var(--red)' : 'var(--accent)'}">${icon}</span>
-      <span>${message}</span>
-    `;
+    const iconSpan = document.createElement('span');
+    iconSpan.style.fontWeight = 'bold';
+    iconSpan.style.color = type === 'success' ? 'var(--green)' : type === 'error' ? 'var(--red)' : 'var(--accent)';
+    iconSpan.textContent = icon;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
 
     this.container.appendChild(toast);
 

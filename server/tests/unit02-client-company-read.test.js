@@ -9,13 +9,14 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createApp } from '../src/app.js';
 import { auditStore } from '../src/middleware/audit.js';
+import { TEST_API_KEY } from './fixtures.js';
 
 describe('Unit 02: Client, Company & Entity Read Endpoints', () => {
   let server;
   let baseUrl;
   const TEST_PORT = 4998;
   const AUTH_HEADER = {
-    'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026'
+    'Authorization': `Bearer ${TEST_API_KEY}`
   };
 
   before(async () => {

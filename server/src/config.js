@@ -10,41 +10,68 @@ export const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
 
   // Active server-to-server credentials
-  // In production, these are loaded from secure server-side environment secrets.
-  apiKeys: [
-    {
-      key: process.env.SLOANE_API_KEY || 'tn_sec_live_sloane_readwrite_2026',
-      actorId: 'actor_kirsty_allen',
-      actorName: 'Kirsty Allen (CEO Command Centre)',
-      scopes: ['sloane:read', 'sloane:write'],
-      isRevoked: false,
-      expiresAt: '2028-12-31T23:59:59.000Z'
-    },
-    {
-      key: 'tn_sec_live_sloane_readonly_2026',
-      actorId: 'actor_sloane_monitor',
-      actorName: 'Sloane Monitoring Agent',
-      scopes: ['sloane:read'],
-      isRevoked: false,
-      expiresAt: '2028-12-31T23:59:59.000Z'
-    },
-    {
-      key: 'tn_sec_revoked_test_key_2026',
-      actorId: 'actor_revoked_client',
-      actorName: 'Revoked Client Test Credential',
-      scopes: ['sloane:read', 'sloane:write'],
-      isRevoked: true,
-      expiresAt: '2028-12-31T23:59:59.000Z'
-    },
-    {
-      key: 'tn_sec_expired_test_key_2026',
-      actorId: 'actor_expired_client',
-      actorName: 'Expired Client Test Credential',
-      scopes: ['sloane:read'],
-      isRevoked: false,
-      expiresAt: '2025-01-01T00:00:00.000Z'
+  // Loaded strictly from environment variables per Section 1.2. No default secrets committed in code.
+  get apiKeys() {
+    const keys = [];
+    const mainKey = (process.env.SLON_API_KEY || process.env.SLOANE_API_KEY || '').trim();
+    if (mainKey) {
+      keys.push({
+        key: mainKey,
+        actorId: 'actor_kirsty_allen',
+        actorName: 'Kirsty Allen (CEO Command Centre)',
+        scopes: ['sloane:read', 'sloane:write'],
+        isRevoked: false,
+        expiresAt: '2028-12-31T23:59:59.000Z'
+      });
     }
-  ],
+
+    const readonlyKey = (process.env.SLON_READONLY_API_KEY || process.env.SLOANE_READONLY_API_KEY || '').trim();
+    if (readonlyKey) {
+      keys.push({
+        key: readonlyKey,
+        actorId: 'actor_sloane_monitor',
+        actorName: 'Sloane Monitoring Agent',
+        scopes: ['sloane:read'],
+        isRevoked: false,
+        expiresAt: '2028-12-31T23:59:59.000Z'
+      });
+    }
+
+    const revokedKey = (process.env.TEST_REVOKED_API_KEY || '').trim();
+    if (revokedKey) {
+      keys.push({
+        key: revokedKey,
+        actorId: 'actor_revoked_client',
+        actorName: 'Revoked Client Test Credential',
+        scopes: ['sloane:read', 'sloane:write'],
+        isRevoked: true,
+        expiresAt: '2028-12-31T23:59:59.000Z'
+      });
+    }
+
+    const expiredKey = (process.env.TEST_EXPIRED_API_KEY || '').trim();
+    if (expiredKey) {
+      keys.push({
+        key: expiredKey,
+        actorId: 'actor_expired_client',
+        actorName: 'Expired Client Test Credential',
+        scopes: ['sloane:read'],
+        isRevoked: false,
+        expiresAt: '2025-01-01T00:00:00.000Z'
+      });
+    }
+
+    return keys;
+  },
+
+  // Owner authentication configuration (Section 1.1)
+  owner: {
+    email: (process.env.SLON_OWNER_EMAIL || '').trim().toLowerCase(),
+    passwordHash: (process.env.SLON_OWNER_PASSWORD_HASH || '').trim()
+  },
+
+  // Storage pre-signed token secret (Section 1.5)
+  storageTokenSecret: (process.env.STORAGE_PRESIGNED_TOKEN_SECRET || process.env.SLON_TOKEN_SECRET || '').trim(),
   
   // Companies House Server-Side Integration Settings
   // Key held exclusively server-side per context/04_backend_integration_context.md §9

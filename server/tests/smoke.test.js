@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { createApp } from '../src/app.js';
 import { mockDb } from '../src/data/db.js';
+import { TEST_API_KEY } from './fixtures.js';
 
 describe('Production Deployment Controlled Smoke Test', () => {
   let server;
@@ -22,7 +23,7 @@ describe('Production Deployment Controlled Smoke Test', () => {
   const PORT = 4991;
 
   // Designate authorized smoke test record
-  const SMOKE_TEST_KEY = 'tn_sec_live_sloane_readwrite_2026';
+  const SMOKE_TEST_KEY = TEST_API_KEY;
   const SMOKE_COMPANY_ID = 'comp_woofington_park_01';
   const SMOKE_DOC_ID = 'doc_woofington_draft_balance_sheet';
 

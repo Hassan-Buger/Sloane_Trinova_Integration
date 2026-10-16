@@ -34,3 +34,4 @@ Thumbs.db
 # Build & Archives
 *.zip
 scratch/
+_baseline/

@@ -9,6 +9,7 @@ import http from 'node:http';
 import { createApp } from '../src/app.js';
 import { auditStore } from '../src/middleware/audit.js';
 import { sanitizeForLog } from '../src/middleware/sanitizer.js';
+import { TEST_API_KEY, TEST_READONLY_KEY, TEST_REVOKED_KEY, TEST_EXPIRED_KEY } from './fixtures.js';
 
 describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
   let server;
@@ -80,7 +81,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
   test('Auth check: Revoked credential returns 401 with CREDENTIAL_REVOKED code', async () => {
     const res = await request('/api/v1/auth/verify', {
       headers: {
-        'Authorization': 'Bearer tn_sec_revoked_test_key_2026'
+        'Authorization': `Bearer ${TEST_REVOKED_KEY}`
       }
     });
     assert.equal(res.status, 401);
@@ -90,7 +91,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
   test('Auth check: Expired credential returns 401 with CREDENTIAL_EXPIRED code', async () => {
     const res = await request('/api/v1/auth/verify', {
       headers: {
-        'Authorization': 'Bearer tn_sec_expired_test_key_2026'
+        'Authorization': `Bearer ${TEST_EXPIRED_KEY}`
       }
     });
     assert.equal(res.status, 401);
@@ -100,7 +101,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
   test('Auth check: Valid Bearer token succeeds and resolves actor', async () => {
     const res = await request('/api/v1/auth/verify', {
       headers: {
-        'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026'
+        'Authorization': `Bearer ${TEST_API_KEY}`
       }
     });
     assert.equal(res.status, 200);
@@ -113,7 +114,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
   test('Auth check: Valid X-Trinova-API-Key header succeeds', async () => {
     const res = await request('/api/v1/auth/verify', {
       headers: {
-        'X-Trinova-API-Key': 'tn_sec_live_sloane_readwrite_2026'
+        'X-Trinova-API-Key': TEST_API_KEY
       }
     });
     assert.equal(res.status, 200);
@@ -125,7 +126,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
     const res = await request('/api/v1/test/mutate', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer tn_sec_live_sloane_readonly_2026'
+        'Authorization': `Bearer ${TEST_READONLY_KEY}`
       }
     });
     assert.equal(res.status, 403);
@@ -137,7 +138,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
     const res = await request('/api/v1/test/mutate', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026'
+        'Authorization': `Bearer ${TEST_API_KEY}`
       }
     });
     assert.equal(res.status, 201);
@@ -150,7 +151,7 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
     await request('/api/v1/test/mutate', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer tn_sec_live_sloane_readwrite_2026'
+        'Authorization': `Bearer ${TEST_API_KEY}`
       }
     });
 

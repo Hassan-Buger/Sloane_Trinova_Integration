@@ -21,6 +21,34 @@ import {
   PEOPLE_WORK
 } from './data/seed.js';
 
+/**
+ * HTML Output Escaping Utility (Section 1.4)
+ * Escapes dynamic values before DOM interpolation to prevent Stored & Reflected XSS.
+ */
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Strict ID Sanitizer (Section 1.4)
+ * Enforces alphanumeric, hyphen, underscore, and dot pattern for entity identifiers.
+ */
+export function sanitizeId(id) {
+  if (typeof id !== 'string') return '';
+  return id.replace(/[^a-zA-Z0-9_\-\.]/g, '');
+}
+
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
+  window.sanitizeId = sanitizeId;
+}
+
 class SloaneApp {
   constructor() {
     this.currentView = 'command';
@@ -337,8 +365,29 @@ class SloaneApp {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.querySelector('.side');
     if (mobileMenuBtn && sidebar) {
-      mobileMenuBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('mobile-open');
+      mobileMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = sidebar.classList.toggle('mobile-open');
+        mobileMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      // Close on outside click
+      document.addEventListener('click', (e) => {
+        if (sidebar.classList.contains('mobile-open')) {
+          if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+            sidebar.classList.remove('mobile-open');
+            mobileMenuBtn.setAttribute('aria-expanded', 'false');
+          }
+        }
+      });
+
+      // Close on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
+          sidebar.classList.remove('mobile-open');
+          mobileMenuBtn.setAttribute('aria-expanded', 'false');
+          mobileMenuBtn.focus();
+        }
       });
     }
 
@@ -698,6 +747,8 @@ class SloaneApp {
     // Close mobile menu if open
     const sidebar = document.querySelector('.side');
     if (sidebar) sidebar.classList.remove('mobile-open');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
 
     // Scroll to top
     window.scrollTo(0, 0);
@@ -723,10 +774,10 @@ class SloaneApp {
     if (top3Container) {
       top3Container.innerHTML = TOP3_ITEMS.map(item => `
         <div class="top3-item ${item.isRed ? 'item-red' : ''}">
-          <div class="rank">${item.rank}</div>
+          <div class="rank">${escapeHtml(item.rank)}</div>
           <div class="top3-item-content">
-            <div class="top3-item-title">${item.title}</div>
-            <div class="top3-item-desc">${item.desc}</div>
+            <div class="top3-item-title">${escapeHtml(item.title)}</div>
+            <div class="top3-item-desc">${escapeHtml(item.desc)}</div>
           </div>
         </div>
       `).join('');
@@ -739,9 +790,9 @@ class SloaneApp {
         <div class="diary-item">
           <div class="diary-item-left">
             <span class="dot ${item.chip === 'URGENT' ? 'red' : 'green'}"></span>
-            <span class="diary-title">${item.title}</span>
+            <span class="diary-title">${escapeHtml(item.title)}</span>
           </div>
-          <span class="timechip">${item.time}</span>
+          <span class="timechip">${escapeHtml(item.time)}</span>
         </div>
       `).join('');
     }
@@ -753,11 +804,11 @@ class SloaneApp {
       cmdBizGrid.innerHTML = businesses.slice(0, 6).map(b => `
         <div class="card" style="padding: 14px; cursor: pointer;" onclick="app.switchView('businesses')">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span class="pill green" style="font-size: 10px;">${b.status}</span>
-            <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${b.clientCount} clients</span>
+            <span class="pill green" style="font-size: 10px;">${escapeHtml(b.status)}</span>
+            <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${escapeHtml(b.clientCount)} clients</span>
           </div>
-          <div style="font-size: 13px; font-weight: 800; color: var(--text);">${b.name}</div>
-          <div style="font-size: 10px; color: var(--muted);">${b.type}</div>
+          <div style="font-size: 13px; font-weight: 800; color: var(--text);">${escapeHtml(b.name)}</div>
+          <div style="font-size: 10px; color: var(--muted);">${escapeHtml(b.type)}</div>
         </div>
       `).join('');
     }
@@ -768,10 +819,10 @@ class SloaneApp {
       signoffContainer.innerHTML = WAITING_SIGNOFF.map(item => `
         <div class="signoff-item">
           <div class="item-main">
-            <div class="item-title">${item.title}</div>
-            <div class="item-sub">${item.sub}</div>
+            <div class="item-title">${escapeHtml(item.title)}</div>
+            <div class="item-sub">${escapeHtml(item.sub)}</div>
           </div>
-          <span class="pill amber">${item.date}</span>
+          <span class="pill amber">${escapeHtml(item.date)}</span>
         </div>
       `).join('');
     }
@@ -782,10 +833,10 @@ class SloaneApp {
       emailContainer.innerHTML = ATTENTION_EMAILS.map(item => `
         <div class="email-item">
           <div class="item-main">
-            <div class="item-title">${item.title}</div>
-            <div class="item-sub">${item.sub}</div>
+            <div class="item-title">${escapeHtml(item.title)}</div>
+            <div class="item-sub">${escapeHtml(item.sub)}</div>
           </div>
-          <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${item.priority}</span>
+          <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${escapeHtml(item.priority)}</span>
         </div>
       `).join('');
     }
@@ -809,15 +860,15 @@ class SloaneApp {
       <div class="card biz-card">
         <div>
           <div class="biz-card-header">
-            <span class="pill green">${b.status}</span>
+            <span class="pill green">${escapeHtml(b.status)}</span>
             <span class="source-badge">Active Area</span>
           </div>
-          <div class="biz-name">${b.name}</div>
-          <div class="biz-type">${b.type}</div>
+          <div class="biz-name">${escapeHtml(b.name)}</div>
+          <div class="biz-type">${escapeHtml(b.type)}</div>
         </div>
         <div class="biz-stats">
           <div class="biz-stat-item">
-            <span class="biz-stat-n">${b.clientCount}</span>
+            <span class="biz-stat-n">${escapeHtml(b.clientCount)}</span>
             <span class="biz-stat-lbl">Clients</span>
           </div>
           <div class="biz-stat-item">
@@ -841,7 +892,7 @@ class SloaneApp {
     if (!filter) return;
     const currentVal = filter.value;
     filter.innerHTML = `<option value="All">All Business Areas</option>` +
-      businesses.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+      businesses.map(b => `<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}</option>`).join('');
     filter.value = currentVal || 'All';
   }
 
@@ -849,7 +900,7 @@ class SloaneApp {
     const businesses = StorageService.getBusinesses();
     const select = document.getElementById('modalClientBiz');
     if (!select) return;
-    select.innerHTML = businesses.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+    select.innerHTML = businesses.map(b => `<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}</option>`).join('');
   }
 
   async renderClients() {
@@ -881,30 +932,38 @@ class SloaneApp {
 
     tbody.innerHTML = clients.map(c => {
       const riskClass = c.risk === 'High' ? 'red' : c.risk === 'Medium' ? 'amber' : 'green';
-      const chUrl = c.no ? `https://find-and-update.company-information.service.gov.uk/company/${c.no}` : null;
-      const clientId = c.id || c.clientId || 'cli_woofington_grp';
+      const clientId = sanitizeId(c.id || c.clientId || 'cli_woofington_grp');
+      const safeName = escapeHtml(c.name);
+      const safeBiz = escapeHtml(c.biz || '—');
+      const safeNo = escapeHtml(c.no);
+      const chUrl = c.no ? `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(c.no)}` : null;
+      const safeDirs = escapeHtml(c.dirs || '—');
+      const safeNotes = escapeHtml(c.notes || '—');
+      const safeVat = escapeHtml(c.vat || 'No');
+      const safeVatNo = escapeHtml(c.vatNo);
+      const safeRisk = escapeHtml(c.risk || 'Low');
 
       return `
         <tr class="client-row" style="cursor: pointer;" title="Click to view full 360 timeline" onclick="app.selectClient360('${clientId}')">
           <td>
-            <div style="font-weight: 700; color: var(--text);">${c.name}</div>
-            <div style="font-size: 11px; color: var(--muted);">${c.biz || '—'}</div>
+            <div style="font-weight: 700; color: var(--text);">${safeName}</div>
+            <div style="font-size: 11px; color: var(--muted);">${safeBiz}</div>
           </td>
           <td>
-            ${c.no ? `<a href="${chUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${c.no} ↗</a>` : '<span style="color: var(--muted);">—</span>'}
+            ${c.no ? `<a href="${chUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${safeNo} ↗</a>` : '<span style="color: var(--muted);">—</span>'}
           </td>
-          <td>${ReconciliationEngine.formatDate(c.year)}</td>
-          <td>${ReconciliationEngine.formatDate(c.accounts)}</td>
-          <td>${ReconciliationEngine.formatDate(c.confirm)}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(c.year))}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(c.accounts))}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(c.confirm))}</td>
           <td>
-            <span class="pill ${c.vat === 'Yes' ? 'green' : 'neutral'}">${c.vat || 'No'}</span>
-            ${c.vatNo ? `<div style="font-size: 10px; color: var(--muted); margin-top: 2px;">${c.vatNo}</div>` : ''}
+            <span class="pill ${c.vat === 'Yes' ? 'green' : 'neutral'}">${safeVat}</span>
+            ${c.vatNo ? `<div style="font-size: 10px; color: var(--muted); margin-top: 2px;">${safeVatNo}</div>` : ''}
           </td>
-          <td style="max-width: 160px; font-size: 11px; color: var(--muted);">${c.dirs || '—'}</td>
-          <td><span class="pill ${riskClass}">${c.risk || 'Low'}</span></td>
+          <td style="max-width: 160px; font-size: 11px; color: var(--muted);">${safeDirs}</td>
+          <td><span class="pill ${riskClass}">${safeRisk}</span></td>
           <td style="max-width: 180px; font-size: 11px; color: var(--muted);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span>${c.notes || '—'}</span>
+              <span>${safeNotes}</span>
               <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
             </div>
           </td>
@@ -913,7 +972,7 @@ class SloaneApp {
     }).join('');
 
     // Populate timeline client selector dropdowns
-    const clientOptions = clients.map(c => `<option value="${c.id || c.clientId}">${c.name}</option>`).join('');
+    const clientOptions = clients.map(c => `<option value="${sanitizeId(c.id || c.clientId)}">${escapeHtml(c.name)}</option>`).join('');
     const tlSelect = document.getElementById('timelineClientSelect');
     if (tlSelect) {
       const currentVal = tlSelect.value || this.activeClient360Id;
@@ -935,10 +994,10 @@ class SloaneApp {
       <div class="card person-card">
         <div class="person-header">
           <div class="person-info">
-            <div class="person-avatar">${p.avatar}</div>
+            <div class="person-avatar">${escapeHtml(p.avatar)}</div>
             <div>
-              <div class="person-name">${p.name}</div>
-              <div class="person-role">${p.role}</div>
+              <div class="person-name">${escapeHtml(p.name)}</div>
+              <div class="person-role">${escapeHtml(p.role)}</div>
             </div>
           </div>
           <span class="pill blue">${p.tasks.length} tasks</span>
@@ -947,19 +1006,19 @@ class SloaneApp {
           ${p.tasks.map(t => `
             <div class="work-item">
               <div>
-                <div style="font-weight: 600; color: var(--text);">${t.client}</div>
-                <div style="font-size: 11px; color: var(--muted);">${t.task}</div>
+                <div style="font-weight: 600; color: var(--text);">${escapeHtml(t.client)}</div>
+                <div style="font-size: 11px; color: var(--muted);">${escapeHtml(t.task)}</div>
               </div>
               <div style="text-align: right;">
-                <span class="pill ${t.isBlocked ? 'red' : 'amber'}">${t.isBlocked ? 'BLOCKED' : t.stage}</span>
-                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">Due ${t.deadline}</div>
+                <span class="pill ${t.isBlocked ? 'red' : 'amber'}">${t.isBlocked ? 'BLOCKED' : escapeHtml(t.stage)}</span>
+                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">Due ${escapeHtml(t.deadline)}</div>
               </div>
             </div>
           `).join('')}
         </div>
         ${p.ceoNote ? `
           <div style="padding: 10px 12px; background: rgba(201, 166, 107, 0.08); border-left: 2px solid var(--accent); border-radius: 4px; font-size: 11px; color: var(--accent);">
-            <strong>Private CEO Note:</strong> ${p.ceoNote}
+            <strong>Private CEO Note:</strong> ${escapeHtml(p.ceoNote)}
           </div>
         ` : ''}
       </div>
@@ -990,30 +1049,30 @@ class SloaneApp {
       else if (state.urgency === 'AMBER') amberCount++;
       else clearCount++;
 
-      const chUrl = r.no ? `https://find-and-update.company-information.service.gov.uk/company/${r.no}` : '#';
+      const chUrl = r.no ? `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.no)}` : '#';
 
       return `
         <tr>
           <td>
-            <div style="font-weight: 700; color: var(--text);">${r.name}</div>
+            <div style="font-weight: 700; color: var(--text);">${escapeHtml(r.name)}</div>
             <div class="source">
               <span class="source-badge ${r.isLive ? 'ch-live' : ''}">${r.isLive ? 'CH Live' : 'Tracker'}</span>
-              ${r.source}
+              ${escapeHtml(r.source)}
             </div>
           </td>
           <td>
-            <a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${r.no} ↗</a>
+            <a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${escapeHtml(r.no)} ↗</a>
           </td>
-          <td>${ReconciliationEngine.formatDate(r.year)}</td>
-          <td>${ReconciliationEngine.formatDate(r.accounts)}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(r.year))}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(r.accounts))}</td>
           <td>
-            ${nearest ? `<strong>${nearest.label}:</strong> ${ReconciliationEngine.formatDate(nearest.date)}` : '—'}
+            ${nearest ? `<strong>${escapeHtml(nearest.label)}:</strong> ${escapeHtml(ReconciliationEngine.formatDate(nearest.date))}` : '—'}
           </td>
           <td>
-            <span class="${state.cls}">${state.label}</span>
+            <span class="${state.cls}">${escapeHtml(state.label)}</span>
           </td>
           <td style="max-width: 220px; font-size: 11px; color: ${r.hasStrikeOff ? 'var(--red)' : 'var(--muted)'};">
-            ${r.note || '—'}
+            ${escapeHtml(r.note || '—')}
           </td>
         </tr>
       `;
@@ -1040,11 +1099,11 @@ class SloaneApp {
     if (actionTbody) {
       actionTbody.innerHTML = ACTION_TRACKER.map(a => `
         <tr>
-          <td style="font-weight: 700; color: var(--text);">${a.company}</td>
-          <td style="font-family: var(--font-mono); color: var(--accent);">${a.no}</td>
-          <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${a.issue}</td>
-          <td style="font-size: 11px; color: var(--muted);">${a.action}</td>
-          <td><span class="pill ${a.urgency === 'RED' ? 'red' : a.urgency === 'AMBER' ? 'amber' : 'green'}">${a.urgency}</span></td>
+          <td style="font-weight: 700; color: var(--text);">${escapeHtml(a.company)}</td>
+          <td style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(a.no)}</td>
+          <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${escapeHtml(a.issue)}</td>
+          <td style="font-size: 11px; color: var(--muted);">${escapeHtml(a.action)}</td>
+          <td><span class="pill ${a.urgency === 'RED' ? 'red' : a.urgency === 'AMBER' ? 'amber' : 'green'}">${escapeHtml(a.urgency)}</span></td>
         </tr>
       `).join('');
     }
@@ -1054,10 +1113,10 @@ class SloaneApp {
     if (vatTbody) {
       vatTbody.innerHTML = VAT_TRACKER.map(v => `
         <tr>
-          <td style="font-weight: 600; color: var(--text);">${v.name}</td>
-          <td>${v.period}</td>
-          <td>${ReconciliationEngine.formatDate(v.due)}</td>
-          <td><span class="pill ${v.status === 'Ready to submit' ? 'green' : v.status.includes('Overdue') ? 'red' : 'neutral'}">${v.status}</span></td>
+          <td style="font-weight: 600; color: var(--text);">${escapeHtml(v.name)}</td>
+          <td>${escapeHtml(v.period)}</td>
+          <td>${escapeHtml(ReconciliationEngine.formatDate(v.due))}</td>
+          <td><span class="pill ${v.status === 'Ready to submit' ? 'green' : v.status.includes('Overdue') ? 'red' : 'neutral'}">${escapeHtml(v.status)}</span></td>
         </tr>
       `).join('');
     }
@@ -1164,9 +1223,9 @@ class SloaneApp {
           <span class="source-badge" style="color: var(--accent); border-color: rgba(201, 166, 107, 0.4);">
             🔒 Private Workspace · CEO View
           </span>
-          <span>${entry.at}</span>
+          <span>${escapeHtml(entry.at)}</span>
         </div>
-        <div class="brain-entry-text">${entry.text}</div>
+        <div class="brain-entry-text">${escapeHtml(entry.text)}</div>
         <div class="brain-entry-footer">
           <span style="font-size: 10px; color: var(--muted);">Awaiting live AI classification</span>
           <button class="card-action-btn" onclick="app.openTrinovaNoteModal(${idx})">
@@ -1395,13 +1454,15 @@ class SloaneApp {
 
   selectClient360(clientId) {
     if (!clientId) return;
-    this.activeClient360Id = clientId;
+    const sanitized = sanitizeId(clientId);
+    if (!sanitized) return;
+    this.activeClient360Id = sanitized;
     this.switchView('clients');
     this.switchClientTab('timeline');
   }
 
   async renderTimeline(clientId = this.activeClient360Id, forceToast = false) {
-    if (!clientId) clientId = 'cli_woofington_grp';
+    clientId = sanitizeId(clientId) || 'cli_woofington_grp';
     this.activeClient360Id = clientId;
 
     const container = document.getElementById('timelineEventsContainer');
@@ -1456,12 +1517,25 @@ class SloaneApp {
       const countBadge = document.getElementById('clientTimelineCountBadge');
       if (countBadge) countBadge.textContent = `${events.length} events`;
 
+      const connBadge = document.getElementById('timelineConnectionBadge');
+      if (connBadge) {
+        if (res.source === 'trinova_live') {
+          connBadge.textContent = '⚡ Connected';
+          connBadge.className = 'pill green';
+          connBadge.title = 'Serving from active backend endpoint';
+        } else {
+          connBadge.textContent = '⚠️ Blocked (TriNova /timeline unmapped)';
+          connBadge.className = 'pill amber';
+          connBadge.title = 'TriNova upstream has no /clients/{id}/timeline route; using local store';
+        }
+      }
+
       if (events.length === 0) {
         container.innerHTML = `
           <div class="timeline-empty">
             <div style="font-size: 24px; margin-bottom: 8px;">⏱️</div>
             <strong style="color: var(--text);">No timeline records found</strong>
-            <p style="margin: 4px 0 12px 0;">No chronological events match the current filters for ${activeClient.name}.</p>
+            <p style="margin: 4px 0 12px 0;">No chronological events match the current filters for ${escapeHtml(activeClient.name)}.</p>
             <button type="button" class="btn btn-secondary" style="font-size: 11px;" onclick="app.timelineEventTypeFilter=''; app.timelineSeverityFilter=''; document.getElementById('timelineEventTypeFilter').value=''; document.getElementById('timelineSeverityFilter').value=''; app.renderTimeline('${clientId}')">Clear Filters</button>
           </div>
         `;
@@ -1507,7 +1581,7 @@ class SloaneApp {
         html += `
           <div class="timeline-date-group">
             <div class="timeline-date-title">
-              <span>📅 ${groupName}</span>
+              <span>📅 ${escapeHtml(groupName)}</span>
               <span style="opacity: 0.7; font-size: 10px;">(${groupEvents.length})</span>
             </div>
             ${groupEvents.map(evt => {
@@ -1515,36 +1589,44 @@ class SloaneApp {
               const dateStr = new Date(evt.occurredAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
               const nodeClass = evt.severity === 'critical' ? 'node-critical' : evt.severity === 'urgent' ? 'node-urgent' : evt.severity === 'info' ? 'node-info' : '';
               const sevPillClass = evt.severity === 'critical' ? 'red' : evt.severity === 'urgent' ? 'amber' : evt.severity === 'info' ? 'blue' : 'neutral';
+              const safeEvtId = sanitizeId(evt.id);
+              const safeTitle = escapeHtml(evt.title);
+              const safeSeverity = escapeHtml(evt.severity);
+              const safeEventType = escapeHtml((evt.eventType || '').replace(/_/g, ' '));
+              const safeDescription = escapeHtml(evt.description || 'No additional narrative recorded.');
+              const safeActor = escapeHtml(evt.actorId || evt.actorType || 'system');
+              const safeSource = escapeHtml(evt.source);
+              const safeExtId = evt.externalId ? escapeHtml(String(evt.externalId).substring(0, 16)) : '';
 
               return `
-                <div class="timeline-item" id="timeline-event-${evt.id}">
+                <div class="timeline-item" id="timeline-event-${safeEvtId}">
                   <div class="timeline-node ${nodeClass}"></div>
                   <div class="timeline-card">
                     <div class="timeline-card-header">
                       <div>
-                        <div class="timeline-card-title">${evt.title}</div>
+                        <div class="timeline-card-title">${safeTitle}</div>
                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
-                          <span class="pill ${sevPillClass}" style="font-size: 9.5px; padding: 1px 6px;">${evt.severity}</span>
-                          <span class="source-badge" style="font-size: 9.5px;">${evt.eventType.replace(/_/g, ' ')}</span>
+                          <span class="pill ${sevPillClass}" style="font-size: 9.5px; padding: 1px 6px;">${safeSeverity}</span>
+                          <span class="source-badge" style="font-size: 9.5px;">${safeEventType}</span>
                           ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒 Private CEO</span>' : ''}
                         </div>
                       </div>
                       <div class="timeline-card-time">${dateStr} · ${timeStr}</div>
                     </div>
                     <div class="timeline-card-body">
-                      ${evt.description || 'No additional narrative recorded.'}
+                      ${safeDescription}
                     </div>
                     <div class="timeline-card-footer">
                       <div class="timeline-card-tags">
                         <span class="timeline-actor-tag">
                           <span>👤</span>
-                          <span>${evt.actorId || evt.actorType || 'system'}</span>
+                          <span>${safeActor}</span>
                         </span>
                         <span class="timeline-actor-tag" style="color: var(--accent);">
                           <span>🔌</span>
-                          <span>${evt.source}</span>
+                          <span>${safeSource}</span>
                         </span>
-                        ${evt.externalId ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted);">ref:${evt.externalId.substring(0, 16)}</span>` : ''}
+                        ${safeExtId ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted);">ref:${safeExtId}</span>` : ''}
                       </div>
                     </div>
                   </div>
@@ -1562,7 +1644,7 @@ class SloaneApp {
       container.innerHTML = `
         <div class="timeline-empty" style="border-color: var(--red);">
           <strong style="color: var(--red);">Unable to retrieve timeline</strong>
-          <p style="margin: 4px 0 12px 0;">Error communicating with TriNova API: ${err.message}</p>
+          <p style="margin: 4px 0 12px 0;">Error communicating with TriNova API: ${escapeHtml(err.message)}</p>
           <button type="button" class="btn btn-secondary" onclick="app.renderTimeline('${clientId}')">Retry</button>
         </div>
       `;
@@ -1570,12 +1652,20 @@ class SloaneApp {
   }
 
   async handleLogTimelineEvent() {
-    const clientId = document.getElementById('modalTimelineClientId').value;
-    const eventType = document.getElementById('modalTimelineEventType').value;
-    const title = document.getElementById('modalTimelineTitle').value.trim();
-    const description = document.getElementById('modalTimelineDesc').value.trim();
-    const severity = document.getElementById('modalTimelineSeverity').value;
-    const visibility = document.getElementById('modalTimelineVisibility').value;
+    if (this._isSubmittingTimelineEvent) return;
+    const submitBtn = document.getElementById('btnSubmitTimelineEvent');
+
+    const clientId = document.getElementById('modalTimelineClientId')?.value;
+    const eventType = document.getElementById('modalTimelineEventType')?.value;
+    const title = document.getElementById('modalTimelineTitle')?.value?.trim();
+    const description = document.getElementById('modalTimelineDesc')?.value?.trim() || '';
+    const severity = document.getElementById('modalTimelineSeverity')?.value || 'normal';
+    const visibility = document.getElementById('modalTimelineVisibility')?.value || 'shared';
+
+    if (!clientId) {
+      Toast.error('Please select a target client.');
+      return;
+    }
 
     if (!title) {
       Toast.error('Event title cannot be empty.');
@@ -1583,6 +1673,12 @@ class SloaneApp {
     }
 
     try {
+      this._isSubmittingTimelineEvent = true;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+      }
+
       await ApiService.createTimelineEvent(clientId, {
         eventType,
         title,
@@ -1602,6 +1698,12 @@ class SloaneApp {
       }
     } catch (err) {
       Toast.error(`Could not log timeline event: ${err.message}`);
+    } finally {
+      this._isSubmittingTimelineEvent = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save to Timeline';
+      }
     }
   }
 
@@ -1666,7 +1768,7 @@ class SloaneApp {
         <button class="btn btn-secondary" style="font-size: 11px;" onclick="document.getElementById('modalTimelineEventType').value='NOTE_CREATED'; ModalManager.open('logTimelineEventModal');">+ New Note</button>
       </div>
       <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
-        Client-specific practitioner communications protected by Solane's strict staff privacy boundary.
+        Client-specific practitioner communications protected by Sloane's strict staff privacy boundary.
       </p>
       <div style="background: var(--panel2); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">

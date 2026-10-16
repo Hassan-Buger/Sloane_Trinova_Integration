@@ -45,7 +45,10 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
 
       if (geminiConfigured && claudeService.geminiApiKey) {
         try {
-          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(claudeService.geminiApiKey.trim())}`, { signal: AbortSignal.timeout(8000) });
+          const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+            headers: { 'x-goog-api-key': claudeService.geminiApiKey.trim() },
+            signal: AbortSignal.timeout(8000)
+          });
           if (resp.ok) {
             const data = await resp.json();
             geminiModels = (data.models || [])
