@@ -195,6 +195,16 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     assert.equal(badAttemptRes.body.error?.code, 'INVALID_CREDENTIALS');
   });
 
+  test('1.1.7 Login succeeds with kirsty.allen@trinova.co.uk UI quick-fill email and password123', async () => {
+    const res = await request('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.22' },
+      body: { email: 'kirsty.allen@trinova.co.uk', password: 'password123' }
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.status, 'success');
+  });
+
   // 1.3 Static File Serving Whitelist & Dotfile Denial
   test('1.3.1 Serving sensitive files (config.js, .env.example, package.json) returns 404', async () => {
     const paths = [

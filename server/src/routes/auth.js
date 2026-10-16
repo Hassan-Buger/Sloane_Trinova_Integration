@@ -69,8 +69,9 @@ export function registerAuthRoutes(app, { authenticate }) {
       });
     }
 
-    // 4. Verify Credentials
-    const isEmailMatch = email === ownerEmail;
+    // 4. Verify Credentials (supports both kirsty@trinova.com and kirsty.allen@trinova.co.uk)
+    const isEmailMatch = email === ownerEmail ||
+      (ownerEmail.startsWith('kirsty') && (email === 'kirsty@trinova.com' || email === 'kirsty.allen@trinova.co.uk'));
     let isPasswordMatch = false;
 
     try {

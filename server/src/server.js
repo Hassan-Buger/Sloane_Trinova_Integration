@@ -39,7 +39,8 @@ export function validateStartup() {
         process.env.SLON_OWNER_EMAIL = 'kirsty@trinova.com';
       }
       if (!process.env.SLON_OWNER_PASSWORD_HASH && !process.env.SLOANE_OWNER_PASSWORD_HASH) {
-        process.env.SLON_OWNER_PASSWORD_HASH = '$2a$10$wT0XkO05yYf8sLpB7s6Hke7kM9YjNlTqB4W0I4S6d3P5m8J5L4h3e';
+        // Hash for 'password123'
+        process.env.SLON_OWNER_PASSWORD_HASH = '$2a$10$wHh4tzXxmMPEzTTYPGE9r.4k.kgs.wCuYIyeLmVDeMf3PGqBtm8UK';
       }
       if (!process.env.SLON_API_KEY && !process.env.SLOANE_API_KEY) {
         process.env.SLON_API_KEY = 'tn_sec_live_sloane_readwrite_2026';
