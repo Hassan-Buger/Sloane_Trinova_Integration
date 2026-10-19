@@ -195,31 +195,85 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* Mobile Top Navigation Bar (Shown on small screens) */
+/* Top Navigation Bar */
 .mobile-nav-bar {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 10px 24px;
+  height: 52px;
   background: rgba(16, 21, 29, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  z-index: 999;
+  z-index: 990;
 }
 
+/* On desktop where sidebar is fully visible, hide the redundant Menu button completely */
 .mobile-menu-btn {
+  display: none !important;
   background: var(--panel2);
   border: 1px solid var(--line);
   color: var(--text);
-  padding: 8px 12px;
+  padding: 7px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 13px;
   font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-btn:hover {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Navigation Drawer Backdrop */
+.drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1050;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  cursor: pointer;
+}
+
+.drawer-backdrop.active {
+  display: block;
+  opacity: 1;
+}
+
+/* Drawer Close Button inside sidebar on mobile/tablet */
+.drawer-close-btn {
+  display: none;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all var(--transition-fast);
+}
+
+.drawer-close-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--panel);
 }
 
 /* Main Content Area */
@@ -358,37 +412,59 @@ h1 {
 }
 
 /* Responsive Media Queries */
+
+/* Tablet & Compact Viewports (<= 1100px) */
 @media (max-width: 1100px) {
   .shell {
     grid-template-columns: 1fr;
   }
-  
+
+  /* Show Menu button in top nav bar when sidebar is collapsed */
+  .mobile-menu-btn {
+    display: inline-flex !important;
+  }
+
+  /* Show close button in drawer header */
+  .drawer-close-btn {
+    display: flex;
+  }
+
+  /* Off-canvas navigation drawer */
   .side {
-    display: none;
+    display: flex;
     position: fixed;
-    top: 56px;
+    top: 0;
     left: 0;
-    width: 280px;
-    height: calc(100vh - 56px);
-    background-color: var(--panel);
+    width: min(300px, 82vw);
+    height: 100vh;
+    height: 100dvh;
+    background-color: rgba(16, 21, 29, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-right: 1px solid var(--line);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
-    z-index: 1000;
+    box-shadow: 12px 0 35px rgba(0, 0, 0, 0.85);
+    z-index: 1200;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 20px 16px;
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 
   .side.mobile-open {
-    display: flex;
+    transform: translateX(0);
   }
 
   .mobile-nav-bar {
-    display: flex;
-    height: 56px;
-    box-sizing: border-box;
+    height: 54px;
+    padding: 10px 18px;
   }
 
   main {
-    padding: 20px;
+    padding: 22px 20px 48px;
+    max-width: 100%;
   }
 
   .top {
@@ -397,17 +473,96 @@ h1 {
     gap: 16px;
   }
 
+  .eyebrow {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+
   .ask-wrapper {
     width: 100%;
   }
 }
 
-@media (max-width: 700px) {
+/* Mobile Devices (<= 768px) */
+@media (max-width: 768px) {
+  main {
+    padding: 16px 14px 44px;
+  }
+
+  .top {
+    margin-bottom: 20px;
+    gap: 14px;
+  }
+
   h1 {
     font-size: 22px;
+    line-height: 1.25;
+    word-break: break-word;
   }
-  
+
+  .eyebrow {
+    font-size: 10.5px;
+    gap: 6px 8px;
+    line-height: 1.4;
+  }
+
+  #trinovaStatusBtn,
+  #headerLockBtn {
+    margin-left: 0 !important;
+  }
+
+  .ask-form {
+    padding: 4px 6px 4px 14px;
+  }
+
+  .ask-suggestions {
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .ask-pill-suggestion {
+    font-size: 10px;
+    padding: 3px 8px;
+    white-space: normal;
+    text-align: left;
+  }
+}
+
+/* Very Small Mobile Viewports (<= 400px) */
+@media (max-width: 400px) {
   main {
-    padding: 14px;
+    padding: 12px 10px 36px;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+
+  .mobile-nav-bar {
+    padding: 8px 12px;
+  }
+
+  .ask-form {
+    padding: 3px 4px 3px 10px;
+    border-radius: 22px;
+  }
+
+  .ask-input {
+    font-size: 11.5px;
+  }
+
+  .ask-provider-select {
+    font-size: 10px;
+    padding: 3px 5px;
+    margin-right: 4px;
+  }
+
+  .ask-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .card {
+    padding: 14px 12px;
   }
 }

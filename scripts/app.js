@@ -109,6 +109,7 @@ class SloaneApp {
     if (authShell) authShell.classList.remove('auth-hidden');
     if (appShell) appShell.style.display = 'none';
     if (mobileNav) mobileNav.style.display = 'none';
+    this.closeNavDrawer();
 
     const emailInput = document.getElementById('loginEmail');
     if (emailInput && !emailInput.value) {
@@ -362,35 +363,52 @@ class SloaneApp {
       });
     });
 
-    // Mobile navigation toggle
+    // Mobile / Tablet Navigation Drawer Controller
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
     const sidebar = document.querySelector('.side');
-    if (mobileMenuBtn && sidebar) {
+
+    if (mobileMenuBtn) {
       mobileMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isOpen = sidebar.classList.toggle('mobile-open');
-        mobileMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      });
-
-      // Close on outside click
-      document.addEventListener('click', (e) => {
-        if (sidebar.classList.contains('mobile-open')) {
-          if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
-            sidebar.classList.remove('mobile-open');
-            mobileMenuBtn.setAttribute('aria-expanded', 'false');
-          }
-        }
-      });
-
-      // Close on Escape key
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
-          sidebar.classList.remove('mobile-open');
-          mobileMenuBtn.setAttribute('aria-expanded', 'false');
-          mobileMenuBtn.focus();
+        const isOpen = sidebar && sidebar.classList.contains('mobile-open');
+        if (isOpen) {
+          this.closeNavDrawer();
+        } else {
+          this.openNavDrawer();
         }
       });
     }
+
+    if (drawerCloseBtn) {
+      drawerCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeNavDrawer();
+        if (mobileMenuBtn) mobileMenuBtn.focus();
+      });
+    }
+
+    if (drawerBackdrop) {
+      drawerBackdrop.addEventListener('click', () => {
+        this.closeNavDrawer();
+      });
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sidebar && sidebar.classList.contains('mobile-open')) {
+        this.closeNavDrawer();
+        if (mobileMenuBtn) mobileMenuBtn.focus();
+      }
+    });
+
+    // Close drawer when viewport expands past 1100px
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 1100 && sidebar && sidebar.classList.contains('mobile-open')) {
+        this.closeNavDrawer();
+      }
+    });
 
     // Ask Sloane input
     const askForm = document.getElementById('askForm');
@@ -727,6 +745,26 @@ class SloaneApp {
     }
   }
 
+  openNavDrawer() {
+    const sidebar = document.querySelector('.side');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (sidebar) sidebar.classList.add('mobile-open');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'true');
+    if (backdrop) backdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeNavDrawer() {
+    const sidebar = document.querySelector('.side');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
   switchView(viewId) {
     this.currentView = viewId;
 
@@ -745,11 +783,8 @@ class SloaneApp {
       targetSection.classList.remove('hidden');
     }
 
-    // Close mobile menu if open
-    const sidebar = document.querySelector('.side');
-    if (sidebar) sidebar.classList.remove('mobile-open');
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    // Close mobile/tablet navigation drawer if open
+    this.closeNavDrawer();
 
     // Scroll to top
     window.scrollTo(0, 0);

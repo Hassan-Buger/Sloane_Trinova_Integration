@@ -535,13 +535,19 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 768px) {
   .cmd-top-grid {
     grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cmd-top-grid > .card:nth-child(3) {
+    grid-column: auto;
   }
 
   .pulse-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
   .biz-grid {
@@ -598,6 +604,52 @@
   .timeline-filter-group select {
     flex: 1;
     min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .pulse-grid {
+    gap: 8px;
+  }
+
+  .card.metric {
+    padding: 10px 8px;
+    min-height: 72px;
+  }
+
+  .card.metric .n {
+    font-size: 20px;
+  }
+
+  .card.metric .lbl {
+    font-size: 9.5px;
+  }
+
+  .top3-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .top3-item-title {
+    font-size: 12px;
+  }
+
+  .alert-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .alert-title {
+    font-size: 11.5px;
+  }
+
+  .diary-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .diary-title {
+    font-size: 11.5px;
   }
 }
 

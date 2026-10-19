@@ -141,10 +141,13 @@
     </button>
   </header>
 
+  <!-- Navigation Drawer Backdrop -->
+  <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+
   <!-- App Shell -->
   <div class="shell">
     
-    <!-- Sticky Sidebar -->
+    <!-- Sticky Sidebar / Mobile Drawer -->
     <aside class="side" id="mainNavSidebar" role="navigation" aria-label="Main Navigation">
       <div class="brand">
         <div class="brand-mark">S</div>
@@ -152,6 +155,7 @@
           <span class="brand-title">SLOANE</span>
           <span class="brand-subtitle">Command Centre</span>
         </div>
+        <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close navigation drawer" title="Close drawer">✕</button>
       </div>
 
       <ul class="nav-list">
