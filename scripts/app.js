@@ -157,20 +157,6 @@ class SloaneApp {
       loginForm.addEventListener('submit', (e) => this.handleLogin(e));
     }
 
-    // Quick Fill Demo Button
-    const quickFillBtn = document.getElementById('btnAuthQuickFill');
-    if (quickFillBtn) {
-      quickFillBtn.addEventListener('click', () => {
-        const emailInput = document.getElementById('loginEmail');
-        const passInput = document.getElementById('loginPassword');
-        if (emailInput) emailInput.value = 'kirsty.allen@trinova.co.uk';
-        if (passInput) passInput.value = 'password123';
-        const alertEl = document.getElementById('authAlert');
-        if (alertEl) alertEl.classList.remove('visible');
-        Toast.info('CEO test credentials populated. Ready to sign in.');
-      });
-    }
-
     // Password Visibility Toggle
     const togglePassBtn = document.getElementById('btnTogglePassword');
     const passInput = document.getElementById('loginPassword');
@@ -187,7 +173,7 @@ class SloaneApp {
     const forgotLink = document.getElementById('authForgotLink');
     if (forgotLink) {
       forgotLink.addEventListener('click', () => {
-        Toast.info('CEO credentials configured for test environment: kirsty.allen@trinova.co.uk / password123', 6000);
+        Toast.info('Please contact your system administrator to reset executive credentials.', 6000);
       });
     }
 
