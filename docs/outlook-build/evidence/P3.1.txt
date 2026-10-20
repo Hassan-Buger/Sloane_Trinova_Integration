@@ -1,0 +1,68 @@
+Task P3.1: PKCE + state store with TTL and single use (§4.2)
+
+Plan:
+- Files touched:
+  - server/src/services/outlookOAuthStateStore.js
+  - Sloane/server/src/services/outlookOAuthStateStore.js
+  - server/tests/unit13-outlook-pkce-state.test.js
+  - docs/outlook-build/evidence/P3.1.txt
+  - docs/outlook-build/PROGRESS.md
+  - context/progress-tracker.md
+- Tests added / updated:
+  - Created server/tests/unit13-outlook-pkce-state.test.js with 13 unit tests across 4 suites:
+    1. PKCE Code Verifier & Challenge (RFC 7636):
+       - Generates valid URL-safe high-entropy code verifier (43 chars, base64url)
+       - Derives deterministic S256 code challenge matching SHA-256 base64url digest
+       - Rejects empty or invalid code verifiers
+       - Generates unique random states and nonces on successive invocations
+    2. State Store Binding & Parameters:
+       - createStateEntry binds state and PKCE verifier to session actorId with 10m TTL
+       - Rejects missing or non-string actorId
+    3. Single-Use Enforcement & Unknown State Rejection:
+       - consumeState succeeds on first attempt with valid state
+       - Single use: second consumeState with identical state fails with UNKNOWN_STATE
+       - Unknown state lookup returns UNKNOWN_STATE error
+       - Missing or malformed state argument returns INVALID_STATE
+       - Double-click race condition simulation: exactly one request succeeds, duplicate fails
+    4. TTL Expiration & Pruning:
+       - Expired state parameter is rejected with EXPIRED_STATE error
+       - cleanupExpired removes past entries while keeping unexpired ones
+- Done criteria:
+  - PKCE code verifier and S256 code challenge generation implemented.
+  - State store with 10-minute TTL and single-use immediate deletion implemented.
+  - Tests verify expiry, reuse, unknown state, double-click protection, and PKCE math.
+  - Full test suite passes with zero regressions (190 passing across 32 suites).
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test tests/unit13-outlook-pkce-state.test.js
+   Output:
+   ▶ Task P3.1: PKCE + State Store with TTL and Single-Use (§4.2)
+     ✔ PKCE Code Verifier & Challenge (RFC 7636) (9.36ms)
+     ✔ State Store Binding & Parameters (2.9414ms)
+     ✔ Single-Use Enforcement & Unknown State Rejection (4.2158ms)
+     ✔ TTL Expiration & Pruning (2.7502ms)
+   ✔ Task P3.1: PKCE + State Store with TTL and Single-Use (§4.2) (20.2071ms)
+   ℹ tests 13
+   ℹ suites 5
+   ℹ pass 13
+   ℹ fail 0
+
+2. Full Test Suite Result:
+   npm test
+   Output:
+   ✔ Phase 1: Security Hardening & Authentication Verification (1361.4734ms)
+   ✔ Task P2.1: Outlook Token Vault Encryption (AES-256-GCM) (64.9135ms)
+   ✔ Task P2.2: Outlook Connection Record Schema & Store (42.6385ms)
+   ✔ Task P3.1: PKCE + State Store with TTL and Single-Use (§4.2) (16.987ms)
+   ℹ tests 190
+   ℹ suites 32
+   ℹ pass 190
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 15337.2621
+
+All criteria satisfied.
