@@ -793,6 +793,27 @@ class SloaneApp {
      ========================================================================== */
 
   async renderCommandCentre() {
+    // 0. Render Red Alerts
+    const redAlertsContainer = document.getElementById('redAlertsContainer');
+    if (redAlertsContainer) {
+      redAlertsContainer.innerHTML = `
+        <div class="alert-item">
+          <span class="dot red" style="margin-top: 4px;"></span>
+          <div class="alert-item-content">
+            <div class="alert-title">CRITICAL: Woofington Park Strike-Off Proposal</div>
+            <div class="alert-desc">First Gazette publication registered. Immediate accounts filing required to protect entity.</div>
+          </div>
+        </div>
+        <div class="alert-item" style="margin-bottom: 0;">
+          <span class="dot red" style="margin-top: 4px;"></span>
+          <div class="alert-item-content">
+            <div class="alert-title">OVERDUE: R GB Elevations Ltd Accounts</div>
+            <div class="alert-desc">50 days past deadline. Penalty tier active. Final bank records pending.</div>
+          </div>
+        </div>
+      `;
+    }
+
     // 1. Render Top 3 Ranked Items
     const top3Container = document.getElementById('top3Container');
     if (top3Container) {

@@ -312,6 +312,22 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
 
     // Login input has no pre-filled value attribute and uses generic placeholder
     assert.doesNotMatch(html, /id="loginEmail"[^>]*value=/i, 'loginEmail must not contain a hardcoded value attribute');
-    assert.match(html, /id="loginEmail"[^>]*placeholder="name@trinova\.co\.uk"/i, 'loginEmail must have generic placeholder');
+    assert.match(html, /id="loginEmail"[^>]*placeholder="Corporate email address"/i, 'loginEmail must have generic placeholder');
+  });
+
+  // Task P1.3: Unauthenticated HTML shell contains zero client data or sample rows
+  test('1.1.9 Unauthenticated HTML shell served on GET / is completely free of client data', async () => {
+    const res = await request('/');
+    assert.equal(res.status, 200);
+    const html = res.rawBody || res.body;
+    assert.ok(typeof html === 'string', 'Root must return HTML string');
+
+    // Leak check regex per prompt specification (§2.5 and §6.1):
+    // woofington|jenkins|alpha delta|cfi|R GB|@|kirsty
+    assert.doesNotMatch(html, /woofington|jenkins|alpha delta|cfi|R GB|@|kirsty/i, 'Public shell must contain no client or identity leaks');
+
+    // Dashboard metrics and containers must start clean / unpopulated in shell
+    assert.match(html, /id="pulseSignoffs">\s*--\s*</i, 'pulseSignoffs must start unpopulated');
+    assert.match(html, /id="redAlertsContainer">\s*<!--[^>]*-->\s*</i, 'redAlertsContainer must start empty');
   });
 });

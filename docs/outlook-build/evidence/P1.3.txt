@@ -1,0 +1,49 @@
+Task P1.3: Make the logged-out shell data-free
+
+Plan:
+- Files touched:
+  - index.html
+  - Sloane/index.html
+  - scripts/app.js
+  - Sloane/scripts/app.js
+  - server/tests/unit10-security-phase1.test.js
+  - docs/outlook-build/evidence/P1.3.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests added / updated:
+  - Updated test 1.1.8 in `server/tests/unit10-security-phase1.test.js` to assert generic placeholder `Corporate email address` without `@`.
+  - Added test 1.1.9 in `server/tests/unit10-security-phase1.test.js` asserting:
+    * `GET /` HTML shell contains zero matches for `/woofington|jenkins|alpha delta|cfi|R GB|@|kirsty/i`.
+    * `pulseSignoffs` starts unpopulated (`--`).
+    * `redAlertsContainer` starts empty (`<!-- Dynamically Populated -->`).
+- Done criteria:
+  - Unauthenticated HTML shell served on `GET /` contains no client names, company names, statutory deadlines, billing amounts, email addresses, or personal names.
+  - The dashboard markup DOM containers (`#redAlertsContainer`, metrics, etc.) are unpopulated in static HTML and populated dynamically via JavaScript only post-session verification.
+  - Leak check regex `woofington|jenkins|alpha delta|cfi|R GB|@|kirsty` returns 0 matches against `GET /`.
+  - Full test suite passes with zero regressions (142 passing across 19 suites).
+
+Evidence & Proof:
+
+1. Verification of zero matches for leak check pattern against index.html:
+   (Get-Content index.html) | Select-String -Pattern "woofington|jenkins|alpha delta|cfi|R GB|@|kirsty"
+   Result: 0 matches found (exit code 0, 0 lines returned).
+
+2. Verification of zero matches against Sloane/index.html:
+   (Get-Content Sloane/index.html) | Select-String -Pattern "woofington|jenkins|alpha delta|cfi|R GB|@|kirsty"
+   Result: 0 matches found (exit code 0, 0 lines returned).
+
+3. Test Execution Result:
+   node --test --test-concurrency=1 tests/*.test.js
+   Output:
+   ✔ 1.1.8 Login form starts empty and unauthenticated HTML shell contains no kirsty identity strings (2.7521ms)
+   ✔ 1.1.9 Unauthenticated HTML shell served on GET / is completely free of client data (2.7519ms)
+   ✔ Phase 1: Security Hardening & Authentication Verification (5428.0037ms)
+   ℹ tests 142
+   ℹ suites 19
+   ℹ pass 142
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 19748.3568
+
+All criteria satisfied.

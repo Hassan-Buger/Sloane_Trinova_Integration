@@ -8,7 +8,7 @@
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght%40400;500;600;700;800;900&display=swap" rel="stylesheet">
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="styles/tokens.css">
@@ -58,7 +58,7 @@
                 <rect x="3" y="5" width="18" height="14" rx="2.5"></rect>
                 <path d="m4 7 8 6 8-6"></path>
               </svg>
-              <input class="auth-input" id="loginEmail" type="email" name="email" placeholder="name@trinova.co.uk" required autocomplete="email" spellcheck="false">
+              <input class="auth-input" id="loginEmail" type="email" name="email" placeholder="Corporate email address" required autocomplete="email" spellcheck="false">
             </div>
           </div>
 
@@ -259,11 +259,10 @@
           </form>
           <div class="ask-suggestions" id="askSuggestions">
             <span style="font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-right: 2px;">Ask:</span>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Why is Woofington Park high risk and amber?">Why is Woofington amber?</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="What happened with Woofington recently? Summarise timeline.">Woofington Timeline</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Summarise R GB Elevations overdue statutory filings.">Summarise R GB</button>
             <button type="button" class="ask-pill-suggestion" data-prompt="What statutory deadlines need immediate attention today?">Deadlines due</button>
             <button type="button" class="ask-pill-suggestion" data-prompt="What should I focus on today?">Today's focus</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Summarise overdue statutory filings.">Overdue filings</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Show high risk client alerts.">High risk alerts</button>
           </div>
         </div>
       </div>
@@ -293,19 +292,8 @@
               <h2 style="color: var(--red);"><span class="dot red"></span> Red Alerts</h2>
               <button class="card-action-btn" id="openMissedModalBtn">What Have I Missed? ↗</button>
             </div>
-            <div class="alert-item">
-              <span class="dot red" style="margin-top: 4px;"></span>
-              <div class="alert-item-content">
-                <div class="alert-title">CRITICAL: Woofington Park Strike-Off Proposal</div>
-                <div class="alert-desc">First Gazette publication registered. Immediate accounts filing required to protect entity.</div>
-              </div>
-            </div>
-            <div class="alert-item" style="margin-bottom: 0;">
-              <span class="dot red" style="margin-top: 4px;"></span>
-              <div class="alert-item-content">
-                <div class="alert-title">OVERDUE: R GB Elevations Ltd Accounts</div>
-                <div class="alert-desc">50 days past deadline. Penalty tier active. Final bank records pending.</div>
-              </div>
+            <div id="redAlertsContainer">
+              <!-- Dynamically Populated -->
             </div>
           </div>
 
@@ -325,27 +313,27 @@
         <!-- Pulse Metrics Row -->
         <div class="pulse-grid">
           <div class="card metric">
-            <div class="n" id="pulseSignoffs">2</div>
+            <div class="n" id="pulseSignoffs">--</div>
             <div class="lbl">Waiting sign-off</div>
           </div>
           <div class="card metric">
-            <div class="n" id="pulseEmails">2</div>
+            <div class="n" id="pulseEmails">--</div>
             <div class="lbl">Sloane attention emails</div>
           </div>
           <div class="card metric metric-urgent">
-            <div class="n" id="pulseOverdue">4</div>
+            <div class="n" id="pulseOverdue">--</div>
             <div class="lbl">Overdue filings</div>
           </div>
           <div class="card metric metric-warning">
-            <div class="n" id="pulseDue7d">6</div>
+            <div class="n" id="pulseDue7d">--</div>
             <div class="lbl">Due in next 14 days</div>
           </div>
           <div class="card metric">
-            <div class="n" id="pulseBlocked">1</div>
+            <div class="n" id="pulseBlocked">--</div>
             <div class="lbl">Team blocked</div>
           </div>
           <div class="card metric">
-            <div class="n" id="pulseBizAreas">6</div>
+            <div class="n" id="pulseBizAreas">--</div>
             <div class="lbl">Business areas</div>
           </div>
         </div>
@@ -491,12 +479,12 @@
           <div class="client-detail-header">
             <div class="client-detail-title-row">
               <div>
-                <h3 class="client-detail-name" id="timelineActiveClientName">Woofington Group</h3>
+                <h3 class="client-detail-name" id="timelineActiveClientName"></h3>
                 <div class="client-detail-meta" id="timelineActiveClientMeta">
-                  <span id="timelineActiveClientType">Corporate Group</span> ·
-                  <span id="timelineActiveClientBiz">Trinova Accounting</span> ·
-                  <span class="pill green" id="timelineActiveClientStatus">Active</span> ·
-                  <span class="pill green" id="timelineConnectionBadge" title="TriNova Timeline Integration Status">⚡ Live API</span>
+                  <span id="timelineActiveClientType"></span>
+                  <span id="timelineActiveClientBiz"></span>
+                  <span class="pill green" id="timelineActiveClientStatus" style="display: none;">Active</span>
+                  <span class="pill green" id="timelineConnectionBadge" title="TriNova Timeline Integration Status" style="display: none;">⚡ Live API</span>
                 </div>
               </div>
             </div>
@@ -599,19 +587,19 @@
         <!-- Radar Stats Row -->
         <div class="stat-radar-grid">
           <div class="card metric">
-            <div class="n" id="statRadarTracked">33</div>
+            <div class="n" id="statRadarTracked">--</div>
             <div class="lbl">Tracked Companies</div>
           </div>
           <div class="card metric">
-            <div class="n" id="statRadarVat">18</div>
+            <div class="n" id="statRadarVat">--</div>
             <div class="lbl">VAT Deadlines Tracked</div>
           </div>
           <div class="card metric metric-urgent">
-            <div class="n" id="statRadarRed">4</div>
+            <div class="n" id="statRadarRed">--</div>
             <div class="lbl">Action Required (RED)</div>
           </div>
           <div class="card metric">
-            <div class="n" id="statRadarClear" style="color: var(--green);">29</div>
+            <div class="n" id="statRadarClear" style="color: var(--green);">--</div>
             <div class="lbl">In Good Standing (CLEAR)</div>
           </div>
         </div>
@@ -1143,7 +1131,7 @@
 
           <div class="form-group" style="margin-bottom: 12px;">
             <label for="modalTimelineTitle" style="font-size: 12px; font-weight: 600;">Event Title</label>
-            <input type="text" class="form-control" id="modalTimelineTitle" required placeholder="e.g. Discussed strike-off defense with Sarah Jenkins" style="width: 100%;">
+            <input type="text" class="form-control" id="modalTimelineTitle" required placeholder="e.g. Discussed statutory defense with director" style="width: 100%;">
           </div>
 
           <div class="form-group" style="margin-bottom: 12px;">
