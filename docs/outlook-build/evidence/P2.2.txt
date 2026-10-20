@@ -1,0 +1,65 @@
+Task P2.2: Connection record schema (getConnection/saveConnection/deleteConnection, unit-tested)
+
+Plan:
+- Files touched:
+  - server/src/services/outlookConnectionStore.js
+  - Sloane/server/src/services/outlookConnectionStore.js
+  - server/tests/unit12-outlook-connection.test.js
+  - docs/outlook-build/evidence/P2.2.txt
+  - docs/outlook-build/PROGRESS.md
+  - context/progress-tracker.md
+- Tests added / updated:
+  - Created server/tests/unit12-outlook-connection.test.js with 12 unit tests across 3 suites:
+    1. Connection Schema Validation:
+       - Validates and normalizes complete connection record schema
+       - Rejects missing actorId
+       - Rejects missing accountEmail
+       - Rejects missing refreshToken
+       - Rejects invalid connection status
+       - Applies default values for optional schema fields (emailSyncEnabled, calendarSyncEnabled, mailFolderIds, connectedAt)
+    2. Repository Lifecycle & Persistence:
+       - getConnection returns null when no connection exists
+       - saveConnection stores encrypted record and getConnection retrieves it
+       - saveConnection supports partial updates merging with existing connection record
+       - deleteConnection permanently purges connection record from disk
+    3. Sanitized Status Exposure:
+       - getSanitizedStatus returns { status: 'disconnected', connected: false } when null
+       - getSanitizedStatus exposes safe metadata and strictly strips all tokens and secrets
+- Done criteria:
+  - Connection record schema conforms to:
+    { actorId, status: 'connected'|'reconnect_required'|'error', accountEmail, displayName, tenantId, scopes[], refreshToken, accessToken, accessTokenExpiresAt, emailSyncEnabled, calendarSyncEnabled, mailFolderIds[], connectedAt, lastSyncAt, lastError }.
+  - Stored encrypted with the tokens via outlookVault.
+  - Repository functions getConnection/saveConnection/deleteConnection implemented and unit-tested.
+  - All 12 connection store unit tests pass; entire test suite (177 tests across 27 suites) passes with zero regressions.
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test tests/unit12-outlook-connection.test.js
+   Output:
+   ▶ Task P2.2: Outlook Connection Record Schema & Store
+     ✔ Connection Schema Validation (16.7008ms)
+     ✔ Repository Lifecycle & Persistence (45.2751ms)
+     ✔ Sanitized Status Exposure (1.8856ms)
+   ✔ Task P2.2: Outlook Connection Record Schema & Store (66.2722ms)
+   ℹ tests 12
+   ℹ suites 4
+   ℹ pass 12
+   ℹ fail 0
+
+2. Full Test Suite Result:
+   npm test
+   Output:
+   ✔ Phase 1: Security Hardening & Authentication Verification (1238.8659ms)
+   ✔ Task P2.1: Outlook Token Vault Encryption (AES-256-GCM) (59.0405ms)
+   ✔ Task P2.2: Outlook Connection Record Schema & Store (46.9429ms)
+   ℹ tests 177
+   ℹ suites 27
+   ℹ pass 177
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 14641.7425
+
+All criteria satisfied. Phase 2 is now 100% complete.
