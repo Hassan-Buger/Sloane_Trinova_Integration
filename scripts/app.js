@@ -112,12 +112,14 @@ class SloaneApp {
     this.closeNavDrawer();
 
     const emailInput = document.getElementById('loginEmail');
-    if (emailInput && !emailInput.value) {
-      emailInput.value = AuthService.getRememberedEmail();
-    }
     const passInput = document.getElementById('loginPassword');
-    if (passInput) {
-      setTimeout(() => passInput.focus(), 120);
+    if (emailInput) {
+      emailInput.value = AuthService.getRememberedEmail();
+      if (!emailInput.value) {
+        setTimeout(() => emailInput.focus(), 120);
+      } else if (passInput) {
+        setTimeout(() => passInput.focus(), 120);
+      }
     }
   }
 

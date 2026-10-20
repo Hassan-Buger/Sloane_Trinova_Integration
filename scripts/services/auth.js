@@ -9,14 +9,14 @@ const REMEMBER_KEY = 'sloane_remember_ceo';
 
 export const AuthService = {
   /**
-   * Default verified CEO credentials
+   * Default verified user placeholder
    */
   defaultUser: {
-    name: 'Kirsty Allen',
-    email: 'kirsty.allen@trinova.co.uk',
-    role: 'CEO & Managing Partner',
-    avatar: 'KA',
-    businessesCount: 6
+    name: 'Executive User',
+    email: '',
+    role: 'Managing Partner',
+    avatar: 'EX',
+    businessesCount: 0
   },
 
   _serverVerified: false,
@@ -122,10 +122,10 @@ export const AuthService = {
     this._serverVerified = true;
 
     const user = result.user || {
-      name: 'Kirsty Allen',
+      name: cleanEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
       email: cleanEmail,
       role: 'CEO & Managing Partner',
-      avatar: 'KA'
+      avatar: cleanEmail.substring(0, 2).toUpperCase()
     };
 
     const sessionData = {
@@ -179,6 +179,6 @@ export const AuthService = {
    * Returns remembered email if any.
    */
   getRememberedEmail() {
-    return localStorage.getItem(REMEMBER_KEY) || 'kirsty.allen@trinova.co.uk';
+    return localStorage.getItem(REMEMBER_KEY) || '';
   }
 };

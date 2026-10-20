@@ -1,0 +1,45 @@
+Task P1.2: Remove login pre-fill and default-email fallbacks
+
+Plan:
+- Files touched:
+  - index.html
+  - scripts/services/auth.js
+  - scripts/app.js
+  - Sloane/index.html
+  - Sloane/scripts/services/auth.js
+  - Sloane/scripts/app.js
+  - server/tests/unit10-security-phase1.test.js
+  - docs/outlook-build/evidence/P1.2.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests added / updated:
+  - Added test 1.1.8: `Login form starts empty and unauthenticated HTML shell contains no kirsty identity strings` in `unit10-security-phase1.test.js`.
+- Done criteria:
+  - The login input starts completely empty (no placeholder, default value, or remember-me default containing kirsty).
+  - Page source contains no `kirsty` string in unauthenticated shell.
+  - Remember-me stores the email only after a successful login.
+  - `npm test` passes with zero regressions (141 pass across 19 suites).
+
+Evidence & Proof:
+
+1. Verification of zero `kirsty` strings in index.html:
+   Select-String -Path index.html -Pattern "kirsty"
+   Result: 0 matches found.
+
+2. Verification of zero hardcoded default emails in auth service:
+   Select-String -Path scripts\services\auth.js -Pattern "kirsty"
+   Result: 0 matches found.
+   `getRememberedEmail()` returns `localStorage.getItem(REMEMBER_KEY) || ''`.
+
+3. Test Execution Result:
+   node --test --test-concurrency=1 tests/*.test.js
+   Output:
+   ℹ tests 141
+   ℹ suites 19
+   ℹ pass 141
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 16151.7981
+
+All criteria satisfied.

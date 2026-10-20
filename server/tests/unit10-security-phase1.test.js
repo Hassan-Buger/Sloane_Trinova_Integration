@@ -299,4 +299,19 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     const hasStaffNote = staffNotes.some(n => n.visibility === 'staff_only');
     assert.ok(hasStaffNote, 'Staff actor must see staff_only notes');
   });
+
+  // Task P1.2: Login pre-fill and personal identity string removal
+  test('1.1.8 Login form starts empty and unauthenticated HTML shell contains no kirsty identity strings', async () => {
+    const res = await request('/');
+    assert.equal(res.status, 200);
+    const html = res.rawBody || res.body;
+    assert.ok(typeof html === 'string', 'Root must return HTML string');
+
+    // Page source contains no 'kirsty' string
+    assert.doesNotMatch(html, /kirsty/i, 'Publicly served index.html must not contain any kirsty identity strings');
+
+    // Login input has no pre-filled value attribute and uses generic placeholder
+    assert.doesNotMatch(html, /id="loginEmail"[^>]*value=/i, 'loginEmail must not contain a hardcoded value attribute');
+    assert.match(html, /id="loginEmail"[^>]*placeholder="name@trinova\.co\.uk"/i, 'loginEmail must have generic placeholder');
+  });
 });
