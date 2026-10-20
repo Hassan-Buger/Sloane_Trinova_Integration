@@ -21,7 +21,7 @@ export class SigningService {
   constructor(options = {}) {
     this.apiUrl = options.apiUrl || config.signing?.apiUrl || 'http://localhost:3000/api/v1';
     this.apiKey = options.apiKey || config.signing?.apiKey || '';
-    this.webhookSecret = options.webhookSecret || config.signing?.webhookSecret || 'documenso_webhook_secret_hmac_2026';
+    this._webhookSecret = options.webhookSecret || '';
     this.storage = options.storage || documentStorage;
     this.mailService = options.mailService || sandboxMailService;
     this.fetchFn = options.fetchFn || globalThis.fetch;
@@ -30,12 +30,20 @@ export class SigningService {
     this.processedEventIds = new Set();
   }
 
+  get webhookSecret() {
+    return this._webhookSecret || config.signing?.webhookSecret || (process.env.SIGNING_WEBHOOK_SECRET || '').trim();
+  }
+
+  set webhookSecret(val) {
+    this._webhookSecret = val;
+  }
+
   /**
    * Verifies incoming webhook HMAC signature.
    * Strictly enforces X-Documenso-Signature (HMAC-SHA256). Plain secret header bypass is removed per Section 1.5.
    */
   verifyWebhookSignature(rawBody, signatureHeader) {
-    if (!signatureHeader || typeof rawBody !== 'string') {
+    if (!signatureHeader || typeof rawBody !== 'string' || !this.webhookSecret) {
       return false;
     }
 

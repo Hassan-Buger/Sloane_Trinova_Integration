@@ -31,34 +31,26 @@ export function validateStartup() {
   }
 
   if (missing.length > 0) {
-    if (process.env.STRICT_STARTUP === 'true') {
-      throw new Error(`Fatal startup error: Required environment variable(s) missing: ${missing.join(', ')}`);
-    } else {
-      logger.warn(`[Startup Warning] Required environment variable(s) missing: ${missing.join(', ')}. Initializing safe fallback credentials for demonstration mode. Set STRICT_STARTUP=true to enforce strict fatal startup.`);
-      if (!process.env.SLON_OWNER_EMAIL && !process.env.SLOANE_OWNER_EMAIL) {
-        process.env.SLON_OWNER_EMAIL = 'kirsty@trinova.com';
-      }
-      if (!process.env.SLON_OWNER_PASSWORD_HASH && !process.env.SLOANE_OWNER_PASSWORD_HASH) {
-        // Hash for 'password123'
-        process.env.SLON_OWNER_PASSWORD_HASH = '$2a$10$wHh4tzXxmMPEzTTYPGE9r.4k.kgs.wCuYIyeLmVDeMf3PGqBtm8UK';
-      }
-      if (!process.env.SLON_API_KEY && !process.env.SLOANE_API_KEY) {
-        process.env.SLON_API_KEY = 'tn_sec_live_sloane_readwrite_2026';
-      }
-      if (!process.env.STORAGE_PRESIGNED_TOKEN_SECRET && !process.env.SLON_TOKEN_SECRET && !process.env.SLOANE_TOKEN_SECRET) {
-        process.env.STORAGE_PRESIGNED_TOKEN_SECRET = 'tn_storage_secret_live_production_2026';
-      }
-    }
+    throw new Error(`Fatal startup error: Required environment variable(s) missing: ${missing.join(', ')}`);
   }
 }
 
-// In non-test execution, validate required startup environment variables
-if (process.env.NODE_ENV !== 'test') {
-  validateStartup();
+import { fileURLToPath } from 'node:url';
+
+function isDirectExecution() {
+  if (!process.argv[1]) return false;
+  try {
+    return fileURLToPath(import.meta.url).toLowerCase() === process.argv[1].toLowerCase();
+  } catch (_) {
+    return false;
+  }
 }
 
-const app = createApp();
-
-app.listen(config.port, () => {
-  logger.info(`Trinova API Server listening on port ${config.port} [env: ${config.env}]`);
-});
+// In non-test direct execution, validate required startup environment variables and start server
+if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
+  validateStartup();
+  const app = createApp();
+  app.listen(config.port, () => {
+    logger.info(`Trinova API Server listening on port ${config.port} [env: ${config.env}]`);
+  });
+}

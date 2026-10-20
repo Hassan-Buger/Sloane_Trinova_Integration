@@ -1,0 +1,46 @@
+Task P1.1: Remove demo fallbacks and committed secrets
+
+Plan:
+- Files touched:
+  - server/src/server.js
+  - server/src/config.js
+  - server/src/services/signingService.js
+  - server/tests/fixtures.js
+  - server/tests/unit01-auth-audit.test.js
+  - server/tests/unit10-security-phase1.test.js
+  - scripts/services/api.js
+  - index.html
+  - docs/outlook-build/evidence/P1.1.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests added / updated:
+  - Added runtime bcrypt password hash generation fixture in `fixtures.js`.
+  - Added `Hard Rule 1 Startup Validation: Missing required env vars throws naming variable without printing values` in `unit01-auth-audit.test.js`.
+  - Updated tests 1.1.4, 1.1.5, 1.1.6, and 1.1.7 in `unit10-security-phase1.test.js` to assert `TEST_PASSWORD`.
+- Done criteria:
+  - Startup validation in server.js refuses to start if required variables (SLON_OWNER_EMAIL, SLON_OWNER_PASSWORD_HASH, SLON_API_KEY/SLOANE_API_KEY, STORAGE_PRESIGNED_TOKEN_SECRET/SLON_TOKEN_SECRET) are missing, naming the missing variable without printing any values.
+  - Committed secrets removed from server.js, config.js, and signingService.js.
+  - `cd server && npm test` green (140 tests pass across 19 suites).
+  - Grep for `password123`, `tn_sec_live`, `tn_storage_secret`, `documenso_webhook_secret_hmac_2026`, `ch_test_server_key` returns NO matches in `src/` or `scripts/`.
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test --test-concurrency=1 tests/*.test.js
+   Output:
+   ℹ tests 140
+   ℹ suites 19
+   ℹ pass 140
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 14180.7083
+
+2. Grep verification for committed secrets in src/ and scripts/:
+   - password123: 0 matches in server/src and scripts/
+   - tn_sec_live: 0 matches in server/src and scripts/
+   - tn_storage_secret: 0 matches in server/src and scripts/
+   - documenso_webhook_secret_hmac_2026: 0 matches in server/src and scripts/
+   - ch_test_server_key: 0 matches in server/src and scripts/
+
+All criteria satisfied.

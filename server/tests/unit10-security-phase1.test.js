@@ -13,7 +13,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { createApp } from '../src/app.js';
 import { mockDb } from '../src/data/db.js';
-import { TEST_API_KEY, TEST_READONLY_KEY, TEST_WEBHOOK_SECRET } from './fixtures.js';
+import { TEST_API_KEY, TEST_READONLY_KEY, TEST_WEBHOOK_SECRET, TEST_PASSWORD } from './fixtures.js';
 
 describe('Phase 1: Security Hardening & Authentication Verification', () => {
   let server;
@@ -117,7 +117,7 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     const blockedRes = await request('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': testIp },
-      body: { email: 'kirsty@trinova.com', password: 'password123' }
+      body: { email: 'kirsty@trinova.com', password: TEST_PASSWORD }
     });
     assert.equal(blockedRes.status, 429);
     assert.ok(blockedRes.body.error?.code);
@@ -127,7 +127,7 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     const res = await request('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.10' },
-      body: { email: 'kirsty@trinova.com', password: 'password123' }
+      body: { email: 'kirsty@trinova.com', password: TEST_PASSWORD }
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'success');
@@ -175,7 +175,7 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     const loginRes = await request('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.20' },
-      body: { email: 'kirsty@trinova.com', password: 'password123' }
+      body: { email: 'kirsty@trinova.com', password: TEST_PASSWORD }
     });
     assert.equal(loginRes.status, 200);
     const setCookie = loginRes.headers['set-cookie'];
@@ -195,11 +195,11 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     assert.equal(badAttemptRes.body.error?.code, 'INVALID_CREDENTIALS');
   });
 
-  test('1.1.7 Login succeeds with kirsty.allen@trinova.co.uk UI quick-fill email and password123', async () => {
+  test('1.1.7 Login succeeds with kirsty.allen@trinova.co.uk owner email and runtime fixture password', async () => {
     const res = await request('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '198.51.100.22' },
-      body: { email: 'kirsty.allen@trinova.co.uk', password: 'password123' }
+      body: { email: 'kirsty.allen@trinova.co.uk', password: TEST_PASSWORD }
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'success');

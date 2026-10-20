@@ -75,25 +75,29 @@ export const config = {
   
   // Companies House Server-Side Integration Settings
   // Key held exclusively server-side per context/04_backend_integration_context.md §9
-  companiesHouse: {
-    apiKey: process.env.COMPANIES_HOUSE_API_KEY || 'ch_test_server_key_live_2026',
-    baseUrl: process.env.COMPANIES_HOUSE_BASE_URL || 'https://api.company-information.service.gov.uk',
-    rateLimitMaxRequests: 600,
-    rateLimitWindowMs: 5 * 60 * 1000, // 5 minutes (600 req / 5 min limit)
-    timeoutMs: 5000, // 5-second bounded timeout
-    maxRetries: 2,
-    cacheTtlMs: 60 * 60 * 1000 // 1 hour server cache
+  get companiesHouse() {
+    return {
+      apiKey: (process.env.COMPANIES_HOUSE_API_KEY || '').trim(),
+      baseUrl: process.env.COMPANIES_HOUSE_BASE_URL || 'https://api.company-information.service.gov.uk',
+      rateLimitMaxRequests: 600,
+      rateLimitWindowMs: 5 * 60 * 1000, // 5 minutes (600 req / 5 min limit)
+      timeoutMs: 5000, // 5-second bounded timeout
+      maxRetries: 2,
+      cacheTtlMs: 60 * 60 * 1000 // 1 hour server cache
+    };
   },
 
   // Document Signing Service Settings (Documenso Community Edition)
   // Evaluated and approved per context/signing-provider-evaluation.md and Unit 06
-  signing: {
-    provider: 'documenso',
-    apiUrl: process.env.SIGNING_API_URL || 'http://localhost:3000/api/v1',
-    apiKey: process.env.SIGNING_API_KEY || 'documenso_test_server_key_live_2026',
-    webhookSecret: process.env.SIGNING_WEBHOOK_SECRET || 'documenso_webhook_secret_hmac_2026',
-    timeoutMs: 5000,
-    maxRetries: 2
+  get signing() {
+    return {
+      provider: 'documenso',
+      apiUrl: process.env.SIGNING_API_URL || 'http://localhost:3000/api/v1',
+      apiKey: (process.env.SIGNING_API_KEY || '').trim(),
+      webhookSecret: (process.env.SIGNING_WEBHOOK_SECRET || '').trim(),
+      timeoutMs: 5000,
+      maxRetries: 2
+    };
   },
 
   // Anthropic Claude Integration Settings

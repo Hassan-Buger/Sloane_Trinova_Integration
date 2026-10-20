@@ -188,4 +188,48 @@ describe('Unit 01: Server-to-Server Auth & Audit Infrastructure', () => {
     assert.equal(sanitized.nested.token, '[REDACTED]');
     assert.equal(sanitized.nested.cleanField, 'allowed');
   });
+
+  test('Hard Rule 1 Startup Validation: Missing required env vars throws naming variable without printing values', async () => {
+    const { validateStartup } = await import('../src/server.js');
+
+    // Backup env vars
+    const origApiKey = process.env.SLON_API_KEY;
+    const origSloaneApiKey = process.env.SLOANE_API_KEY;
+    const origOwnerEmail = process.env.SLON_OWNER_EMAIL;
+    const origPasswordHash = process.env.SLON_OWNER_PASSWORD_HASH;
+    const origStorageSecret = process.env.STORAGE_PRESIGNED_TOKEN_SECRET;
+    const origSlonTokenSecret = process.env.SLON_TOKEN_SECRET;
+
+    try {
+      delete process.env.SLON_API_KEY;
+      delete process.env.SLOANE_API_KEY;
+      delete process.env.SLON_OWNER_EMAIL;
+      delete process.env.SLON_OWNER_PASSWORD_HASH;
+      delete process.env.STORAGE_PRESIGNED_TOKEN_SECRET;
+      delete process.env.SLON_TOKEN_SECRET;
+
+      assert.throws(() => {
+        validateStartup();
+      }, (err) => {
+        assert.doesNotMatch(err.message, /password123/);
+        assert.doesNotMatch(err.message, /\$2a\$/);
+        assert.doesNotMatch(err.message, /kirsty@/i);
+        assert.doesNotMatch(err.message, /test_storage_token/i);
+        return true;
+      });
+    } finally {
+      // Restore env vars
+      if (origApiKey) process.env.SLON_API_KEY = origApiKey;
+      if (origSloaneApiKey) process.env.SLOANE_API_KEY = origSloaneApiKey;
+      if (origOwnerEmail) process.env.SLON_OWNER_EMAIL = origOwnerEmail;
+      if (origPasswordHash) process.env.SLON_OWNER_PASSWORD_HASH = origPasswordHash;
+      if (origStorageSecret) process.env.STORAGE_PRESIGNED_TOKEN_SECRET = origStorageSecret;
+      if (origSlonTokenSecret) process.env.SLON_TOKEN_SECRET = origSlonTokenSecret;
+    }
+
+    // With all env vars restored, validateStartup must succeed
+    assert.doesNotThrow(() => {
+      validateStartup();
+    });
+  });
 });

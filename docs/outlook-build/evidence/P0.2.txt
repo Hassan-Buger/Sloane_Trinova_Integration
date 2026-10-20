@@ -1,0 +1,24 @@
+Task P0.2: Record architectural decisions in DECISIONS.md
+
+Plan:
+- Files to touch:
+  - docs/outlook-build/DECISIONS.md
+  - docs/outlook-build/evidence/P0.2.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests to add: None (architecture and scope decisions record).
+- Done criteria:
+  - Identity option (§3.2 A or B) recorded with one-line rationale and human approval reference for H2.
+  - Token store location (§5 P2.1) recorded with one-line rationale.
+  - Callback cookie handling (§4.2) recorded with one-line rationale.
+  - Revocation wording (§4.1) recorded with one-line rationale.
+  - Client-secret expiry date recorded with one-line rationale and H1 reference.
+
+Evidence & Proof:
+All 5 decisions recorded in `docs/outlook-build/DECISIONS.md`:
+1. D0.1: Identity Scopes: Option A (recommended, `openid profile email`), extracts name and email from verified `id_token` claims without extra Graph network hop or `User.Read` scope. Reference: Checkpoint H2.
+2. D0.2: Token Store Location: `server/data-private/outlook-vault.json` (via `OUTLOOK_VAULT_PATH`), AES-256-GCM encrypted, gitignored outside static root, 0700 dir / 0600 file modes. Reference: P2.1.
+3. D0.3: Callback Cookie Handling: `GET /api/v1/integrations/outlook/callback` does not require session cookie; owner is bound via single-use 10-minute TTL `state` parameter to avoid `SameSite=Strict` redirect loss. Reference: P3.2.
+4. D0.4: Revocation Wording: Honest UI confirm dialog directing user to `https://myapps.microsoft.com` to revoke Microsoft-side grant while locally purging vault and cache. Reference: P4.1, P5.5, P7.5.
+5. D0.5: Client Secret Expiry: Maximum 180-day rotation policy from Entra ID creation date, calendar reminder at 150 days. Reference: Checkpoint H1.
+
+All criteria satisfied.

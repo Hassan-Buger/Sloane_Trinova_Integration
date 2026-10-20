@@ -1,0 +1,24 @@
+Task P0.3: Take baseline browser snapshot of current logged-out page
+
+Plan:
+- Files to touch / create:
+  - docs/outlook-build/evidence/baseline/logged-out-source.html
+  - docs/outlook-build/evidence/baseline/screenshot.png
+  - docs/outlook-build/evidence/P0.3.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests to add: None (baseline artifact capture).
+- Done criteria:
+  - Baseline view-source text dump of the current logged-out page saved in docs/outlook-build/evidence/baseline/.
+  - Baseline screenshot of the logged-out login page captured and saved in docs/outlook-build/evidence/baseline/.
+
+Evidence & Proof:
+1. Baseline source dump saved:
+   File: docs/outlook-build/evidence/baseline/logged-out-source.html
+   Size: 58,374 bytes
+   Method: Captured via HTTP GET against local server http://localhost:4000/
+2. Baseline screenshot saved:
+   File: docs/outlook-build/evidence/baseline/screenshot.png
+   Size: 976,278 bytes
+   Method: Captured via Chromium browser subagent in logged-out incognito state.
+
+All criteria satisfied.

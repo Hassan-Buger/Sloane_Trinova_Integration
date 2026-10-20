@@ -1,0 +1,24 @@
+Task P0.1: Create docs/outlook-build/ with PROGRESS.md, DECISIONS.md, evidence/
+
+Plan:
+- Files to touch / create:
+  - docs/outlook-build/PROGRESS.md
+  - docs/outlook-build/DECISIONS.md
+  - docs/outlook-build/evidence/P0.1.txt
+- Tests to add: None (baseline test run of existing test suite).
+- Done criteria:
+  - docs/outlook-build/ exists with PROGRESS.md, DECISIONS.md, and evidence/ directory.
+  - Baseline `npm test` executed and full output recorded (139 passing tests across 19 suites).
+
+Evidence / Output of baseline `npm test`:
+cd server && npm test
+Output:
+ℹ tests 139
+ℹ suites 19
+ℹ pass 139
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14759.1872
+Result: 139 pass, 0 fail. Baseline verified.
