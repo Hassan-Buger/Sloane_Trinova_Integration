@@ -16,7 +16,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P1.6** Mark the `/api/v1/test/mutate` endpoint dev-only (mount only when `NODE_ENV !== 'production'`).
 
 ## Phase 2 — Encrypted token vault and connection store
-- [ ] **P2.1** Implement `server/src/services/outlookVault.js` (AES-256-GCM, atomic writes, `0600` permissions, key validation).
+- [x] **P2.1** Implement `server/src/services/outlookVault.js` (AES-256-GCM, atomic writes, `0600` permissions, key validation).
 - [ ] **P2.2** Connection record schema (`getConnection/saveConnection/deleteConnection`, unit-tested).
 
 ## Phase 3 — OAuth connect and callback

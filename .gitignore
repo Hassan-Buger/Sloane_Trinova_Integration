@@ -35,3 +35,9 @@ Thumbs.db
 *.zip
 scratch/
 _baseline/
+
+# Private Data & Token Vaults
+data-private/
+server/data-private/
+*.tmp
+

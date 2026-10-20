@@ -1,0 +1,73 @@
+Task P2.1: Implement server/src/services/outlookVault.js (AES-256-GCM, atomic writes, 0600 permissions, key validation)
+
+Plan:
+- Files touched:
+  - server/src/services/outlookVault.js
+  - Sloane/server/src/services/outlookVault.js
+  - server/tests/unit11-outlook-vault.test.js
+  - .gitignore
+  - docs/outlook-build/evidence/P2.1.txt
+  - docs/outlook-build/PROGRESS.md
+  - context/progress-tracker.md
+- Tests added / updated:
+  - Created server/tests/unit11-outlook-vault.test.js containing 19 unit tests across 3 suites:
+    1. Key Validation & Configuration Gate:
+       - 64-char hex key (32 bytes) validation
+       - 44-char base64 key (32 bytes) validation
+       - 32-byte Buffer key validation
+       - 32-char UTF-8 key validation
+       - Missing / undefined / empty key rejection
+       - Invalid byte length rejection (16, 31, 33 bytes)
+       - isConfigured() checks OUTLOOK_TOKEN_ENC_KEY or key override
+    2. AES-256-GCM Cryptographic Integrity:
+       - Plaintext string round-trip encryption & decryption
+       - Structured JSON object round-trip encryption & decryption
+       - Tampered ciphertext detection & rejection (GCM auth tag verification)
+       - Tampered auth tag detection & rejection
+       - Tampered IV detection & rejection
+       - Wrong key decryption rejection
+       - Invalid key invocation rejection
+    3. Vault File Persistence, Atomicity & Secret Hygiene:
+       - writeVault and readVault persistence and retrieval
+       - Zero secret leakage on disk: raw file contains zero plaintext substrings of tokens, email, or schema keys
+       - Directory created with mode 0700, vault file with mode 0600
+       - Atomic write with temp file, fsync, and atomic rename (zero leftover temp files)
+       - deleteVault unlinks file cleanly and subsequent readVault returns null
+- Done criteria:
+  - AES-256-GCM encryption with 12-byte IV, 16-byte GCM tag, and versioned output { v: 1, iv, tag, ct } in base64.
+  - Refuses to encrypt/decrypt if key is missing or not 32 bytes; isConfigured() returns false without halting server.
+  - Default path server/data-private/outlook-vault.json (outside static root, added to .gitignore).
+  - Atomic writes using temp file, explicit fsync, and atomic rename.
+  - Mode 0700 directory, mode 0600 file.
+  - All 19 vault unit tests and full test suite (165 tests across 23 suites) pass with zero regressions.
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test tests/unit11-outlook-vault.test.js
+   Output:
+   ▶ Task P2.1: Outlook Token Vault Encryption (AES-256-GCM)
+     ✔ Key Validation & Configuration Gate (7.0439ms)
+     ✔ AES-256-GCM Cryptographic Integrity (25.4892ms)
+     ✔ Vault File Persistence, Atomicity & Secret Hygiene (79.5761ms)
+   ✔ Task P2.1: Outlook Token Vault Encryption (AES-256-GCM) (119.5228ms)
+   ℹ tests 19
+   ℹ suites 4
+   ℹ pass 19
+   ℹ fail 0
+
+2. Full Test Suite Result:
+   npm test
+   Output:
+   ✔ Phase 1: Security Hardening & Authentication Verification (1558.1255ms)
+   ✔ Task P2.1: Outlook Token Vault Encryption (AES-256-GCM) (72.9522ms)
+   ℹ tests 165
+   ℹ suites 23
+   ℹ pass 165
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 19061.8812
+
+All criteria satisfied.
