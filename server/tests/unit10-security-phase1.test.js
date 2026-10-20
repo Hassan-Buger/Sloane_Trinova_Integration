@@ -388,4 +388,56 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     assert.match(indexHtml, /id="configToken"[^>]*readonly/i, 'index.html configToken input must be readonly');
     assert.match(indexHtml, /value="HttpOnly Session Cookie \(slon_session\)"/i, 'index.html configToken must indicate HttpOnly Session Cookie');
   });
+
+  // Task P1.6: /api/v1/test/mutate endpoint is dev-only (mounted only when NODE_ENV !== 'production')
+  test('1.1.13 /api/v1/test/mutate is dev-only and returns 404 in production mode', async () => {
+    // 1. In production mode, /api/v1/test/mutate must return 404
+    const prevEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      const prodApp = createApp();
+      let prodServer;
+      await new Promise(resolve => {
+        prodServer = prodApp.listen(0, resolve);
+      });
+      const prodPort = prodServer.address().port;
+
+      const res = await new Promise((resolve, reject) => {
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: prodPort,
+          path: '/api/v1/test/mutate',
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${TEST_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null });
+          });
+        });
+        req.on('error', reject);
+        req.end();
+      });
+
+      await new Promise(resolve => prodServer.close(resolve));
+      assert.equal(res.status, 404, 'POST /api/v1/test/mutate in production must return 404');
+      assert.equal(res.body?.error?.code, 'NOT_FOUND');
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+
+    // 2. In non-production mode, /api/v1/test/mutate is mounted and succeeds with write scope
+    const devRes = await request('/api/v1/test/mutate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TEST_API_KEY}`
+      }
+    });
+    assert.equal(devRes.status, 201, 'POST /api/v1/test/mutate in non-production must succeed with 201');
+    assert.equal(devRes.body?.status, 'success');
+  });
 });

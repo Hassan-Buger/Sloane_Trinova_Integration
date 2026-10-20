@@ -1,0 +1,47 @@
+Task P1.6: Mark /api/v1/test/mutate endpoint dev-only
+
+Plan:
+- Files touched:
+  - server/src/app.js
+  - Sloane/server/src/app.js
+  - server/tests/unit10-security-phase1.test.js
+  - docs/outlook-build/evidence/P1.6.txt
+  - docs/outlook-build/PROGRESS.md
+  - context/progress-tracker.md
+- Tests added / updated:
+  - Added test 1.1.13 in server/tests/unit10-security-phase1.test.js:
+    * Verifies that when `NODE_ENV === 'production'`, `POST /api/v1/test/mutate` is not mounted and returns 404 with code `NOT_FOUND`.
+    * Verifies that in non-production environments (`test`/`development`), `POST /api/v1/test/mutate` remains mounted and succeeds with status 201 for callers with `sloane:write` scope.
+- Done criteria:
+  - `app.post('/api/v1/test/mutate', ...)` is wrapped inside `if (process.env.NODE_ENV !== 'production') { ... }`.
+  - In production mode, requests to `/api/v1/test/mutate` return 404.
+  - Full test suite passes with zero regressions (146 passing across 19 suites).
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test tests/unit10-security-phase1.test.js
+   Output:
+   [INFO] Audit Log: [post__api_v1_test_mutate] by anonymous on test:root (404)
+   [INFO] Audit Log: [test_mutation_executed] by actor_kirsty_allen on test_entity:root (201)
+     ✔ 1.1.13 /api/v1/test/mutate is dev-only and returns 404 in production mode (37.1923ms)
+   ✔ Phase 1: Security Hardening & Authentication Verification (3353.1691ms)
+   ℹ tests 18
+   ℹ suites 1
+   ℹ pass 18
+   ℹ fail 0
+
+2. Full Test Suite Result:
+   npm test
+   Output:
+   ✔ Phase 1: Security Hardening & Authentication Verification (2085.5177ms)
+   ℹ tests 146
+   ℹ suites 19
+   ℹ pass 146
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 27030.4362
+
+All criteria satisfied. Phase 1 is now 100% complete.

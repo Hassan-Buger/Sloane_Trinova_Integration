@@ -407,17 +407,19 @@ export function createApp(options = {}) {
     });
   });
 
-  // Write Mutation Test Endpoint
-  app.post('/api/v1/test/mutate', authenticate, requireScope('sloane:write'), (req, res) => {
-    req.auditAction = 'test_mutation_executed';
-    req.resourceType = 'test_entity';
+  // Write Mutation Test Endpoint (Dev-only: mount only when NODE_ENV !== 'production')
+  if (process.env.NODE_ENV !== 'production') {
+    app.post('/api/v1/test/mutate', authenticate, requireScope('sloane:write'), (req, res) => {
+      req.auditAction = 'test_mutation_executed';
+      req.resourceType = 'test_entity';
 
-    res.status(201).json({
-      status: 'success',
-      message: 'Mutation executed successfully with write scope.',
-      actor: req.actor
+      res.status(201).json({
+        status: 'success',
+        message: 'Mutation executed successfully with write scope.',
+        actor: req.actor
+      });
     });
-  });
+  }
 
   // --- Mount Section 1.1 Auth Routes ---
   registerAuthRoutes(app, { authenticate, requireScope });

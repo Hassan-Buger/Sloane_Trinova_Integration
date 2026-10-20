@@ -13,7 +13,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P1.3** Make the logged-out shell data-free. Strip all client names, amounts, deadlines, and sample rows from `index.html`; the dashboard markup is populated only after a session check.
 - [x] **P1.4** Stop serving `scripts/data/` publicly. Move `seed.js` out of the static tree (or delete it if the standalone adapter is removed). Update the static whitelist in `server/src/app.js` so `scripts/data/` returns 404 anonymously. Remove sample Outlook events from `server/src/data/db.js`.
 - [x] **P1.5** Remove the Trinova bearer token from `localStorage` (`scripts/services/api.js`). The API calls use the session cookie only. Remove the `sloane_anthropic_api_key` cleanup logic if it is no longer needed.
-- [ ] **P1.6** Mark the `/api/v1/test/mutate` endpoint dev-only (mount only when `NODE_ENV !== 'production'`).
+- [x] **P1.6** Mark the `/api/v1/test/mutate` endpoint dev-only (mount only when `NODE_ENV !== 'production'`).
 
 ## Phase 2 — Encrypted token vault and connection store
 - [ ] **P2.1** Implement `server/src/services/outlookVault.js` (AES-256-GCM, atomic writes, `0600` permissions, key validation).
