@@ -1,0 +1,37 @@
+Task P3.2: GET .../connect (session required) and GET .../callback (no cookie required, state-bound)
+Recorded At: 2026-10-21T01:24:00+05:00
+Test Command: npm test
+Result: 202 passed across 35 suites (0 failing, 0 skipped, duration 16.65s)
+
+Automated Test Suite: server/tests/unit14-outlook-oauth-routes.test.js
+Test Output:
+▶ Task P3.2: Outlook OAuth 2.0 Connect & Callback Routes
+  ▶ GET /api/v1/integrations/outlook/connect
+    ✔ 1. Rejects unauthenticated request without session cookie with 401
+    ✔ 2. Authenticated request redirects 302 to Microsoft authorize endpoint with correct parameters
+    ✔ 3. Returns 503 when OUTLOOK_CLIENT_ID is unconfigured
+  ✔ GET /api/v1/integrations/outlook/connect
+  ▶ GET /api/v1/integrations/outlook/callback
+    ✔ 4. Does not require session cookie to handle callback
+    ✔ 5. Handles user-denied error by redirecting to dashboard with error and stores nothing
+    ✔ 6. Rejects missing or malformed state parameter with 400
+    ✔ 7. Rejects expired state parameter with 400
+    ✔ 8. Replayed callback / double-click: second invocation fails with UNKNOWN_STATE message
+    ✔ 9. Handles Microsoft token endpoint 500 error gracefully with 502
+    ✔ 10. Rejects token response missing refresh_token with 400 MISSING_REFRESH_TOKEN
+    ✔ 11. Rejects bad id_token signature with 401 INVALID_ID_TOKEN
+    ✔ 12. Success flow: exchanges code, validates tokens, persists encrypted vault record, redirects 302 to /index.html?outlook=connected
+  ✔ GET /api/v1/integrations/outlook/callback
+✔ Task P3.2: Outlook OAuth 2.0 Connect & Callback Routes
+
+Verification Summary:
+- Implemented `server/src/routes/outlookAuth.js` and `server/src/services/outlookIdentityService.js` (and mirrored to `Sloane/`).
+- `GET /api/v1/integrations/outlook/connect`: Requires active session (`authenticate`), calls `createStateEntry({ actorId })`, redirects 302 to Microsoft authorize endpoint with `response_type=code`, `response_mode=query`, `client_id`, `redirect_uri`, `scope`, `state`, `code_challenge`, `code_challenge_method=S256`, `nonce`, and `prompt=select_account`.
+- `GET /api/v1/integrations/outlook/callback`: Works without session cookies, resolving owner actor strictly from single-use state store.
+- Rejects provider error / user denial by redirecting to dashboard with `?outlook_error=...` without storing any data.
+- Handles unknown, expired, and replayed states with 400 Bad Request and readable double-click idempotent message.
+- Performs code exchange with Microsoft token endpoint with 10s timeout. Handles 500 error cleanly.
+- Asserts presence of `refresh_token` (fails with 400 MISSING_REFRESH_TOKEN if absent).
+- Verifies `id_token` RS256 signature against Microsoft JWKS public keyset and validates claims (`nonce`, `aud`, `exp`). Rejects forged or tampered signatures with 401 INVALID_ID_TOKEN.
+- Stores validated record into AES-256-GCM encrypted vault with `status: 'connected'`, folders, and sync toggles.
+- Redirects successfully to `/index.html?outlook=connected`.

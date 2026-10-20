@@ -17,6 +17,7 @@ import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerOutlookAuthRoutes } from './routes/outlookAuth.js';
 import { telemetry } from './services/telemetry.js';
 import { sessionStore } from './services/sessionStore.js';
 
@@ -106,6 +107,11 @@ export function createApp(options = {}) {
       res.json = function(data) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify(data));
+      };
+
+      res.redirect = function(url, statusCode = 302) {
+        res.writeHead(statusCode, { Location: url });
+        res.end();
       };
 
       // CORS handling with explicit origin whitelist (Section 1.5)
@@ -444,6 +450,9 @@ export function createApp(options = {}) {
 
   // --- Mount Feature 02 Claude AI Routes ---
   registerAiRoutes(app, { authenticate, requireScope });
+
+  // --- Mount Outlook OAuth 2.0 Authorization Routes (Task P3.2) ---
+  registerOutlookAuthRoutes(app, { authenticate, requireScope }, options.outlookOptions || options);
 
   return app;
 }

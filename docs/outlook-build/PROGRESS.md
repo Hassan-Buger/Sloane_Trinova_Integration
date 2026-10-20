@@ -21,7 +21,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 
 ## Phase 3 — OAuth connect and callback
 - [x] **P3.1** PKCE + state store with TTL and single use (§4.2). Unit tests: expiry, reuse, unknown state.
-- [ ] **P3.2** `GET .../connect` (session required) and `GET .../callback` (no cookie required, state-bound).
+- [x] **P3.2** `GET .../connect` (session required) and `GET .../callback` (no cookie required, state-bound).
 - [ ] **P3.3** Option A: JWKS fetch with cache and `id_token` verification. Option B: `GET /me`.
 
 ## Phase 4 — Graph client and token lifecycle
