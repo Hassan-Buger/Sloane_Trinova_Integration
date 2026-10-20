@@ -330,4 +330,32 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     assert.match(html, /id="pulseSignoffs">\s*--\s*</i, 'pulseSignoffs must start unpopulated');
     assert.match(html, /id="redAlertsContainer">\s*<!--[^>]*-->\s*</i, 'redAlertsContainer must start empty');
   });
+
+  // Task P1.4: Stop serving scripts/data/ publicly and remove sample Outlook events
+  test('1.1.10 Anonymous request to /scripts/data/seed.js returns 404, authenticated request returns 200', async () => {
+    // 1. Unauthenticated request must return 404
+    const anonRes = await request('/scripts/data/seed.js');
+    assert.equal(anonRes.status, 404, 'Anonymous request to /scripts/data/seed.js must return 404');
+
+    // 2. Authenticated request with session cookie must return 200
+    const loginRes = await request('/api/v1/auth/login', {
+      method: 'POST',
+      body: { email: 'kirsty.allen@trinova.co.uk', password: TEST_PASSWORD }
+    });
+    const setCookie = loginRes.headers['set-cookie'];
+    const cookieStr = Array.isArray(setCookie) ? setCookie[0] : (setCookie || '');
+    const sessionCookie = cookieStr.split(';')[0];
+    assert.match(sessionCookie, /slon_session=/);
+
+    const authRes = await request('/scripts/data/seed.js', {
+      headers: { Cookie: sessionCookie }
+    });
+    assert.equal(authRes.status, 200, 'Authenticated request to /scripts/data/seed.js must return 200');
+  });
+
+  test('1.1.11 db.js timeline events contain zero sample Outlook events', async () => {
+    const { mockDb } = await import('../src/data/db.js');
+    const outlookEvents = (mockDb.timeline_events || []).filter(e => e.source === 'outlook');
+    assert.equal(outlookEvents.length, 0, 'mockDb.timeline_events must contain 0 events with source: outlook');
+  });
 });

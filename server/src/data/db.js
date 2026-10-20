@@ -542,26 +542,6 @@ export const mockDb = {
       }
     },
     {
-      id: "evt_woof_002",
-      clientId: "cli_woofington_grp",
-      companyId: "comp_woofington_park_01",
-      eventType: "EMAIL_RECEIVED",
-      title: "Client Requested Urgent Accounts Information",
-      description: "Sarah Jenkins inquired: 'Hi Kirsty, we received the notice from Companies House. What do we need to sign?'",
-      occurredAt: "2026-09-18T15:20:00.000Z",
-      createdAt: "2026-09-18T15:20:00.000Z",
-      actorType: "user",
-      actorId: "cnt_sarah_jenkins",
-      source: "outlook",
-      severity: "warning",
-      visibility: "shared",
-      externalId: "msg_woof_01",
-      metadata: {
-        sender: "sarah@woofingtonpark.co.uk",
-        subject: "Urgent: Companies House Notice"
-      }
-    },
-    {
       id: "evt_woof_003",
       clientId: "cli_woofington_grp",
       companyId: "comp_woofington_park_01",

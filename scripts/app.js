@@ -10,16 +10,28 @@ import { ApiService } from './services/api.js';
 import { AuthService } from './services/auth.js';
 import { ModalManager } from './components/modal.js';
 import { Toast } from './components/toast.js';
-import {
-  ACCOUNTS_TRACKER,
-  ACTION_TRACKER,
-  VAT_TRACKER,
-  TOP3_ITEMS,
-  DIARY_ITEMS,
-  WAITING_SIGNOFF,
-  ATTENTION_EMAILS,
-  PEOPLE_WORK
-} from './data/seed.js';
+
+// Dynamic authenticated loader for seed data (Task P1.4: not requested on unauthenticated page load)
+let _seedData = null;
+async function getSeedData() {
+  if (!_seedData) {
+    try {
+      _seedData = await import('./data/seed.js');
+    } catch (e) {
+      _seedData = {
+        ACCOUNTS_TRACKER: [],
+        ACTION_TRACKER: [],
+        VAT_TRACKER: [],
+        TOP3_ITEMS: [],
+        DIARY_ITEMS: [],
+        WAITING_SIGNOFF: [],
+        ATTENTION_EMAILS: [],
+        PEOPLE_WORK: []
+      };
+    }
+  }
+  return _seedData;
+}
 
 /**
  * HTML Output Escaping Utility (Section 1.4)
@@ -782,8 +794,8 @@ class SloaneApp {
     await this.renderCommandCentre();
     await this.renderBusinesses();
     await this.renderClients();
-    this.renderPeopleWork();
-    this.renderStatutory();
+    await this.renderPeopleWork();
+    await this.renderStatutory();
     this.renderIntelligence();
     this.renderBrain();
   }
@@ -793,6 +805,12 @@ class SloaneApp {
      ========================================================================== */
 
   async renderCommandCentre() {
+    const seed = await getSeedData();
+    const TOP3_ITEMS = seed.TOP3_ITEMS || [];
+    const DIARY_ITEMS = seed.DIARY_ITEMS || [];
+    const WAITING_SIGNOFF = seed.WAITING_SIGNOFF || [];
+    const ATTENTION_EMAILS = seed.ATTENTION_EMAILS || [];
+
     // 0. Render Red Alerts
     const redAlertsContainer = document.getElementById('redAlertsContainer');
     if (redAlertsContainer) {
@@ -1031,12 +1049,14 @@ class SloaneApp {
     }
   }
 
-  renderPeopleWork() {
+  async renderPeopleWork() {
     const container = document.getElementById('peopleGridContainer');
     if (!container) return;
 
+    const seed = await getSeedData();
+    const PEOPLE_WORK = seed.PEOPLE_WORK || [];
+
     container.innerHTML = PEOPLE_WORK.map(p => `
-      <div class="card person-card">
         <div class="person-header">
           <div class="person-info">
             <div class="person-avatar">${escapeHtml(p.avatar)}</div>
@@ -1070,7 +1090,12 @@ class SloaneApp {
     `).join('');
   }
 
-  renderStatutory() {
+  async renderStatutory() {
+    const seed = await getSeedData();
+    const ACCOUNTS_TRACKER = seed.ACCOUNTS_TRACKER || [];
+    const ACTION_TRACKER = seed.ACTION_TRACKER || [];
+    const VAT_TRACKER = seed.VAT_TRACKER || [];
+
     const chCache = StorageService.getCHCache();
 
     // Assemble all statutory records

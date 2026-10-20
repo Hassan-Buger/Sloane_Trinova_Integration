@@ -6,7 +6,6 @@
 
 import { StorageService } from './storage.js';
 import { ReconciliationEngine } from './reconciliation.js';
-import { ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER } from '../data/seed.js';
 
 // Default production endpoint and fallback key
 // If running in browser, connect to origin/api/v1 automatically (seamless full-stack Railway / domain support)

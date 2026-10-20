@@ -11,7 +11,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P1.1** Remove demo fallbacks (§2.7). Startup fails naming missing variables. Remove committed secrets from `config.js`, `server.js`, `signingService.js`. Update test 1.1.7 and any test that depends on `password123`; add a test fixture that generates a bcrypt hash at runtime.
 - [x] **P1.2** Remove the login pre-fill (§2.5). Also remove the default-email fallback in `getRememberedEmail`. Remember-me may store the email only after a successful login.
 - [x] **P1.3** Make the logged-out shell data-free. Strip all client names, amounts, deadlines, and sample rows from `index.html`; the dashboard markup is populated only after a session check.
-- [ ] **P1.4** Stop serving `scripts/data/` publicly. Move `seed.js` out of the static tree (or delete it if the standalone adapter is removed). Update the static whitelist in `server/src/app.js` so `scripts/data/` returns 404 anonymously. Remove sample Outlook events from `server/src/data/db.js`.
+- [x] **P1.4** Stop serving `scripts/data/` publicly. Move `seed.js` out of the static tree (or delete it if the standalone adapter is removed). Update the static whitelist in `server/src/app.js` so `scripts/data/` returns 404 anonymously. Remove sample Outlook events from `server/src/data/db.js`.
 - [ ] **P1.5** Remove the Trinova bearer token from `localStorage` (`scripts/services/api.js`). The API calls use the session cookie only. Remove the `sloane_anthropic_api_key` cleanup logic if it is no longer needed.
 - [ ] **P1.6** Mark the `/api/v1/test/mutate` endpoint dev-only (mount only when `NODE_ENV !== 'production'`).
 

@@ -1,0 +1,45 @@
+Task P1.4: Stop serving scripts/data/ publicly
+
+Plan:
+- Files touched:
+  - server/src/app.js
+  - server/src/data/db.js
+  - server/src/data/seed.js
+  - scripts/app.js
+  - scripts/services/api.js
+  - scripts/services/storage.js
+  - Sloane/scripts/app.js
+  - Sloane/scripts/services/api.js
+  - Sloane/scripts/services/storage.js
+  - server/tests/unit10-security-phase1.test.js
+  - docs/outlook-build/evidence/P1.4.txt
+  - docs/outlook-build/PROGRESS.md
+- Tests added / updated:
+  - Added test 1.1.10 in `server/tests/unit10-security-phase1.test.js`: asserts anonymous request to `/scripts/data/seed.js` returns 404, while authenticated request with `slon_session` cookie returns 200.
+  - Added test 1.1.11 in `server/tests/unit10-security-phase1.test.js`: asserts `mockDb.timeline_events` contains 0 events with `source: 'outlook'`.
+- Done criteria:
+  - `GET /scripts/data/seed.js` returns 404 to unauthenticated/anonymous requests.
+  - `seed.js` copied to `server/src/data/seed.js` out of the public static tree.
+  - Frontend scripts do not statically import `seed.js` on unauthenticated page load; seed data is loaded dynamically only post-session verification.
+  - Unused `seed.js` imports removed from `api.js` and `storage.js`.
+  - Sample Outlook timeline event (`evt_woof_002`) removed from `server/src/data/db.js`.
+  - Full test suite passes with zero regressions (144 passing across 19 suites).
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test --test-concurrency=1 tests/*.test.js
+   Output:
+   ✔ 1.1.10 Anonymous request to /scripts/data/seed.js returns 404, authenticated request returns 200 (119.7288ms)
+   ✔ 1.1.11 db.js timeline events contain zero sample Outlook events (1.0717ms)
+   ✔ Phase 1: Security Hardening & Authentication Verification (5521.2182ms)
+   ℹ tests 144
+   ℹ suites 19
+   ℹ pass 144
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 31889.5493
+
+All criteria satisfied.

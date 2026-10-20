@@ -18,6 +18,7 @@ import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { telemetry } from './services/telemetry.js';
+import { sessionStore } from './services/sessionStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,6 +181,17 @@ export function createApp(options = {}) {
         }
 
         // 2. Strict public file/directory whitelist: only index.html, favicon.ico, styles/, scripts/, assets/
+        // scripts/data/ contains seed records and must return 404 to anonymous requests (Task P1.4 / Section 2.6)
+        if (relativePath.startsWith('scripts/data/') || relativePath === 'scripts/data') {
+          const cookies = sessionStore.parseCookies(req.headers.cookie);
+          const session = cookies.slon_session ? sessionStore.getSession(cookies.slon_session) : null;
+          if (!session) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+            return;
+          }
+        }
+
         const isExplicitPublic =
           relativePath === 'index.html' ||
           relativePath === 'favicon.ico' ||

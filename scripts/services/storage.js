@@ -4,7 +4,8 @@
  * and cached shared data from Trinova.
  */
 
-import { INITIAL_BUSINESSES, INITIAL_CLIENTS } from '../data/seed.js';
+const INITIAL_BUSINESSES = [];
+const INITIAL_CLIENTS = [];
 
 const STORAGE_KEYS = {
   BUSINESSES: 'sloane_businesses_v2',
