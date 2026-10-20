@@ -604,8 +604,8 @@ class SloaneApp {
         const anthropicInput = document.getElementById('configAnthropicKey');
         const providerInput = document.getElementById('configAiProviderSelect');
         if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
-        if (tokenInput) tokenInput.value = ApiService.config.token;
-        if (anthropicInput) anthropicInput.value = ApiService.config.anthropicApiKey || '';
+        if (tokenInput) tokenInput.value = 'HttpOnly Session Cookie (slon_session)';
+        if (anthropicInput) anthropicInput.value = '';
         if (providerInput) providerInput.value = ApiService.getAiProvider();
         ModalManager.open('trinovaConfigModal', trinovaStatusBtn);
       });
@@ -617,14 +617,12 @@ class SloaneApp {
       trinovaConfigForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const baseUrl = document.getElementById('configBaseUrl').value.trim();
-        const token = document.getElementById('configToken').value.trim();
-        const anthropicApiKey = document.getElementById('configAnthropicKey')?.value.trim();
         const chosenProvider = document.getElementById('configAiProviderSelect')?.value;
         if (chosenProvider) {
           ApiService.setAiProvider(chosenProvider);
           this.syncProviderDropdowns(chosenProvider);
         }
-        ApiService.configure({ baseUrl, token, anthropicApiKey });
+        ApiService.configure({ baseUrl });
         Toast.info('Connecting to updated TriNova endpoint...');
         this.logToTrinovaConsole(`Configuration saved. Re-testing endpoint ${baseUrl}...`);
         await this.checkTrinovaBackend();
@@ -699,7 +697,7 @@ class SloaneApp {
         const tokenInput = document.getElementById('configToken');
         const anthropicInput = document.getElementById('configAnthropicKey');
         if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
-        if (tokenInput) tokenInput.value = ApiService.config.token;
+        if (tokenInput) tokenInput.value = 'HttpOnly Session Cookie (slon_session)';
         if (anthropicInput) anthropicInput.value = '';
         Toast.info('Reset to default Railway endpoints.');
         this.logToTrinovaConsole('Reset configuration to Railway defaults.');

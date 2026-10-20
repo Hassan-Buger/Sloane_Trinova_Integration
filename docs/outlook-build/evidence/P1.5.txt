@@ -1,0 +1,54 @@
+Task P1.5: Remove the Trinova bearer token from localStorage (scripts/services/api.js)
+
+Plan:
+- Files touched:
+  - scripts/services/api.js
+  - scripts/app.js
+  - index.html
+  - Sloane/scripts/services/api.js
+  - Sloane/scripts/app.js
+  - Sloane/index.html
+  - server/tests/unit10-security-phase1.test.js
+  - docs/outlook-build/evidence/P1.5.txt
+  - docs/outlook-build/PROGRESS.md
+  - context/progress-tracker.md
+- Tests added / updated:
+  - Added test 1.1.12 in server/tests/unit10-security-phase1.test.js:
+    * Verifies `scripts/services/api.js` does not read or set `sloane_trinova_api_token` in `localStorage`.
+    * Verifies `scripts/services/api.js` does not inject `Authorization: Bearer` from `config.token`.
+    * Verifies `ApiService.config.token` is undefined.
+    * Verifies legacy cleanup logic for `sloane_anthropic_api_key` has been removed.
+    * Verifies `index.html` `#configToken` is readonly and displays `HttpOnly Session Cookie (slon_session)`.
+- Done criteria:
+  - Trinova bearer token removed from localStorage reading and storage.
+  - API requests rely exclusively on server-issued HttpOnly session cookies (`slon_session`) sent via `credentials: 'include'`.
+  - Config modal updated: `#configToken` is readonly, displaying session authentication indicator rather than prompting for secret keys.
+  - Legacy `sloane_anthropic_api_key` cleanup logic removed.
+  - Full test suite passes with zero regressions (145 passing across 19 suites).
+
+Evidence & Proof:
+
+1. Test Execution Result:
+   node --test tests/unit10-security-phase1.test.js
+   Output:
+   ✔ 1.1.12 api.js does not store or read Trinova bearer token in localStorage and injects no Bearer token (45.2271ms)
+   ✔ Phase 1: Security Hardening & Authentication Verification (9643.3916ms)
+   ℹ tests 17
+   ℹ suites 1
+   ℹ pass 17
+   ℹ fail 0
+
+2. Full Test Suite Result:
+   npm test
+   Output:
+   ✔ Phase 1: Security Hardening & Authentication Verification (8254.3932ms)
+   ℹ tests 145
+   ℹ suites 19
+   ℹ pass 145
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 41963.541
+
+All criteria satisfied.

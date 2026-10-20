@@ -1,7 +1,7 @@
 /**
  * Sloane Trinova API Client & Service Layer
  * Adheres strictly to the TriNova /api/v1 REST API specification.
- * Supports configurable Base URL and Bearer Token with local cache fallback.
+ * Supports configurable Base URL with session-cookie authentication and local cache fallback.
  */
 
 import { StorageService } from './storage.js';
@@ -18,10 +18,9 @@ const getDynamicDefaultBaseUrl = () => {
 
 const DEFAULT_BASE_URL = getDynamicDefaultBaseUrl();
 
-// Server-side secret protection: purge legacy client-stored keys and stale credentials
+// Server-side secret protection: purge legacy client-stored tokens and stale credentials
 if (typeof localStorage !== 'undefined') {
   try {
-    localStorage.removeItem('sloane_anthropic_api_key');
     localStorage.removeItem('sloane_trinova_api_token');
     const storedUrl = localStorage.getItem('sloane_trinova_base_url');
     if (storedUrl && storedUrl.includes('testnova-production-7b65.up.railway.app')) {
@@ -30,13 +29,10 @@ if (typeof localStorage !== 'undefined') {
   } catch (_) {}
 }
 
-const initialToken = (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_api_token')) || '';
-
 export const ApiService = {
   // Current in-memory configuration
   config: {
     baseUrl: (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_base_url')) || DEFAULT_BASE_URL,
-    token: initialToken,
     status: 'unknown', // 'online' | 'offline' | 'checking'
     lastChecked: null,
     latencyMs: null,
@@ -46,17 +42,11 @@ export const ApiService = {
   /**
    * Updates configuration and persists to localStorage.
    */
-  configure({ baseUrl, token }) {
+  configure({ baseUrl }) {
     if (baseUrl !== undefined) {
       this.config.baseUrl = baseUrl.trim().replace(/\/+$/, '');
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('sloane_trinova_base_url', this.config.baseUrl);
-      }
-    }
-    if (token !== undefined) {
-      this.config.token = token.trim();
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('sloane_trinova_api_token', this.config.token);
       }
     }
     return this.config;
@@ -67,8 +57,7 @@ export const ApiService = {
    */
   resetToDefaults() {
     return this.configure({
-      baseUrl: DEFAULT_BASE_URL,
-      token: ''
+      baseUrl: DEFAULT_BASE_URL
     });
   },
 
@@ -98,10 +87,6 @@ export const ApiService = {
       'Accept': 'application/json',
       ...options.headers
     };
-
-    if (this.config.token && !options.skipAuth) {
-      headers['Authorization'] = `Bearer ${this.config.token}`;
-    }
 
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
       headers['Content-Type'] = 'application/json';

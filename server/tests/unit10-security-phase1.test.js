@@ -11,9 +11,15 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
 import { mockDb } from '../src/data/db.js';
 import { TEST_API_KEY, TEST_READONLY_KEY, TEST_WEBHOOK_SECRET, TEST_PASSWORD } from './fixtures.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('Phase 1: Security Hardening & Authentication Verification', () => {
   let server;
@@ -357,5 +363,29 @@ describe('Phase 1: Security Hardening & Authentication Verification', () => {
     const { mockDb } = await import('../src/data/db.js');
     const outlookEvents = (mockDb.timeline_events || []).filter(e => e.source === 'outlook');
     assert.equal(outlookEvents.length, 0, 'mockDb.timeline_events must contain 0 events with source: outlook');
+  });
+
+  // Task P1.5: Trinova bearer token removal from localStorage and frontend session cookie auth
+  test('1.1.12 api.js does not store or read Trinova bearer token in localStorage and injects no Bearer token', async () => {
+    const apiJsContent = fs.readFileSync(path.resolve(__dirname, '../../scripts/services/api.js'), 'utf8');
+
+    // api.js must not read or set sloane_trinova_api_token
+    assert.doesNotMatch(apiJsContent, /localStorage\.getItem\(['"]sloane_trinova_api_token['"]\)/, 'api.js must not read sloane_trinova_api_token from localStorage');
+    assert.doesNotMatch(apiJsContent, /localStorage\.setItem\(['"]sloane_trinova_api_token['"]/, 'api.js must not write sloane_trinova_api_token to localStorage');
+
+    // api.js must not inject Authorization: Bearer from config.token
+    assert.doesNotMatch(apiJsContent, /Authorization.*Bearer.*config\.token/, 'api.js must not inject Authorization: Bearer from config.token');
+
+    // ApiService.config.token must not exist
+    const { ApiService } = await import('../../scripts/services/api.js');
+    assert.equal(ApiService.config.token, undefined, 'ApiService.config.token must not be defined');
+
+    // Legacy cleanup logic for sloane_anthropic_api_key removed
+    assert.doesNotMatch(apiJsContent, /sloane_anthropic_api_key/, 'api.js must not contain sloane_anthropic_api_key cleanup logic');
+
+    // Verify index.html configToken input is readonly and displays session cookie indicator
+    const indexHtml = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
+    assert.match(indexHtml, /id="configToken"[^>]*readonly/i, 'index.html configToken input must be readonly');
+    assert.match(indexHtml, /value="HttpOnly Session Cookie \(slon_session\)"/i, 'index.html configToken must indicate HttpOnly Session Cookie');
   });
 });

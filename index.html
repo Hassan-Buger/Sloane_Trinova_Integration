@@ -988,10 +988,10 @@
 
           <div class="form-group" style="margin-bottom: 14px;">
             <label for="configToken" style="font-weight: 600; font-size: 12px; display: flex; justify-content: space-between;">
-              <span>TriNova Bearer Token</span>
-              <span style="font-size: 10px; color: var(--muted); font-weight: normal;">(Header: Authorization: Bearer &lt;key&gt;)</span>
+              <span>Authentication</span>
+              <span style="font-size: 10px; color: var(--accent); font-weight: normal;">(HttpOnly Cookie Protected)</span>
             </label>
-            <input type="password" class="form-control" id="configToken" required style="font-family: var(--font-mono); font-size: 12px;" placeholder="Enter TriNova API token">
+            <input type="text" class="form-control" id="configToken" readonly style="font-family: var(--font-mono); font-size: 12px; opacity: 0.8; cursor: not-allowed;" value="HttpOnly Session Cookie (slon_session)">
           </div>
 
           <div class="form-group" style="margin-bottom: 14px;">
