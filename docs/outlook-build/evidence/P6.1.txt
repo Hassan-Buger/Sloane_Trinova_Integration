@@ -1,0 +1,40 @@
+Task P6.1: Implement GET /api/v1/outlook/diary and GET /api/v1/outlook/flagged-emails
+Recorded At: 2026-10-21T20:07:00+05:00
+Test Command: npm test
+Result: 304 passed across 52 suites (0 failing, 0 skipped, duration 14.07s)
+
+Automated Test Suite: server/tests/unit19-outlook-data-routes.test.js
+Test Output:
+▶ Task P6.1: Outlook Data Endpoints (Diary & Flagged Emails)
+  ▶ GET /api/v1/outlook/diary
+    ✔ 1. Unauthenticated request to /api/v1/outlook/diary returns 401 UNAUTHORIZED (44.6288ms)
+    ✔ 2. GET diary returns empty state when no connection exists in vault (4.1961ms)
+    ✔ 3. GET diary returns reconnect_required empty state when connection status is reconnect_required (15.6104ms)
+    ✔ 4. GET diary returns calendar_sync_disabled empty state when calendarSyncEnabled is false (10.8785ms)
+    ✔ 5. GET diary succeeds: maps Graph calendarView items to DIARY_ITEMS shape with clash detection (11.6212ms)
+  ✔ GET /api/v1/outlook/diary (87.9717ms)
+  ▶ GET /api/v1/outlook/flagged-emails
+    ✔ 6. Unauthenticated request to /api/v1/outlook/flagged-emails returns 401 UNAUTHORIZED (3.0549ms)
+    ✔ 7. GET flagged-emails returns empty state when no connection exists in vault (2.7809ms)
+    ✔ 8. GET flagged-emails returns reconnect_required empty state when connection status is reconnect_required (11.4835ms)
+    ✔ 9. GET flagged-emails returns email_sync_disabled empty state when emailSyncEnabled is false (8.8778ms)
+    ✔ 10. GET flagged-emails succeeds: maps Graph messages to ATTENTION_EMAILS shape with priority rules (11.5105ms)
+    ✔ 11. GET endpoints return 401 when Graph throws OUTLOOK_RECONNECT_REQUIRED (18.8349ms)
+    ✔ 12. GET endpoints return 503 when Graph throws MICROSOFT_BUSY (9.0742ms)
+    ✔ 13. GET endpoints return 502 when Graph throws transient network error (10.2363ms)
+  ✔ GET /api/v1/outlook/flagged-emails (76.853ms)
+✔ Task P6.1: Outlook Data Endpoints (Diary & Flagged Emails) (172.9238ms)
+
+Verification Summary:
+- Implemented `GET /api/v1/outlook/diary` and `GET /api/v1/outlook/flagged-emails` in `server/src/routes/outlookData.js`.
+- Session authenticated (`authenticate` middleware) returning 401 UNAUTHORIZED if unauthenticated.
+- Clean empty states matching exact specification wording:
+  - Not connected: `Connect your Outlook to see this here` (`OUTLOOK_NOT_CONNECTED`)
+  - Reconnect required: `Reconnect your Outlook` (`OUTLOOK_RECONNECT_REQUIRED`)
+  - Calendar sync disabled: `Calendar sync is off` (`CALENDAR_SYNC_DISABLED`)
+  - Email sync disabled: `Email sync is off` (`EMAIL_SYNC_DISABLED`)
+- Live Graph calendar view integration with Europe/London timezone header (`Prefer: outlook.timezone="GMT Standard Time"`).
+- Live Graph flagged emails integration querying configured mail folders, deduplicating, sorting newest first, and capping at 25.
+- Robust error handling: 401 on Graph re-authentication required, 503 on MICROSOFT_BUSY, 502 on transient network failure.
+- Strict zero token exposure: tokens, keys, secrets never exposed in response body or raw payload.
+- Mirrored to `Sloane/server/src/routes/outlookData.js`, `Sloane/server/src/services/outlookDataService.js`, and `Sloane/server/tests/unit19-outlook-data-routes.test.js`.

@@ -19,6 +19,7 @@ import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerOutlookAuthRoutes } from './routes/outlookAuth.js';
 import { registerOutlookSettingsRoutes } from './routes/outlookSettings.js';
+import { registerOutlookDataRoutes } from './routes/outlookData.js';
 import { telemetry } from './services/telemetry.js';
 import { sessionStore } from './services/sessionStore.js';
 
@@ -457,6 +458,9 @@ export function createApp(options = {}) {
 
   // --- Mount Outlook Settings & Lifecycle Routes (Task P5.1) ---
   registerOutlookSettingsRoutes(app, { authenticate, requireScope }, options.outlookOptions || options);
+
+  // --- Mount Outlook Data Routes: Diary & Flagged Emails (Task P6.1) ---
+  registerOutlookDataRoutes(app, { authenticate, requireScope }, options.outlookOptions || options);
 
   return app;
 }
