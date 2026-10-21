@@ -2317,14 +2317,14 @@ class SloaneApp {
 
           <!-- Response Text -->
           <div class="ai-answer-text" style="line-height: 1.6; font-size: 13.5px; color: var(--text);">
-            ${data.answer || 'Analysis complete.'}
+            ${escapeHtml(data.answer || 'Analysis complete.').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>')}
           </div>
 
           <!-- Key Drivers (Only if present) -->
           ${data.key_reasons && data.key_reasons.length > 0 ? `
             <div class="ai-subheading">Key Drivers & Evidence</div>
             <ul class="ai-reasons-list">
-              ${data.key_reasons.map(r => `<li>${r}</li>`).join('')}
+              ${data.key_reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
             </ul>
           ` : ''}
 
@@ -2334,9 +2334,9 @@ class SloaneApp {
             <div class="ai-actions-grid">
               ${data.recommended_actions.map(act => `
                 <div class="ai-action-item">
-                  <span class="ai-action-text">${act.action}</span>
+                  <span class="ai-action-text">${escapeHtml(act.action)}</span>
                   <span class="pill ${act.priority === 'high' ? 'red' : act.priority === 'normal' ? 'amber' : 'neutral'}" style="font-size: 10px; text-transform: uppercase;">
-                    ${act.priority}
+                    ${escapeHtml(act.priority)}
                   </span>
                 </div>
               `).join('')}
@@ -2349,10 +2349,10 @@ class SloaneApp {
             <div class="ai-evidence-box">
               ${data.evidence.map(ev => `
                 <div class="ai-evidence-item">
-                  <span style="color: #c5d1de;">${ev.reason || 'Record cited'}</span>
+                  <span style="color: #c5d1de;">${escapeHtml(ev.reason || 'Record cited')}</span>
                   ${ev.timeline_event_id ? `
-                    <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${ev.timeline_event_id}', '${targetClientId || 'cli_woofington_grp'}')">
-                      View Event #${ev.timeline_event_id.substring(0, 12)} ↗
+                    <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${sanitizeId(ev.timeline_event_id)}', '${sanitizeId(targetClientId || 'cli_woofington_grp')}')">
+                      View Event #${escapeHtml(ev.timeline_event_id.substring(0, 12))} ↗
                     </button>
                   ` : ''}
                 </div>
@@ -2386,16 +2386,16 @@ class SloaneApp {
     // 1. Close modal
     ModalManager.closeAll();
 
-    // 2. Switch to Client 360 view
+    // 2. Select client if provided
+    if (clientId) {
+      this.activeClient360Id = sanitizeId(clientId) || this.activeClient360Id;
+    }
+
+    // 3. Switch to Client 360 view
     this.switchView('clients');
 
-    // 3. Switch to Timeline tab
+    // 4. Switch to Timeline tab
     this.switchClientTab('timeline');
-
-    // 4. Select client if provided
-    if (clientId && clientId !== this.activeClient360Id) {
-      this.activeClient360Id = clientId;
-    }
 
     // 5. Render timeline
     await this.renderTimeline(this.activeClient360Id);

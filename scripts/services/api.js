@@ -141,6 +141,7 @@ export const ApiService = {
         status: response.status,
         durationMs: duration,
         data: data?.data !== undefined ? data.data : data,
+        raw: data,
         meta: data?.meta || null
       };
     } catch (err) {
@@ -810,10 +811,11 @@ export const ApiService = {
         body: { message: 'Ping. Confirm AI assistant status.' }
       });
       if (res && res.ok) {
-        const isClaude = res.data?.source === 'anthropic_claude';
+        const source = res.raw?.source || res.data?.source || 'backend_ai';
+        const isClaude = source === 'anthropic_claude';
         return {
           ok: true,
-          source: res.data?.source || 'backend_ai',
+          source,
           message: isClaude
             ? 'Connected successfully to Anthropic Claude 3.5 Sonnet via secure server backend!'
             : 'Connected to Sloane backend (Operating under deterministic practice rules engine).'
@@ -860,16 +862,19 @@ export const ApiService = {
       });
 
       if (res && res.ok && res.data) {
+        const envelope = res.raw || {};
         const payloadData = res.data.data !== undefined ? res.data.data : res.data;
+        const source = envelope.source || res.data.source || 'deterministic_rules_engine';
+        const model = envelope.model || res.data.model || 'deterministic-rules-v1';
         return {
           ok: true,
-          status: res.data.status || 'success',
-          source: res.data.source || 'anthropic_claude',
-          model: res.data.model || 'claude-3-5-sonnet',
+          status: envelope.status || res.data.status || 'success',
+          source,
+          model,
           data: payloadData,
-          privacy: res.data.privacy,
-          usage: res.data.usage || { durationMs: Math.round(performance.now() - startTime) },
-          reason: res.data.reason || null
+          privacy: envelope.privacy || res.data.privacy,
+          usage: envelope.usage || res.data.usage || { durationMs: Math.round(performance.now() - startTime) },
+          reason: envelope.reason || res.data.reason || null
         };
       }
     } catch (err) {

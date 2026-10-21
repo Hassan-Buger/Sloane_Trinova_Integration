@@ -1,0 +1,87 @@
+Task P7.4.4: Ask Sloane AI Assistant, Grounded Pipeline & Provenance Tracking Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P7.4.4 verifies and fortifies the Ask Sloane AI assistant query pipeline, Claude server-side service, grounded fallback, and provenance tracking:
+
+1. Server-Side AI Assistant & Privacy Boundary:
+   - Route `POST /api/v1/ai/ask` strictly requires bearer authentication (`sloane:read`) returning 401 for unauthenticated requests.
+   - Enforces sliding-window rate limiting (Section 38) returning 429 when limits are exceeded.
+   - Input validation: rejects empty or whitespace queries with 422 (`VALIDATION_FAILED`), rejects queries >1000 characters with 422 (`MESSAGE_TOO_LONG`), and non-existent `clientId` with 404 (`CLIENT_NOT_FOUND`).
+   - Multi-turn conversation history is sanitized: capped at 10 items, role constrained to user/assistant, content length limited.
+   - `ContextBuilder.buildContext` unconditionally enforces `privateCeoBrainDenied: true` across both client-specific and practice-wide queries, strictly isolating client contexts and never leaking CEO Brain private notes.
+   - `GET /api/v1/ai/models` and `GET /api/v1/ai/executive-briefing` provide verified diagnostic and morning executive briefing data with audit tags.
+
+2. Client-Side ApiService & Provenance Truthfulness:
+   - `ApiService.request` now preserves the full response `raw` envelope alongside unwrapped `data`.
+   - `ApiService.askAi` calls backend `POST /api/v1/ai/ask`, faithfully extracting `source` and `model` from the response envelope.
+   - When backend is offline or errors, seamlessly engages `runGroundedFallback` which truthfully reports `source: 'offline_rules_engine'` and NEVER fabricates live Claude or Gemini status.
+   - Answers conversational inputs naturally and calculates math directly without false risk cards.
+
+3. Frontend UI Implementation & XSS Sanitization:
+   - `scripts/app.js` `handleAskSloane` maintains ongoing dialogue via `this.aiConversationHistory` across initial query and modal follow-ups (`#aiModalReplyForm`).
+   - Provenance badges truthfully indicate engine: `⚡ Claude 3.5 Sonnet`, `✨ Google Gemini`, or `🛡️ Offline Grounded Fallback`.
+   - Comprehensive XSS escaping applied:
+     - `escapeHtml(data.answer)` with formatted paragraph/break restoration (`<br><br>`, `<br>`).
+     - `escapeHtml(r)` for key drivers & evidence list.
+     - `escapeHtml(act.action)` and `escapeHtml(act.priority)` for recommended next actions.
+     - `escapeHtml(ev.reason)` and `sanitizeId(ev.timeline_event_id)` for grounded provenance citations.
+   - `jumpToTimelineEvent` closes modal, sets `this.activeClient360Id`, switches view to `clients`, switches tab to `timeline`, loads timeline records, and smoothly scrolls to and highlights target timeline event with `.highlighted-event`.
+
+4. Static Shell Leak & Security Hygiene:
+   - `index.html` static logged-out shell contains zero literal `@` symbols and zero sensitive client entities (`woofington`, `jenkins`, `alpha delta`, `cfi awarding`, `r gb`, `kirsty`).
+   - Accessible modal structure verified: `#aiResponseModal`, `#aiModalBody`, `#aiModalReplyForm`, `#aiModalReplyInput`, `#modalAiProviderSelect`.
+
+5. Bidirectional Sync:
+   - Synchronized `scripts/app.js`, `scripts/services/api.js`, and `server/tests/unit28-ask-sloane-api.test.js` between root repository and `Sloane/` mirror.
+
+Automated Test Results
+----------------------
+Command: npm test in server/
+Test Suites: 94 passed, 94 total
+Tests: 407 passed, 407 total
+Failures: 0
+Duration: 47.50s
+
+Test Execution Log (Task P7.4.4 excerpt):
+-----------------------------------------
+▶ Task P7.4.4: Ask Sloane AI Assistant & Grounded Pipeline
+  ▶ 1. Authentication, Rate Limiting & Endpoints
+    ✔ 1.1 POST /api/v1/ai/ask rejects unauthenticated requests with 401 (150.1784ms)
+[INFO] Audit Log: [ai_query_processed] by actor_kirsty_allen on executive_ai:root (200)
+    ✔ 1.2 POST /api/v1/ai/ask accepts valid authenticated request (38.3382ms)
+[INFO] Audit Log: [get__api_v1_ai_models] by actor_sloane_monitor on ai:root (200)
+    ✔ 1.3 GET /api/v1/ai/models reports configured provider status (19.0437ms)
+[INFO] Audit Log: [ai_executive_briefing_generated] by actor_kirsty_allen on executive_briefing:root (200)
+    ✔ 1.4 GET /api/v1/ai/executive-briefing returns morning briefing with privacy audit (18.0204ms)
+  ✔ 1. Authentication, Rate Limiting & Endpoints (228.6553ms)
+[INFO] Audit Log: [post__api_v1_ai_ask] by actor_kirsty_allen on ai:root (422)
+  ▶ 2. Input Validation & Multi-Turn History
+    ✔ 2.1 Rejects empty query with 422 (21.615ms)
+[INFO] Audit Log: [post__api_v1_ai_ask] by actor_kirsty_allen on ai:root (422)
+    ✔ 2.2 Rejects query exceeding 1000 characters with 422 (18.181ms)
+[INFO] Audit Log: [post__api_v1_ai_ask] by actor_kirsty_allen on ai:root (404)
+    ✔ 2.3 Rejects non-existent clientId with 404 (14.9845ms)
+[INFO] Audit Log: [ai_query_processed] by actor_kirsty_allen on client:cli_woofington_grp:root (200)
+    ✔ 2.4 Accepts and answers query for valid client (24.1402ms)
+  ✔ 2. Input Validation & Multi-Turn History (81.5092ms)
+  ▶ 3. Strict Privacy Boundary (PRIVATE_CEO_BRAIN = DENY)
+    ✔ 3.1 ContextBuilder strictly denies private CEO Brain in client queries (1.527ms)
+    ✔ 3.2 ContextBuilder strictly denies private CEO Brain in practice-wide queries (0.9535ms)
+  ✔ 3. Strict Privacy Boundary (PRIVATE_CEO_BRAIN = DENY) (3.2104ms)
+  ▶ 4. Frontend Integration & Grounded Fallback Hygiene
+    ✔ 4.1 scripts/services/api.js contains truthful askAi and runGroundedFallback methods (1.9014ms)
+    ✔ 4.2 scripts/app.js handles dialogue, provenance badges and sanitizes output (2.946ms)
+    ✔ 4.3 jumpToTimelineEvent correctly sets activeClient360Id before switching tabs (2.5157ms)
+  ✔ 4. Frontend Integration & Grounded Fallback Hygiene (7.9636ms)
+  ▶ 5. Static Shell Leak & Security Hygiene
+    ✔ 5.1 index.html logged-out shell contains zero literal @ symbols (2.0635ms)
+    ✔ 5.2 index.html logged-out shell contains zero client entity leaks (3.8953ms)
+    ✔ 5.3 index.html includes accessible AI Response Modal structure (1.3136ms)
+  ✔ 5. Static Shell Leak & Security Hygiene (8.2603ms)
+✔ Task P7.4.4: Ask Sloane AI Assistant & Grounded Pipeline (357.9904ms)
