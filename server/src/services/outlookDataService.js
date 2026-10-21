@@ -191,10 +191,11 @@ export function setCachedResource(actorId, resource, data, ttlMs = DATA_CACHE_TT
   });
 }
 
-export { clearOutlookDataCache };
+export { outlookDataCache, clearOutlookDataCache };
 
 export const outlookDataService = {
   DATA_CACHE_TTL_MS,
+  outlookDataCache,
   formatEventTimeRange,
   detectEventClashes,
   mapGraphEventsToDiary,

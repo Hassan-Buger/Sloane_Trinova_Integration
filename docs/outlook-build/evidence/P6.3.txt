@@ -1,0 +1,31 @@
+Task P6.3: Per-User 2-Minute In-Memory Cache with Disconnect and Sync Invalidation
+Recorded At: 2026-10-21T20:19:00+05:00
+Test Command: npm test
+Result: 320 passed across 58 suites (0 failing, 0 skipped, duration 13.45s)
+
+Automated Test Suite: server/tests/unit21-outlook-data-cache.test.js
+Test Output:
+▶ Task P6.3: Per-User 2-Minute In-Memory Cache
+  ▶ Cache Helper Functions
+    ✔ 1. DATA_CACHE_TTL_MS is exactly 2 minutes (120,000 ms) (9.0279ms)
+    ✔ 2. getCachedResource returns null for non-existent or expired keys (6.2235ms)
+    ✔ 3. setCachedResource stores valid entries and isolates by actor and resource (8.2762ms)
+  ✔ Cache Helper Functions (24.3806ms)
+  ▶ HTTP Endpoints Cache Integration
+    ✔ 4. GET /api/v1/outlook/diary caches first response; second request hits cache without Graph call (53.8574ms)
+    ✔ 5. GET /api/v1/outlook/flagged-emails caches first response; second request hits cache without Graph call (15.4155ms)
+    ✔ 6. POST /api/v1/integrations/outlook/sync clears cache so subsequent reads call Graph again (23.0444ms)
+    ✔ 7. POST /api/v1/integrations/outlook/disconnect purges all caches (13.9122ms)
+  ✔ HTTP Endpoints Cache Integration (106.9709ms)
+✔ Task P6.3: Per-User 2-Minute In-Memory Cache (140.8943ms)
+
+Verification Summary:
+- Implemented per-user 2-minute in-memory caching keyed by `${actorId}:${resource}` (`DATA_CACHE_TTL_MS = 120_000`).
+- Validated cache hit semantics:
+  - First request fetches live data from Microsoft Graph, caches response, and returns `fromCache: false`.
+  - Subsequent requests within 2 minutes resolve directly from cache with `fromCache: true` without invoking Microsoft Graph.
+- Cache invalidation triggers:
+  - `POST /api/v1/integrations/outlook/sync` explicitly purges cached entries, forcing next read to perform fresh Microsoft Graph fetch.
+  - `POST /api/v1/integrations/outlook/disconnect` purges all cached entries alongside token vault deletion, returning clean empty states on next read.
+- Exported cache accessors `outlookDataCache`, `getCachedResource`, `setCachedResource`, `clearOutlookDataCache`, and `DATA_CACHE_TTL_MS` from `server/src/services/outlookDataService.js`.
+- Bidirectional mirror synced to `Sloane/server/src/services/outlookDataService.js` and `Sloane/server/tests/unit21-outlook-data-cache.test.js`.
