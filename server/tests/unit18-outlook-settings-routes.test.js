@@ -660,4 +660,133 @@ describe('Tasks P5.1 & P5.2: Outlook Settings Endpoints', () => {
       assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
     });
   });
+
+  // ==========================================
+  // P5.3: GET /api/v1/integrations/outlook/folders
+  // ==========================================
+  describe('Task P5.3: GET folders', () => {
+    test('22. GET /api/v1/integrations/outlook/folders without session returns 401 UNAUTHORIZED', async () => {
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        method: 'GET'
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'UNAUTHORIZED');
+    });
+
+    test('23. GET folders returns 404 OUTLOOK_NOT_CONNECTED when no connection in vault', async () => {
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 404);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_NOT_CONNECTED');
+    });
+
+    test('24. GET folders returns 401 when connection status is reconnect_required', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'reconnect_required',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_RECONNECT_REQUIRED');
+    });
+
+    test('25. GET folders returns 401 when Graph throws OUTLOOK_RECONNECT_REQUIRED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new GraphClientError('OUTLOOK_RECONNECT_REQUIRED', 'Token revoked', { status: 401 });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_RECONNECT_REQUIRED');
+    });
+
+    test('26. GET folders returns 503 when Graph is busy (MICROSOFT_BUSY)', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new GraphClientError('MICROSOFT_BUSY', 'Microsoft is busy', { status: 429 });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 503);
+      assert.equal(res.body?.error?.code, 'MICROSOFT_BUSY');
+    });
+
+    test('27. GET folders returns 502 when Graph call fails with general network error', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new Error('ETIMEDOUT: Connection timed out');
+
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 502);
+      assert.equal(res.body?.error?.code, 'GRAPH_FOLDERS_FETCH_FAILED');
+    });
+
+    test('28. GET folders returns mapped list of [{ id, displayName, unreadItemCount }]', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        accessToken: SENSITIVE_TOKENS.accessToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphResponse = {
+        value: [
+          { id: 'f_inbox_01', displayName: 'Inbox', unreadItemCount: 4, extraInternalGraphField: 'leak_check' },
+          { id: 'f_archive_02', displayName: 'Archive', unreadItemCount: 0 },
+          { id: 'f_sent_03', displayName: 'Sent Items', unreadItemCount: 0 }
+        ]
+      };
+
+      const res = await makeRequest('/api/v1/integrations/outlook/folders', {
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 200);
+      assert.ok(Array.isArray(res.body));
+      assert.equal(res.body.length, 3);
+      assert.deepEqual(res.body, [
+        { id: 'f_inbox_01', displayName: 'Inbox', unreadItemCount: 4 },
+        { id: 'f_archive_02', displayName: 'Archive', unreadItemCount: 0 },
+        { id: 'f_sent_03', displayName: 'Sent Items', unreadItemCount: 0 }
+      ]);
+
+      // Strict token and credential leakage checks
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.refreshToken));
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
+      assert.ok(!res.raw.includes('leak_check'));
+    });
+  });
 });

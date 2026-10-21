@@ -31,7 +31,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 ## Phase 5 — Settings API
 - [x] **P5.1** `GET /api/v1/integrations/outlook/status`.
 - [x] **P5.2** `PATCH /api/v1/integrations/outlook/settings`.
-- [ ] **P5.3** `GET /api/v1/integrations/outlook/folders`.
+- [x] **P5.3** `GET /api/v1/integrations/outlook/folders`.
 - [ ] **P5.4** `POST /api/v1/integrations/outlook/sync`.
 - [ ] **P5.5** `POST /api/v1/integrations/outlook/disconnect`.
 - [ ] **P5.6** CSRF protection for all state-changing routes (`Origin` + `X-Requested-With: sloane`).

@@ -1,0 +1,29 @@
+Task P5.3: Implement GET /api/v1/integrations/outlook/folders
+Recorded At: 2026-10-21T18:47:15+05:00
+Test Command: npm test
+Result: 271 passed across 46 suites (0 failing, 0 skipped, duration 34.71s)
+
+Automated Test Suite: server/tests/unit18-outlook-settings-routes.test.js
+Test Output:
+▶ Tasks P5.1 & P5.2: Outlook Settings Endpoints
+  ▶ Task P5.3: GET folders
+    ✔ 22. GET /api/v1/integrations/outlook/folders without session returns 401 UNAUTHORIZED (3.6708ms)
+    ✔ 23. GET folders returns 404 OUTLOOK_NOT_CONNECTED when no connection in vault (3.796ms)
+    ✔ 24. GET folders returns 401 when connection status is reconnect_required (12.5675ms)
+    ✔ 25. GET folders returns 401 when Graph throws OUTLOOK_RECONNECT_REQUIRED (13.406ms)
+    ✔ 26. GET folders returns 503 when Graph is busy (MICROSOFT_BUSY) (12.1872ms)
+    ✔ 27. GET folders returns 502 when Graph call fails with general network error (12.4391ms)
+    ✔ 28. GET folders returns mapped list of [{ id, displayName, unreadItemCount }] (11.8765ms)
+  ✔ Task P5.3: GET folders (71.0912ms)
+✔ Tasks P5.1 & P5.2: Outlook Settings Endpoints (537.5892ms)
+
+Verification Summary:
+- Implemented `GET /api/v1/integrations/outlook/folders` in `server/src/routes/outlookSettings.js`.
+- Session authenticated (`authenticate` middleware) returning 401 UNAUTHORIZED if unauthenticated.
+- Rejects requests when no active connection exists in vault (404 OUTLOOK_NOT_CONNECTED).
+- Rejects requests when connection status is `reconnect_required` (401 OUTLOOK_RECONNECT_REQUIRED).
+- Calls Microsoft Graph endpoint `GET /me/mailFolders?$top=100&$select=id,displayName,unreadItemCount`.
+- Formats response as an array of objects matching `{ id, displayName, unreadItemCount }`.
+- Robust error mapping: 401 for re-authentication required, 503 for Microsoft busy (429/503), 502 for Graph network errors.
+- Verified strict zero token leakage: response never contains tokens, keys, secrets, or internal Graph metadata.
+- Mirrored all files to `Sloane/server/src/routes/outlookSettings.js` and `Sloane/server/tests/unit18-outlook-settings-routes.test.js`.

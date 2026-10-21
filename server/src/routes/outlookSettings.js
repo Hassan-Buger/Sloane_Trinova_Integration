@@ -138,6 +138,103 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
   });
 
   /**
+   * GET /api/v1/integrations/outlook/folders
+   * Lists mail folders from Microsoft Graph for the folder selection control.
+   * Returns [{ id, displayName, unreadItemCount }]
+   * Session required (401 if unauthenticated).
+   */
+  app.get('/api/v1/integrations/outlook/folders', authenticate, async (req, res) => {
+    // 1. Verify feature configuration
+    if (!isOutlookConfigured(options)) {
+      return res.status(503).json({
+        error: {
+          code: 'OUTLOOK_NOT_CONFIGURED',
+          message: 'Outlook integration is not configured on this server.'
+        }
+      });
+    }
+
+    // 2. Read active connection from vault
+    const vaultOptions = {
+      filePath: options.vaultPath,
+      key: options.vaultKey
+    };
+
+    let connection;
+    try {
+      connection = connectionStore.getConnection(vaultOptions);
+    } catch (err) {
+      logger.error('Failed to read Outlook connection store:', err);
+      return res.status(500).json({
+        error: {
+          code: 'VAULT_READ_ERROR',
+          message: 'Failed to access encrypted Outlook connection vault'
+        }
+      });
+    }
+
+    if (!connection) {
+      return res.status(404).json({
+        error: {
+          code: 'OUTLOOK_NOT_CONNECTED',
+          message: 'No active Outlook connection found. Connect an Outlook account before listing folders.'
+        }
+      });
+    }
+
+    if (connection.status === 'reconnect_required') {
+      return res.status(401).json({
+        error: {
+          code: 'OUTLOOK_RECONNECT_REQUIRED',
+          message: 'Outlook connection requires re-authentication'
+        }
+      });
+    }
+
+    // 3. Fetch mail folders from Microsoft Graph
+    try {
+      const graphRes = await graph.get('/me/mailFolders?$top=100&$select=id,displayName,unreadItemCount', {
+        ...options,
+        vaultPath: options.vaultPath,
+        vaultKey: options.vaultKey
+      });
+
+      const rawFolders = (graphRes && Array.isArray(graphRes.value)) ? graphRes.value : [];
+      const mapped = rawFolders.map(f => ({
+        id: String(f.id || ''),
+        displayName: String(f.displayName || ''),
+        unreadItemCount: typeof f.unreadItemCount === 'number' ? f.unreadItemCount : 0
+      }));
+
+      return res.json(mapped);
+    } catch (graphErr) {
+      if (graphErr.code === 'OUTLOOK_RECONNECT_REQUIRED') {
+        return res.status(401).json({
+          error: {
+            code: 'OUTLOOK_RECONNECT_REQUIRED',
+            message: 'Outlook connection requires re-authentication'
+          }
+        });
+      }
+      if (graphErr.code === 'MICROSOFT_BUSY') {
+        return res.status(503).json({
+          error: {
+            code: 'MICROSOFT_BUSY',
+            message: 'Sync error — Microsoft is busy, try again shortly.'
+          }
+        });
+      }
+      logger.warn('Failed to fetch mail folders via Graph:', graphErr.message);
+      return res.status(502).json({
+        error: {
+          code: 'GRAPH_FOLDERS_FETCH_FAILED',
+          message: 'Could not reach Microsoft to list mail folders.'
+        }
+      });
+    }
+  });
+
+  /**
    * PATCH /api/v1/integrations/outlook/settings
    * Updates sync toggles and folder selection.
    * Validates booleans and confirms mailFolderIds exist via Microsoft Graph.
