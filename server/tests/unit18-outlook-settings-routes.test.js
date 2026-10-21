@@ -37,7 +37,16 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
 import { sessionStore } from '../src/services/sessionStore.js';
 import { outlookConnectionStore } from '../src/services/outlookConnectionStore.js';
-import { formatStatusResponse, isOutlookConfigured, setSyncActiveForTest, clearOutlookDataCache, outlookDataCache } from '../src/routes/outlookSettings.js';
+import {
+  formatStatusResponse,
+  isOutlookConfigured,
+  setSyncActiveForTest,
+  clearOutlookDataCache,
+  outlookDataCache,
+  getAllowedOrigins,
+  isAllowedOrigin,
+  verifyOutlookCsrf
+} from '../src/routes/outlookSettings.js';
 import { GraphClientError } from '../src/services/graphClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -121,7 +130,21 @@ describe('Tasks P5.1 & P5.2: Outlook Settings Endpoints', () => {
   function makeRequest(reqPath, options = {}) {
     return new Promise((resolve, reject) => {
       const url = new URL(reqPath, baseUrl);
-      const reqHeaders = { ...(options.headers || {}) };
+      const isStateChanging = ['POST', 'PATCH', 'PUT', 'DELETE'].includes((options.method || 'GET').toUpperCase());
+      const defaultHeaders = isStateChanging ? {
+        Origin: baseUrl,
+        'X-Requested-With': 'sloane'
+      } : {};
+      const reqHeaders = { ...defaultHeaders, ...(options.headers || {}) };
+
+      // Explicitly allow removal of Origin or X-Requested-With for negative CSRF tests
+      if (options.headers && 'Origin' in options.headers && options.headers.Origin === null) {
+        delete reqHeaders.Origin;
+      }
+      if (options.headers && 'X-Requested-With' in options.headers && options.headers['X-Requested-With'] === null) {
+        delete reqHeaders['X-Requested-With'];
+      }
+
       if (options.body && !reqHeaders['Content-Type']) {
         reqHeaders['Content-Type'] = 'application/json';
       }
@@ -1064,5 +1087,181 @@ describe('Tasks P5.1 & P5.2: Outlook Settings Endpoints', () => {
       assert.ok(res.body.message.includes('https://myapps.microsoft.com'));
     });
   });
+
+  // ==========================================
+  // P5.6: CSRF Protection on State-Changing Routes
+  // ==========================================
+  describe('Task P5.6: CSRF Protection on State-Changing Routes', () => {
+    test('41. getAllowedOrigins and isAllowedOrigin correctly evaluate origins', () => {
+      const allowed = getAllowedOrigins({ allowedOrigins: ['https://custom-portal.trinova.com'] });
+      assert.ok(allowed.includes('http://localhost:8088'));
+      assert.ok(allowed.includes('https://custom-portal.trinova.com'));
+
+      // Loopback on any port in test/development
+      assert.equal(isAllowedOrigin('http://localhost:8088'), true);
+      assert.equal(isAllowedOrigin('http://localhost:5006'), true);
+      assert.equal(isAllowedOrigin('http://127.0.0.1:3000'), true);
+      assert.equal(isAllowedOrigin('https://sloanetrinovaintegration-production.up.railway.app'), true);
+
+      // Foreign and invalid origins rejected
+      assert.equal(isAllowedOrigin('https://evil-attacker.com'), false);
+      assert.equal(isAllowedOrigin('http://phishing.co.uk'), false);
+      assert.equal(isAllowedOrigin(''), false);
+      assert.equal(isAllowedOrigin(null), false);
+    });
+
+    test('42. PATCH /settings rejects missing Origin header with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/settings', {
+        method: 'PATCH',
+        headers: {
+          Cookie: sessionCookie,
+          Origin: null // explicitly delete
+        },
+        body: { emailSyncEnabled: true }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+      assert.ok(res.body?.error?.message.includes('Origin header is required'));
+    });
+
+    test('43. PATCH /settings rejects foreign Origin header with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/settings', {
+        method: 'PATCH',
+        headers: {
+          Cookie: sessionCookie,
+          Origin: 'https://evil-attacker.com'
+        },
+        body: { emailSyncEnabled: true }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+      assert.ok(res.body?.error?.message.includes('not authorized'));
+    });
+
+    test('44. PATCH /settings rejects missing X-Requested-With header with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/settings', {
+        method: 'PATCH',
+        headers: {
+          Cookie: sessionCookie,
+          'X-Requested-With': null // explicitly delete
+        },
+        body: { emailSyncEnabled: true }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+      assert.ok(res.body?.error?.message.includes('X-Requested-With'));
+    });
+
+    test('45. PATCH /settings rejects invalid X-Requested-With header (XMLHttpRequest) with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/settings', {
+        method: 'PATCH',
+        headers: {
+          Cookie: sessionCookie,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: { emailSyncEnabled: true }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+    });
+
+    test('46. POST /sync rejects foreign Origin with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: {
+          Cookie: sessionCookie,
+          Origin: 'https://malicious-site.org'
+        }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+    });
+
+    test('47. POST /disconnect rejects missing X-Requested-With header with 403 CSRF_DETECTED', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/disconnect', {
+        method: 'POST',
+        headers: {
+          Cookie: sessionCookie,
+          'X-Requested-With': null
+        }
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.body?.error?.code, 'CSRF_DETECTED');
+    });
+
+    test('48. Read-only endpoints (GET /status, GET /folders) do not require CSRF headers and succeed', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      // GET status without Origin or X-Requested-With
+      const statusRes = await makeRequest('/api/v1/integrations/outlook/status', {
+        method: 'GET',
+        headers: { Cookie: sessionCookie }
+      });
+      assert.equal(statusRes.status, 200);
+      assert.equal(statusRes.body.status, 'connected');
+
+      // GET folders without Origin or X-Requested-With
+      const foldersRes = await makeRequest('/api/v1/integrations/outlook/folders', {
+        method: 'GET',
+        headers: { Cookie: sessionCookie }
+      });
+      assert.equal(foldersRes.status, 200);
+      assert.ok(Array.isArray(foldersRes.body));
+    });
+  });
 });
+
 

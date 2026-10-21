@@ -1,0 +1,33 @@
+Task P5.6: Implement CSRF Protection for State-Changing Routes
+Recorded At: 2026-10-21T19:52:15+05:00
+Test Command: npm test
+Result: 291 passed across 49 suites (0 failing, 0 skipped, duration 13.02s)
+
+Automated Test Suite: server/tests/unit18-outlook-settings-routes.test.js
+Test Output:
+▶ Tasks P5.1 & P5.2: Outlook Settings Endpoints
+  ▶ Task P5.6: CSRF Protection on State-Changing Routes
+    ✔ 41. getAllowedOrigins and isAllowedOrigin correctly evaluate origins (1.1001ms)
+    ✔ 42. PATCH /settings rejects missing Origin header with 403 CSRF_DETECTED (6.7071ms)
+    ✔ 43. PATCH /settings rejects foreign Origin header with 403 CSRF_DETECTED (6.83ms)
+    ✔ 44. PATCH /settings rejects missing X-Requested-With header with 403 CSRF_DETECTED (10.4432ms)
+    ✔ 45. PATCH /settings rejects invalid X-Requested-With header (XMLHttpRequest) with 403 CSRF_DETECTED (6.6302ms)
+    ✔ 46. POST /sync rejects foreign Origin with 403 CSRF_DETECTED (5.9602ms)
+    ✔ 47. POST /disconnect rejects missing X-Requested-With header with 403 CSRF_DETECTED (6.1515ms)
+    ✔ 48. Read-only endpoints (GET /status, GET /folders) do not require CSRF headers and succeed (11.4009ms)
+  ✔ Task P5.6: CSRF Protection on State-Changing Routes (55.8779ms)
+✔ Tasks P5.1 & P5.2: Outlook Settings Endpoints (449.3187ms)
+
+Verification Summary:
+- Implemented `verifyOutlookCsrf(options)` middleware in `server/src/routes/outlookSettings.js`.
+- Applied `verifyOutlookCsrf` to all state-changing Outlook routes:
+  - `PATCH /api/v1/integrations/outlook/settings`
+  - `POST /api/v1/integrations/outlook/sync`
+  - `POST /api/v1/integrations/outlook/disconnect`
+- Enforces strict dual-condition validation:
+  1. `Origin` header must be present and match the authorized origin whitelist (`isAllowedOrigin`). Missing or foreign Origin returns 403 `CSRF_DETECTED`.
+  2. Custom `X-Requested-With: sloane` header must be present (case-insensitive). Missing or mismatched value returns 403 `CSRF_DETECTED`.
+- Added `X-Requested-With` to `Access-Control-Allow-Headers` in `server/src/app.js` and `Sloane/server/src/app.js`.
+- Verified read-only endpoints (`GET /status`, `GET /folders`) execute without requiring CSRF headers.
+- Zero token leakage: CSRF rejections and sanitized audit logs never expose sensitive credentials or tokens.
+- Mirrored all changes to `Sloane/server/src/routes/outlookSettings.js`, `Sloane/server/src/app.js`, and `Sloane/server/tests/unit18-outlook-settings-routes.test.js`.

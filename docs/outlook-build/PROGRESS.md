@@ -34,7 +34,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P5.3** `GET /api/v1/integrations/outlook/folders`.
 - [x] **P5.4** `POST /api/v1/integrations/outlook/sync`.
 - [x] **P5.5** `POST /api/v1/integrations/outlook/disconnect`.
-- [ ] **P5.6** CSRF protection for all state-changing routes (`Origin` + `X-Requested-With: sloane`).
+- [x] **P5.6** CSRF protection for all state-changing routes (`Origin` + `X-Requested-With: sloane`).
 
 ## Phase 6 — Data endpoints
 - [ ] **P6.1** `GET /api/v1/outlook/diary` and `GET /api/v1/outlook/flagged-emails`.

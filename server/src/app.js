@@ -137,7 +137,7 @@ export function createApp(options = {}) {
       }
 
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trinova-API-Key, Idempotency-Key, If-Match, X-Documenso-Signature');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trinova-API-Key, Idempotency-Key, If-Match, X-Documenso-Signature, X-Requested-With');
 
       // Security Headers: Content-Security-Policy & Defensive Headers (Section 1.4)
       res.setHeader(

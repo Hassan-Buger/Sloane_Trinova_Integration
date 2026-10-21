@@ -102,6 +102,117 @@ export function clearOutlookDataCache() {
 }
 
 /**
+ * Resolves the list of authorized origins for CSRF validation.
+ * Includes explicit defaults, CORS environment variable entries, and non-production loopback origins.
+ *
+ * @param {object} [options]
+ * @returns {string[]}
+ */
+export function getAllowedOrigins(options = {}) {
+  const allowed = [
+    'http://localhost:4000',
+    'http://localhost:8088',
+    'http://127.0.0.1:4000',
+    'http://127.0.0.1:8088',
+    'https://sloanetrinovaintegration-production.up.railway.app'
+  ];
+
+  if (process.env.CORS_ALLOWED_ORIGINS) {
+    process.env.CORS_ALLOWED_ORIGINS.split(',').forEach(o => {
+      const trimmed = o.trim();
+      if (trimmed && !allowed.includes(trimmed)) allowed.push(trimmed);
+    });
+  }
+
+  if (Array.isArray(options.allowedOrigins)) {
+    options.allowedOrigins.forEach(o => {
+      const trimmed = String(o).trim();
+      if (trimmed && !allowed.includes(trimmed)) allowed.push(trimmed);
+    });
+  }
+
+  return allowed;
+}
+
+/**
+ * Validates whether an incoming Origin header is permitted.
+ *
+ * @param {string} origin - Incoming Origin header value
+ * @param {object} [options]
+ * @returns {boolean}
+ */
+export function isAllowedOrigin(origin, options = {}) {
+  if (!origin || typeof origin !== 'string') return false;
+
+  const normalized = origin.trim();
+  const allowedList = getAllowedOrigins(options);
+
+  if (allowedList.includes(normalized)) {
+    return true;
+  }
+
+  // In non-production or test environments, allow localhost / 127.0.0.1 on any port
+  if (process.env.NODE_ENV !== 'production' || options.allowLocalhostPorts) {
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalized)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * CSRF Protection Middleware for state-changing Outlook endpoints (PATCH, POST).
+ * Implements Task P5.6 per docs/outlook-build/SPEC.md §5:
+ * - Requires Origin header to match an authorized origin
+ * - Requires custom header X-Requested-With: sloane (case-insensitive)
+ * - Returns 403 CSRF_DETECTED on violation
+ *
+ * @param {object} [options]
+ * @returns {Function} Express/Connect compatible middleware
+ */
+export function verifyOutlookCsrf(options = {}) {
+  return function csrfMiddleware(req, res, next) {
+    const origin = req.headers.origin;
+    const requestedWith = req.headers['x-requested-with'];
+
+    // 1. Verify Origin header presence
+    if (!origin) {
+      return res.status(403).json({
+        error: {
+          code: 'CSRF_DETECTED',
+          message: 'Cross-site request forgery protection: Origin header is required for state-changing requests.'
+        }
+      });
+    }
+
+    // 2. Validate Origin against allowed whitelist
+    if (!isAllowedOrigin(origin, options)) {
+      return res.status(403).json({
+        error: {
+          code: 'CSRF_DETECTED',
+          message: `Cross-site request forgery protection: Origin '${origin}' is not authorized.`
+        }
+      });
+    }
+
+    // 3. Verify custom header X-Requested-With: sloane
+    if (!requestedWith || String(requestedWith).trim().toLowerCase() !== 'sloane') {
+      return res.status(403).json({
+        error: {
+          code: 'CSRF_DETECTED',
+          message: "Cross-site request forgery protection: 'X-Requested-With: sloane' header is required."
+        }
+      });
+    }
+
+    if (typeof next === 'function') {
+      next();
+    }
+  };
+}
+
+/**
  * Registers Outlook settings endpoints on the application router.
  *
  * @param {object} app - Application router instance
@@ -112,6 +223,7 @@ export function clearOutlookDataCache() {
 export function registerOutlookSettingsRoutes(app, { authenticate }, options = {}) {
   const connectionStore = options.connectionStore || outlookConnectionStore;
   const graph = options.graphClient || graphClient;
+  const csrf = verifyOutlookCsrf(options);
 
   /**
    * GET /api/v1/integrations/outlook/status
@@ -259,7 +371,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
    * Empty folder list is rejected with 422.
    * Session required (401 if unauthenticated).
    */
-  app.patch('/api/v1/integrations/outlook/settings', authenticate, async (req, res) => {
+  app.patch('/api/v1/integrations/outlook/settings', authenticate, csrf, async (req, res) => {
     // 1. Verify feature configuration
     if (!isOutlookConfigured(options)) {
       return res.status(503).json({
@@ -431,7 +543,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
    * Returns 409 if a sync is already running.
    * Session required (401 if unauthenticated).
    */
-  app.post('/api/v1/integrations/outlook/sync', authenticate, async (req, res) => {
+  app.post('/api/v1/integrations/outlook/sync', authenticate, csrf, async (req, res) => {
     // 1. Verify feature configuration
     if (!isOutlookConfigured(options)) {
       return res.status(503).json({
@@ -617,7 +729,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
    * Returns guidance and link to Microsoft My Apps to delete cloud-side consent.
    * Session required (401 if unauthenticated).
    */
-  app.post('/api/v1/integrations/outlook/disconnect', authenticate, async (req, res) => {
+  app.post('/api/v1/integrations/outlook/disconnect', authenticate, csrf, async (req, res) => {
     // 1. Verify feature configuration
     if (!isOutlookConfigured(options)) {
       return res.status(503).json({
