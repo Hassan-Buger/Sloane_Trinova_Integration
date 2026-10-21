@@ -17,15 +17,28 @@ const REDACTED_KEYS = new Set([
   'brain',
   'private_notes',
   'buffer',
-  'file_content'
+  'file_content',
+  // Outlook OAuth & Graph Tokens (Task P4.2)
+  'access_token',
+  'accesstoken',
+  'refresh_token',
+  'refreshtoken',
+  'id_token',
+  'idtoken',
+  'client_secret',
+  'clientsecret',
+  'code_verifier',
+  'codeverifier'
 ]);
 
 export function sanitizeForLog(data) {
   if (data === null || data === undefined) return data;
 
   if (typeof data === 'string') {
-    // Redact Bearer tokens in raw strings
-    return data.replace(/Bearer\s+[A-Za-z0-9-_.]+/gi, 'Bearer [REDACTED]');
+    // Redact Bearer tokens and sensitive query parameters/strings
+    return data
+      .replace(/Bearer\s+[A-Za-z0-9-_.]+/gi, 'Bearer [REDACTED]')
+      .replace(/(access_token|refresh_token|id_token|client_secret|code_verifier)=[A-Za-z0-9-_.]+/gi, '$1=[REDACTED]');
   }
 
   if (Array.isArray(data)) {
@@ -36,7 +49,8 @@ export function sanitizeForLog(data) {
     const sanitized = {};
     for (const [key, value] of Object.entries(data)) {
       const lowerKey = key.toLowerCase();
-      if (REDACTED_KEYS.has(lowerKey)) {
+      const normalizedKey = lowerKey.replace(/[-_]/g, '');
+      if (REDACTED_KEYS.has(lowerKey) || REDACTED_KEYS.has(normalizedKey)) {
         sanitized[key] = '[REDACTED]';
       } else if (typeof value === 'object' && value !== null) {
         sanitized[key] = sanitizeForLog(value);

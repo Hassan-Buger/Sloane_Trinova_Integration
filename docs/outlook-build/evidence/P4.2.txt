@@ -1,0 +1,21 @@
+Task P4.2: Add Outlook-specific logging hygiene: extend sanitizer.js redaction keys with access_token, refresh_token, id_token, client_secret, code_verifier
+Recorded At: 2026-10-21T17:38:30+05:00
+Test Command: npm test
+Result: 243 passed across 42 suites (0 failing, 0 skipped, duration 12.43s)
+
+Automated Test Suite: server/tests/unit17-outlook-sanitizer.test.js
+Test Output:
+▶ Task P4.2: Outlook-Specific Logging Hygiene & Sanitization
+  ✔ 1. Redacts access_token, refresh_token, id_token, client_secret, code_verifier in flat objects
+  ✔ 2. Redacts camelCase variants (accessToken, refreshToken, idToken, clientSecret, codeVerifier)
+  ✔ 3. Recursively redacts sensitive keys within deeply nested objects and arrays
+  ✔ 4. Redacts Bearer tokens and sensitive token parameters in raw log strings
+  ✔ 5. logger methods (info, warn, error) redact sensitive keys in console output
+✔ Task P4.2: Outlook-Specific Logging Hygiene & Sanitization
+
+Verification Summary:
+- Extended `server/src/middleware/sanitizer.js` with `access_token`, `refresh_token`, `id_token`, `client_secret`, and `code_verifier`.
+- Added key normalization (`key.toLowerCase().replace(/[-_]/g, '')`) to seamlessly redact both snake_case (`refresh_token`) and camelCase (`refreshToken`) variations.
+- Added regex redaction for raw string log outputs containing token parameters (e.g. `client_secret=...`, `code_verifier=...`).
+- Mirrored all sanitization changes into `Sloane/server/src/middleware/sanitizer.js`.
+- Intercepted `logger.info`, `logger.warn`, and `logger.error` output in automated tests to prove console output never emits plaintext tokens or credentials.
