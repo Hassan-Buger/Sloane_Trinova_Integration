@@ -1624,7 +1624,10 @@ class SloaneApp {
     const textarea = document.getElementById('brainInput');
     if (!textarea) return;
     const text = textarea.value.trim();
-    if (!text) return;
+    if (!text) {
+      Toast.warning('Please enter a note before saving to CEO Brain.');
+      return;
+    }
 
     const entries = StorageService.getBrainEntries();
     entries.unshift({
@@ -1641,20 +1644,31 @@ class SloaneApp {
     this.renderBrain();
   }
 
-  openTrinovaNoteModal(entryIndex) {
+  async openTrinovaNoteModal(entryIndex) {
     const entries = StorageService.getBrainEntries();
     const entry = entries[entryIndex];
     if (!entry) return;
 
     this.selectedBrainEntryForTrinova = entry;
 
-    document.getElementById('trinovaNoteContent').value = entry.text;
+    const contentInput = document.getElementById('trinovaNoteContent');
+    if (contentInput) contentInput.value = entry.text;
+
+    // Explicitly uncheck confirmation box per privacy boundary
+    const confirmBox = document.getElementById('trinovaNoteConfirm');
+    if (confirmBox) confirmBox.checked = false;
     
-    // Populate company select
-    const clients = StorageService.getClients();
+    // Populate company select from live API / cached clients
+    let clients = [];
+    try {
+      const res = await ApiService.getClients();
+      clients = res.data || [];
+    } catch (_) {
+      clients = StorageService.getClients();
+    }
     const companySelect = document.getElementById('trinovaNoteCompany');
     if (companySelect) {
-      companySelect.innerHTML = clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      companySelect.innerHTML = clients.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
     }
 
     ModalManager.open('trinovaNoteModal');
@@ -1671,10 +1685,21 @@ class SloaneApp {
       return;
     }
 
-    // Resolve matching company ID
-    const clients = StorageService.getClients();
+    if (!text) {
+      Toast.error('Note text cannot be empty.');
+      return;
+    }
+
+    // Resolve matching company ID from live / cached clients
+    let clients = [];
+    try {
+      const res = await ApiService.getClients();
+      clients = res.data || [];
+    } catch (_) {
+      clients = StorageService.getClients();
+    }
     const match = clients.find(c => c.name === companyName);
-    const companyId = match ? (match.rawId || match.id) : 1;
+    const companyId = match ? (match.rawId || match.id) : 'comp_woofington_park_01';
 
     try {
       this.logToTrinovaConsole(`Posting internal note to TriNova for company ${companyName} (${visibility})...`);

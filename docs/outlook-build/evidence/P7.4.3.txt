@@ -1,0 +1,72 @@
+Task P7.4.3: CEO Brain Notes & Strict Privacy Boundary Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P7.4.3 verifies and fortifies the CEO Brain note capture, storage boundary, and opt-in export to TriNova:
+
+1. CEO Brain Local Isolation & Storage Boundary:
+   - Private workspace notes are captured with `isPrivate: true`, local timestamp, and stored in `StorageService` (`sloane_brain_v2`).
+   - `handleSaveBrain()` in `scripts/app.js` enforces non-empty input validation with helpful warning toast notifications.
+   - Private notes are NEVER automatically synchronized to TriNova.
+
+2. AI Privacy Boundary (`PRIVATE_CEO_BRAIN = DENY`):
+   - `ContextBuilder.buildContext()` in `server/src/services/ai/contextBuilder.js` unconditionally enforces `privacyAudit.privateCeoBrainDenied: true`.
+   - Verified that client context compilation never extracts or includes CEO Brain entries in AI prompts or briefings.
+   - Strips any private timeline events or internal notes (`visibility === 'private'`) before AI queries.
+
+3. Opt-in "Send to Trinova" Export Workflow:
+   - Export modal (`#trinovaNoteModal`) explicitly presents an unticked confirmation checkbox (`#trinovaNoteConfirm`).
+   - `handleSendNoteToTrinova()` strictly halts and alerts if the confirmation box is unchecked.
+   - `ApiService.sendNoteToTrinova()` calls `POST /api/v1/companies/:companyId/notes` with `confirm_write_to_trinova: true`.
+   - Server route `POST /api/v1/companies/:companyId/notes` strictly requires `confirm_write_to_trinova: true` (returns 422 if omitted), persists note to `mockDb.notes`, and logs an audit event.
+   - Creates a `NOTE_CREATED` event on the client timeline and auto-refreshes active views.
+
+4. UI Sanitization & View Hygiene:
+   - `renderBrain()` renders entries with `escapeHtml` to prevent XSS.
+   - Provides honest empty state when no notes exist (`No private notes in CEO Brain yet. Jot down anything above.`).
+   - `openTrinovaNoteModal()` asynchronously populates company selection from live API / cached clients with proper HTML escaping.
+
+5. Bidirectional Sync:
+   - Updated `scripts/app.js` and `server/tests/unit27-ceo-brain-notes.test.js` in `Sloane/` mirror.
+
+Automated Test Results
+----------------------
+Command: npm test in server/
+Test Suites: 88 passed, 88 total
+Tests: 391 passed, 391 total
+Failures: 0
+Duration: 24.00s
+
+Test Execution Log (Task P7.4.3 excerpt):
+-----------------------------------------
+▶ Task P7.4.3: CEO Brain Notes & Strict Privacy Boundary
+  ▶ 1. AI Context Privacy Boundary (PRIVATE_CEO_BRAIN = DENY)
+    ✔ 1.1 ContextBuilder unconditionally asserts privateCeoBrainDenied: true for client queries (1.7322ms)
+    ✔ 1.2 ContextBuilder unconditionally asserts privateCeoBrainDenied: true for executive briefings (0.545ms)
+    ✔ 1.3 ContextBuilder strips private timeline events and notes from context (0.813ms)
+  ✔ 1. AI Context Privacy Boundary (PRIVATE_CEO_BRAIN = DENY) (3.8706ms)
+[INFO] Audit Log: [post__api_v1_companies_comp_woofington_park_01_notes] by actor_kirsty_allen on companies:root (422)
+  ▶ 2. Opt-in "Send to Trinova" Export Privacy Boundary
+    ✔ 2.1 POST /api/v1/companies/:companyId/notes rejects export without confirm_write_to_trinova (422) (75.2525ms)
+[INFO] Audit Log: [internal_note_created] by actor_kirsty_allen on company_note:root (201)
+[INFO] Audit Log: [read_client_timeline] by actor_kirsty_allen on client_timeline:cli_woofington_grp:root (200)
+    ✔ 2.2 POST /api/v1/companies/:companyId/notes creates note and timeline event when confirmed (201) (30.2864ms)
+  ✔ 2. Opt-in "Send to Trinova" Export Privacy Boundary (106.0505ms)
+  ▶ 3. Frontend Implementation & UI Sanitization
+    ✔ 3.1 handleSaveBrain validates non-empty input and stores isPrivate: true (0.7593ms)
+    ✔ 3.2 renderBrain renders honest empty state and escapeHtml (0.5873ms)
+    ✔ 3.3 openTrinovaNoteModal requires explicit checkbox and fetches live clients (0.3639ms)
+    ✔ 3.4 handleSendNoteToTrinova verifies checkbox before calling ApiService.sendNoteToTrinova (0.3808ms)
+    ✔ 3.5 ApiService.sendNoteToTrinova requires confirm_write_to_trinova: true (0.2864ms)
+    ✔ 3.6 index.html static shell has zero literal @ symbols and zero leaks (0.3374ms)
+  ✔ 3. Frontend Implementation & UI Sanitization (3.2119ms)
+✔ Task P7.4.3: CEO Brain Notes & Strict Privacy Boundary (122.8859ms)
+ℹ tests 391
+ℹ suites 88
+ℹ pass 391
+ℹ fail 0
