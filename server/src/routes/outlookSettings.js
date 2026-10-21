@@ -94,6 +94,13 @@ export function setSyncActiveForTest(val) {
   isSyncInProgress = Boolean(val);
 }
 
+// In-memory data cache for diary and flagged-emails (cleared on disconnect and sync-now)
+export const outlookDataCache = new Map();
+
+export function clearOutlookDataCache() {
+  outlookDataCache.clear();
+}
+
 /**
  * Registers Outlook settings endpoints on the application router.
  *
@@ -539,6 +546,14 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
         status: 'connected'
       }, vaultOptions);
 
+      // 7. Flush cached diary & email responses on successful sync
+      clearOutlookDataCache();
+      if (options.dataCache && typeof options.dataCache.clear === 'function') {
+        try {
+          options.dataCache.clear();
+        } catch {}
+      }
+
       // Return status descriptor + counts
       return res.json({
         synced: true,
@@ -592,6 +607,61 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       });
     } finally {
       isSyncInProgress = false;
+    }
+  });
+
+  /**
+   * POST /api/v1/integrations/outlook/disconnect
+   * Permanently deletes the Outlook connection from the encrypted vault and
+   * flushes in-memory data caches.
+   * Returns guidance and link to Microsoft My Apps to delete cloud-side consent.
+   * Session required (401 if unauthenticated).
+   */
+  app.post('/api/v1/integrations/outlook/disconnect', authenticate, async (req, res) => {
+    // 1. Verify feature configuration
+    if (!isOutlookConfigured(options)) {
+      return res.status(503).json({
+        error: {
+          code: 'OUTLOOK_NOT_CONFIGURED',
+          message: 'Outlook integration is not configured on this server.'
+        }
+      });
+    }
+
+    const vaultOptions = {
+      filePath: options.vaultPath,
+      key: options.vaultKey
+    };
+
+    try {
+      // 2. Permanently delete encrypted connection vault file
+      connectionStore.deleteConnection(vaultOptions);
+
+      // 3. Clear in-memory data cache
+      clearOutlookDataCache();
+      if (options.dataCache && typeof options.dataCache.clear === 'function') {
+        try {
+          options.dataCache.clear();
+        } catch {}
+      }
+
+      logger.info('Outlook connection purged and disconnected');
+
+      return res.json({
+        disconnected: true,
+        status: 'not_connected',
+        connected: false,
+        message: "This deletes Sloane's copy of your Outlook access and clears diary and email data from the dashboard; to fully remove Sloane's access from your Microsoft account, use https://myapps.microsoft.com (or the link Microsoft shows under your account's connected apps).",
+        revocationUrl: 'https://myapps.microsoft.com'
+      });
+    } catch (err) {
+      logger.error('Failed to disconnect Outlook account:', err);
+      return res.status(500).json({
+        error: {
+          code: 'DISCONNECT_FAILED',
+          message: 'Failed to purge Outlook connection from vault'
+        }
+      });
     }
   });
 

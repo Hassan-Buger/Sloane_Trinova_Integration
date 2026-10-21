@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
 import { sessionStore } from '../src/services/sessionStore.js';
 import { outlookConnectionStore } from '../src/services/outlookConnectionStore.js';
-import { formatStatusResponse, isOutlookConfigured, setSyncActiveForTest } from '../src/routes/outlookSettings.js';
+import { formatStatusResponse, isOutlookConfigured, setSyncActiveForTest, clearOutlookDataCache, outlookDataCache } from '../src/routes/outlookSettings.js';
 import { GraphClientError } from '../src/services/graphClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -965,4 +965,104 @@ describe('Tasks P5.1 & P5.2: Outlook Settings Endpoints', () => {
       assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
     });
   });
+
+  // ==========================================
+  // P5.5: POST /api/v1/integrations/outlook/disconnect
+  // ==========================================
+  describe('Task P5.5: POST disconnect', () => {
+    test('37. POST /api/v1/integrations/outlook/disconnect without session returns 401 UNAUTHORIZED', async () => {
+      const res = await makeRequest('/api/v1/integrations/outlook/disconnect', {
+        method: 'POST'
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'UNAUTHORIZED');
+    });
+
+    test('38. POST disconnect when active connection exists purges vault and data cache, returning §4.1 revocation guidance', async () => {
+      // 1. Establish connected vault record with sensitive tokens
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        displayName: 'Kirsty Allen',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        accessToken: SENSITIVE_TOKENS.accessToken,
+        calendarSyncEnabled: true,
+        emailSyncEnabled: true,
+        mailFolderIds: ['inbox']
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      assert.ok(fs.existsSync(TEST_VAULT_PATH));
+
+      // 2. Set test item in memory cache
+      outlookDataCache.set('test_diary_cache', { events: ['meeting1'] });
+      assert.equal(outlookDataCache.size, 1);
+
+      // 3. Send disconnect request
+      const res = await makeRequest('/api/v1/integrations/outlook/disconnect', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.disconnected, true);
+      assert.equal(res.body.status, 'not_connected');
+      assert.equal(res.body.connected, false);
+      assert.ok(res.body.message.includes('https://myapps.microsoft.com'));
+      assert.ok(res.body.message.includes("deletes Sloane's copy of your Outlook access"));
+      assert.equal(res.body.revocationUrl, 'https://myapps.microsoft.com');
+
+      // 4. Verify vault file is completely removed / 0 tokens remain
+      assert.equal(fs.existsSync(TEST_VAULT_PATH), false);
+      const reloaded = outlookConnectionStore.getConnection({
+        filePath: TEST_VAULT_PATH,
+        key: TEST_ENC_KEY
+      });
+      assert.equal(reloaded, null);
+
+      // 5. Verify cache is flushed
+      assert.equal(outlookDataCache.size, 0);
+
+      // 6. Verify zero token leakage in raw response
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.refreshToken));
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
+      assert.ok(!res.raw.includes(TEST_ENC_KEY));
+    });
+
+    test('39. Subsequent status and sync calls immediately reflect disconnected state', async () => {
+      // Status should return not_connected
+      const statusRes = await makeRequest('/api/v1/integrations/outlook/status', {
+        method: 'GET',
+        headers: { Cookie: sessionCookie }
+      });
+      assert.equal(statusRes.status, 200);
+      assert.equal(statusRes.body.status, 'not_connected');
+      assert.equal(statusRes.body.connected, false);
+
+      // Sync should return 404 OUTLOOK_NOT_CONNECTED
+      const syncRes = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+      assert.equal(syncRes.status, 404);
+      assert.equal(syncRes.body?.error?.code, 'OUTLOOK_NOT_CONNECTED');
+    });
+
+    test('40. POST disconnect is idempotent and succeeds safely when vault is already empty', async () => {
+      assert.equal(fs.existsSync(TEST_VAULT_PATH), false);
+
+      const res = await makeRequest('/api/v1/integrations/outlook/disconnect', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.disconnected, true);
+      assert.equal(res.body.status, 'not_connected');
+      assert.equal(res.body.connected, false);
+      assert.ok(res.body.message.includes('https://myapps.microsoft.com'));
+    });
+  });
 });
+
