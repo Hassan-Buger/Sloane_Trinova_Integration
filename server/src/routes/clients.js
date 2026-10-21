@@ -158,4 +158,87 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       }
     });
   });
+
+  /**
+   * POST /api/v1/clients
+   * Creates a new client with a linked company entity in TriNova.
+   */
+  app.post('/api/v1/clients', authenticate, requireScope('sloane:write'), (req, res) => {
+    req.auditAction = 'create_client';
+    req.resourceType = 'client';
+
+    const { name, biz, no, year, accounts, confirm, vat, vatNo, paye, cis, dirs, owner, risk, notes } = req.body || {};
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Client name is required.'
+        }
+      });
+    }
+
+    const clientId = `cli_${Date.now()}`;
+    const companyId = `comp_${Date.now()}`;
+
+    // Split directors string into structured officers array
+    const directorNames = (dirs || '').split(',').map(d => d.trim()).filter(Boolean);
+    const officers = directorNames.map((dName, idx) => ({
+      id: `off_${Date.now()}_${idx}`,
+      name: dName,
+      role: 'Director',
+      isActive: true
+    }));
+
+    // Create linked company
+    const newCompany = {
+      id: companyId,
+      clientId,
+      companyName: name.trim(),
+      companyNumber: (no || '').trim(),
+      accountingReferenceDate: year || '2026-03-31',
+      accountsDueDate: accounts || '2026-12-31',
+      confirmationDueDate: confirm || '2026-11-30',
+      vatRegistered: vat === 'Yes',
+      vatNumber: vatNo || null,
+      payeRegistered: Boolean(paye),
+      payeReference: paye || null,
+      cisStatus: cis || 'No',
+      riskLevel: risk || 'Low',
+      officers,
+      contacts: [],
+      services: [],
+      notes: notes || ''
+    };
+
+    const newClient = {
+      id: clientId,
+      name: name.trim(),
+      clientType: biz || 'Corporate',
+      businessArea: biz || 'Trinova Accounting',
+      status: 'Active',
+      assignedManagerId: owner ? `usr_${owner.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : 'usr_kirsty_allen',
+      assignedManagerName: owner || 'Kirsty Allen',
+      companyIds: [companyId],
+      contacts: directorNames.length > 0 ? [{
+        id: `cnt_${Date.now()}`,
+        name: directorNames[0],
+        email: `${directorNames[0].toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        isPrimary: true
+      }] : [],
+      createdAt: new Date().toISOString()
+    };
+
+    mockDb.companies.unshift(newCompany);
+    mockDb.clients.unshift(newClient);
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        ...newClient,
+        companies: [newCompany]
+      }
+    });
+  });
 }
+

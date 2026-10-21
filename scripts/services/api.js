@@ -231,27 +231,28 @@ export const ApiService = {
       if (res.data && Array.isArray(res.data)) {
         // Map TriNova entities into Sloane's Client 360 schema
         const mappedClients = res.data.map(item => {
+          const primaryComp = (item.companies && item.companies[0]) || {};
           const dirsFormatted = Array.isArray(item.directors) 
             ? item.directors.join(', ') 
-            : (item.directors || item.primary_contact?.name || '—');
+            : (item.directors || item.primary_contact?.name || (item.contacts && item.contacts[0]?.name) || '—');
 
           return {
-            id: item.company_id || `comp_${item.id}`,
+            id: item.id || item.company_id || `comp_${item.id}`,
             rawId: item.id,
-            clientId: item.client_id,
-            name: item.name || item.company_name,
-            no: item.company_number || '',
-            biz: item.entity_type || 'Corporate',
-            year: item.financial_year_end || '2026-03-31',
-            accounts: item.accounts_due || '2026-08-31',
-            confirm: item.confirmation_statement_due || '2026-09-15',
+            clientId: item.client_id || item.id,
+            name: item.name || item.company_name || primaryComp.companyName,
+            no: item.company_number || primaryComp.companyNumber || '',
+            biz: item.businessArea || item.entity_type || 'Corporate',
+            year: item.financial_year_end || primaryComp.accountingReferenceDate || '2026-03-31',
+            accounts: item.accounts_due || primaryComp.accountsDueDate || '2026-08-31',
+            confirm: item.confirmation_statement_due || primaryComp.confirmationDueDate || '2026-09-15',
             vat: item.vat_registered ? 'Yes' : (item.tax_reference ? 'Yes' : 'No'),
             vatNo: item.vat_number || item.tax_reference || '',
             paye: item.paye_reference || '',
             cis: item.cis_registered ? 'Yes' : 'No',
             dirs: dirsFormatted,
-            owner: item.account_manager || 'Kirsty Allen',
-            risk: item.risk_tier || (item.aml_status === 'Action Required' ? 'High' : 'Low'),
+            owner: item.assignedManagerName || item.account_manager || 'Kirsty Allen',
+            risk: primaryComp.riskLevel || item.risk_tier || (item.aml_status === 'Action Required' ? 'High' : 'Low'),
             notes: item.notes || item.primary_contact?.address || '',
             isLiveTriNova: true
           };
@@ -320,23 +321,42 @@ export const ApiService = {
   },
 
   /**
-   * Creates a new client/company record locally and attempts TriNova write.
+   * Creates a new client/company record via POST /api/v1/clients with local storage cache fallback.
    */
   async createClient(clientData) {
-    const clients = StorageService.getClients();
-    const newClient = {
-      id: `cl-${Date.now()}`,
-      ...clientData,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const res = await this.request('/clients', {
+        method: 'POST',
+        body: clientData
+      });
 
-    clients.unshift(newClient);
-    StorageService.saveClients(clients);
+      const clients = StorageService.getClients();
+      if (res.data) {
+        clients.unshift(res.data);
+        StorageService.saveClients(clients);
+      }
 
-    return {
-      status: 'success',
-      data: newClient
-    };
+      return {
+        status: 'success',
+        data: res.data
+      };
+    } catch (err) {
+      console.warn('Could not create client via API, falling back to local storage cache:', err.message);
+      const clients = StorageService.getClients();
+      const newClient = {
+        id: `cl-${Date.now()}`,
+        ...clientData,
+        createdAt: new Date().toISOString()
+      };
+
+      clients.unshift(newClient);
+      StorageService.saveClients(clients);
+
+      return {
+        status: 'success',
+        data: newClient
+      };
+    }
   },
 
   /**
@@ -585,6 +605,25 @@ export const ApiService = {
         source: 'local_cache',
         message: `Note recorded in local audit log (${visibility}) — will sync when online`,
         data: auditRecord
+      };
+    }
+  },
+
+  /**
+   * Reads internal notes for a company from GET /api/v1/companies/:companyId/notes.
+   */
+  async getCompanyNotes(companyId) {
+    try {
+      const res = await this.request(`/companies/${companyId}/notes`);
+      return {
+        status: 'success',
+        data: res.data || []
+      };
+    } catch (err) {
+      console.warn('Could not fetch company notes from API:', err.message);
+      return {
+        status: 'fallback',
+        data: []
       };
     }
   },

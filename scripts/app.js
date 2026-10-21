@@ -1671,6 +1671,10 @@ class SloaneApp {
       ModalManager.close('trinovaNoteModal');
       Toast.success(res.message);
       this.logToTrinovaConsole(`Note posted successfully: ${res.message}`);
+      if (this.activeClient360Id) {
+        await this.renderClientNotesDetail(this.activeClient360Id);
+        await this.renderTimeline(this.activeClient360Id);
+      }
     } catch (err) {
       Toast.error(err.message || 'Failed to send note to Trinova.');
       this.logToTrinovaConsole(`Note post failed: ${err.message}`);
@@ -1972,6 +1976,7 @@ class SloaneApp {
 
       if (this.activeClient360Id === clientId) {
         await this.renderTimeline(clientId);
+        await this.renderClientNotesDetail(clientId);
       }
     } catch (err) {
       Toast.error(`Could not log timeline event: ${err.message}`);
@@ -1984,38 +1989,82 @@ class SloaneApp {
     }
   }
 
-  renderClientStatutoryDetail(clientId) {
+  async renderClientStatutoryDetail(clientId) {
     const card = document.getElementById('clientStatutoryDetailCard');
     if (!card) return;
-    const companies = StorageService.getBusinesses();
+
+    let company = null;
+    try {
+      const clientRes = await ApiService.getClients();
+      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
+      if (match) {
+        const detailsRes = await ApiService.getCompanyDetails(match.rawId || match.id);
+        company = detailsRes?.data || match;
+      }
+    } catch (_) {}
+
+    const accountsDueDate = company?.accountsDueDate || company?.accounts || '2026-12-31';
+    const confirmDueDate = company?.confirmationDueDate || company?.confirm || '2026-11-30';
+    const vatStatus = company?.vatRegistered || company?.vat === 'Yes' ? 'Active' : 'Not Registered';
+
     card.innerHTML = `
       <div class="card-header">
         <h3>Statutory Filings & Obligations</h3>
-        <span class="pill green">Active Filings</span>
+        <span class="pill ${company?.riskLevel === 'High' ? 'red' : 'green'}">${company?.riskLevel === 'High' ? 'Action Required' : 'Active Filings'}</span>
       </div>
       <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
         Synchronized Companies House registers, annual accounts schedules, and confirmation statements.
       </p>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
         <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-          <span style="font-size: 11px; color: var(--muted); display: block;">Accounts Status</span>
-          <strong style="color: var(--amber);">Due in 6 Days</strong>
+          <span style="font-size: 11px; color: var(--muted); display: block;">Accounts Due Date</span>
+          <strong style="color: var(--text);">${escapeHtml(ReconciliationEngine.formatDate(accountsDueDate))}</strong>
         </div>
         <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
           <span style="font-size: 11px; color: var(--muted); display: block;">Confirmation Statement</span>
-          <strong style="color: var(--green);">Up to Date</strong>
+          <strong style="color: var(--text);">${escapeHtml(ReconciliationEngine.formatDate(confirmDueDate))}</strong>
         </div>
         <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
           <span style="font-size: 11px; color: var(--muted); display: block;">VAT Registration</span>
-          <strong style="color: var(--text);">Active (Quarterly)</strong>
+          <strong style="color: var(--text);">${escapeHtml(vatStatus)}${company?.vatNumber ? ` (${escapeHtml(company.vatNumber)})` : ''}</strong>
         </div>
       </div>
     `;
   }
 
-  renderClientDocumentsDetail(clientId) {
+  async renderClientDocumentsDetail(clientId) {
     const card = document.getElementById('clientDocumentsDetailCard');
     if (!card) return;
+
+    let companyId = clientId;
+    try {
+      const clientRes = await ApiService.getClients();
+      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
+      if (match && (match.rawId || match.id)) {
+        companyId = match.rawId || match.id;
+      }
+    } catch (_) {}
+
+    let docs = [];
+    try {
+      const res = await ApiService.getCompanyDocuments(companyId);
+      docs = res.data || [];
+    } catch (err) {
+      console.warn('Could not load company documents:', err);
+    }
+
+    const docsHtml = docs.length > 0
+      ? docs.map(d => `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel2); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+            <div>
+              <div style="font-weight: 700; font-size: 13px; color: var(--text);">${escapeHtml(d.filename || d.name || 'Document.pdf')}</div>
+              <div style="font-size: 11px; color: var(--muted);">${d.uploadedBy ? `Uploaded by ${escapeHtml(d.uploadedBy)} · ` : ''}Category: ${escapeHtml(d.category || 'General')}</div>
+            </div>
+            <span class="pill ${d.status === 'Ready' || d.status === 'Signed' ? 'green' : 'amber'}">${escapeHtml(d.status || 'Active')}</span>
+          </div>
+        `).join('')
+      : `<div class="table-empty" style="padding: 24px;">No corporate documents recorded for this client.</div>`;
+
     card.innerHTML = `
       <div class="card-header">
         <h3>Corporate Documents & Certificates</h3>
@@ -2025,20 +2074,46 @@ class SloaneApp {
         Archived statutory balance sheets, minutes, and tamper-evident Documenso certificates.
       </p>
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel2); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-          <div>
-            <div style="font-weight: 700; font-size: 13px; color: var(--text);">Draft_Balance_Sheet_2025.pdf</div>
-            <div style="font-size: 11px; color: var(--muted);">Uploaded by Jessica Taylor · Category: Accounts</div>
-          </div>
-          <span class="pill amber">Ready for Sign-off</span>
-        </div>
+        ${docsHtml}
       </div>
     `;
   }
 
-  renderClientNotesDetail(clientId) {
+  async renderClientNotesDetail(clientId) {
     const card = document.getElementById('clientNotesDetailCard');
     if (!card) return;
+
+    let companyId = clientId;
+    try {
+      const clientRes = await ApiService.getClients();
+      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
+      if (match && (match.rawId || match.id)) {
+        companyId = match.rawId || match.id;
+      }
+    } catch (_) {}
+
+    let notes = [];
+    try {
+      const res = await ApiService.getCompanyNotes(companyId);
+      notes = res.data || [];
+    } catch (err) {
+      console.warn('Could not load company notes:', err);
+    }
+
+    const notesListHtml = notes.length > 0
+      ? notes.map(n => `
+          <div style="background: var(--panel2); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <strong style="font-size: 12.5px; color: var(--text);">${escapeHtml(n.authorName || n.author || 'Staff')}</strong>
+              <span style="font-size: 11px; color: var(--muted);">${n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
+            </div>
+            <p style="font-size: 12px; color: #c5d1de; margin: 0; line-height: 1.5;">
+              ${escapeHtml(n.text || n.content || '')}
+            </p>
+          </div>
+        `).join('')
+      : `<div class="table-empty" style="padding: 24px;">No internal notes recorded for this client.</div>`;
+
     card.innerHTML = `
       <div class="card-header">
         <h3>Internal Operational & Strategic Notes</h3>
@@ -2047,17 +2122,12 @@ class SloaneApp {
       <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
         Client-specific practitioner communications protected by Sloane's strict staff privacy boundary.
       </p>
-      <div style="background: var(--panel2); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-          <strong style="font-size: 12.5px; color: var(--text);">Kirsty Allen (CEO)</strong>
-          <span style="font-size: 11px; color: var(--muted);">18 Sep 2026, 12:00</span>
-        </div>
-        <p style="font-size: 12px; color: #c5d1de; margin: 0; line-height: 1.5;">
-          Spoke with Sarah Jenkins. Strike-off was triggered by delayed filing; bank statements are now with Jessica.
-        </p>
+      <div id="clientNotesListContainer">
+        ${notesListHtml}
       </div>
     `;
   }
+
 
   // =========================================================================
   // Feature 2: Secure Claude AI Assistant ("Ask Sloane") (Section 18-41)
