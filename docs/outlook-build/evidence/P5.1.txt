@@ -1,0 +1,30 @@
+Task P5.1: Implement GET /api/v1/integrations/outlook/status
+Recorded At: 2026-10-21T18:22:30+05:00
+Test Command: npm test
+Result: 253 passed across 43 suites (0 failing, 0 skipped, duration 22.12s)
+
+Automated Test Suite: server/tests/unit18-outlook-settings-routes.test.js
+Test Output:
+▶ Task P5.1: Outlook Settings & Status Endpoints
+  ✔ 1. Unauthenticated request to /api/v1/integrations/outlook/status returns 401 UNAUTHORIZED (56.4945ms)
+  ✔ 2. isOutlookConfigured correctly determines readiness from key and client ID (0.9062ms)
+  ✔ 3. formatStatusResponse sanitizes records and guarantees schema conformity (2.2534ms)
+  ✔ 4. GET /api/v1/integrations/outlook/status returns not_configured when configuration is missing (15.4181ms)
+  ✔ 5. GET /api/v1/integrations/outlook/status returns not_connected when no connection exists in vault (4.6782ms)
+  ✔ 6. GET /api/v1/integrations/outlook/status returns connected state with populated fields and no tokens (17.5708ms)
+  ✔ 7. GET /api/v1/integrations/outlook/status returns reconnect_required when token is invalidated (17.1964ms)
+  ✔ 8. GET /api/v1/integrations/outlook/status returns error when connection has error status (15.1965ms)
+  ✔ 9. GET /api/v1/integrations/outlook/status handles vault read failure without crashing (9.3424ms)
+  ✔ 10. Raw response NEVER contains tokens, encryption keys, or client secrets (14.5794ms)
+✔ Task P5.1: Outlook Settings & Status Endpoints (168.8107ms)
+
+Verification Summary:
+- Implemented `server/src/routes/outlookSettings.js` providing `GET /api/v1/integrations/outlook/status`.
+- Route is protected by session authentication (`authenticate` middleware), returning 401 UNAUTHORIZED if not logged in.
+- Evaluates server environment configuration via `isOutlookConfigured` (checking valid 32-byte `OUTLOOK_TOKEN_ENC_KEY` and non-empty `OUTLOOK_CLIENT_ID`). Returns `status: 'not_configured'` with null metadata and empty arrays if unconfigured.
+- Evaluates vault presence via `connectionStore.getConnection()`. Returns `status: 'not_connected'` if no active connection record exists in vault.
+- Formats active connection records into public descriptors with `{ status, accountEmail, displayName, lastSyncAt, lastError, emailSyncEnabled, calendarSyncEnabled, mailFolderIds, scopes, connected, connectedAt, tenantId }`.
+- Supports `'connected'`, `'reconnect_required'`, and `'error'` status states.
+- Handles unexpected vault read errors gracefully by catching exceptions and returning `status: 'error'` without crashing the route.
+- Strictly verified zero token leakage: tokens (`access_token`, `refresh_token`, `id_token`, `client_secret`, `code_verifier`, and encryption key) never appear in response JSON or raw string output.
+- Mirrored all implementation and unit tests to `Sloane/server/src/routes/outlookSettings.js` and `Sloane/server/tests/unit18-outlook-settings-routes.test.js`.

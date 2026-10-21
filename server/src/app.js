@@ -18,6 +18,7 @@ import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerOutlookAuthRoutes } from './routes/outlookAuth.js';
+import { registerOutlookSettingsRoutes } from './routes/outlookSettings.js';
 import { telemetry } from './services/telemetry.js';
 import { sessionStore } from './services/sessionStore.js';
 
@@ -453,6 +454,9 @@ export function createApp(options = {}) {
 
   // --- Mount Outlook OAuth 2.0 Authorization Routes (Task P3.2) ---
   registerOutlookAuthRoutes(app, { authenticate, requireScope }, options.outlookOptions || options);
+
+  // --- Mount Outlook Settings & Lifecycle Routes (Task P5.1) ---
+  registerOutlookSettingsRoutes(app, { authenticate, requireScope }, options.outlookOptions || options);
 
   return app;
 }

@@ -29,7 +29,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P4.2** Add Outlook-specific logging hygiene: extend `sanitizer.js` redaction keys with `access_token`, `refresh_token`, `id_token`, `client_secret`, `code_verifier`.
 
 ## Phase 5 — Settings API
-- [ ] **P5.1** `GET /api/v1/integrations/outlook/status`.
+- [x] **P5.1** `GET /api/v1/integrations/outlook/status`.
 - [ ] **P5.2** `PATCH /api/v1/integrations/outlook/settings`.
 - [ ] **P5.3** `GET /api/v1/integrations/outlook/folders`.
 - [ ] **P5.4** `POST /api/v1/integrations/outlook/sync`.
