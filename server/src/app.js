@@ -17,6 +17,7 @@ import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
+import { registerBusinessRoutes } from './routes/businesses.js';
 import { registerOutlookAuthRoutes } from './routes/outlookAuth.js';
 import { registerOutlookSettingsRoutes } from './routes/outlookSettings.js';
 import { registerOutlookDataRoutes } from './routes/outlookData.js';
@@ -434,6 +435,9 @@ export function createApp(options = {}) {
 
   // --- Mount Unit 02 Client & Company Read Routes ---
   registerClientRoutes(app, { authenticate, requireScope });
+
+  // --- Mount Business Areas Routes (Task P7.4.2) ---
+  registerBusinessRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 03 Companies House & Statutory Reconciliation Routes ---
   registerStatutoryRoutes(app, { authenticate, requireScope }, options.chService);

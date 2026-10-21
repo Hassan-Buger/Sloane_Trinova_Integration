@@ -5,6 +5,16 @@
  */
 
 export const mockDb = {
+  // Business Areas (Practice verticals / business divisions)
+  businesses: [
+    { id: "biz-1", name: "Trinova Accounting", type: "Accountancy & Tax", status: "Active" },
+    { id: "biz-2", name: "CFI Awarding", type: "Awarding Organisation", status: "Active" },
+    { id: "biz-3", name: "The Thinking Tent / Yellow Brick", type: "Consultancy & Design", status: "Active" },
+    { id: "biz-4", name: "MTDflow", type: "Fintech / SaaS", status: "Active" },
+    { id: "biz-5", name: "Meta Digital Accounting", type: "Digital Accounting", status: "Active" },
+    { id: "biz-6", name: "Other ventures & property", type: "Holdings & Investments", status: "Active" }
+  ],
+
   // Clients (Top-level client entities)
   clients: [
     {

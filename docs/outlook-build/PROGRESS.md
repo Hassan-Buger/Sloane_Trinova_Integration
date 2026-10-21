@@ -47,7 +47,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P7.3** Remove remaining imports of demo arrays from the UI path.
 - [ ] **P7.4** Keep interactive features working against the API:
   - [x] **P7.4.1** Client 360 (add client, add event, add note)
-  - [ ] **P7.4.2** Add Business Area
+  - [x] **P7.4.2** Add Business Area
   - [ ] **P7.4.3** CEO Brain notes
   - [ ] **P7.4.4** Ask Sloane
 - [ ] **P7.5** Disconnect confirm dialog and reconnect banner (`ModalManager`, ESC closes, focus trapped).

@@ -360,15 +360,28 @@ export const ApiService = {
   },
 
   /**
-   * Reads business areas.
+   * Reads business areas from GET /api/v1/businesses with local cache fallback.
    */
   async getBusinesses() {
+    try {
+      const res = await this.request('/businesses');
+      if (res && Array.isArray(res.data)) {
+        StorageService.saveBusinesses(res.data);
+        return {
+          status: 'success',
+          data: res.data
+        };
+      }
+    } catch (err) {
+      console.warn('Could not fetch businesses from API, falling back to local cache:', err.message);
+    }
+
     const businesses = StorageService.getBusinesses();
     const clients = StorageService.getClients();
 
     // Dynamically calculate real linked client counts
     const enriched = businesses.map(b => {
-      const count = clients.filter(c => c.biz === b.name).length;
+      const count = clients.filter(c => c.biz === b.name || c.businessArea === b.name).length;
       return {
         ...b,
         clientCount: count
@@ -382,9 +395,28 @@ export const ApiService = {
   },
 
   /**
-   * Adds a business area.
+   * Adds a business area via POST /api/v1/businesses with local storage fallback.
    */
   async createBusiness(bizData) {
+    try {
+      const res = await this.request('/businesses', {
+        method: 'POST',
+        body: bizData
+      });
+
+      const businesses = StorageService.getBusinesses();
+      if (res && res.data) {
+        businesses.push(res.data);
+        StorageService.saveBusinesses(businesses);
+        return {
+          status: 'success',
+          data: res.data
+        };
+      }
+    } catch (err) {
+      console.warn('Could not create business via API, falling back to local cache:', err.message);
+    }
+
     const businesses = StorageService.getBusinesses();
     const newBiz = {
       id: `biz-${Date.now()}`,

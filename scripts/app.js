@@ -522,9 +522,9 @@ class SloaneApp {
     // Add Client modal open & save
     const addClientBtn = document.getElementById('openAddClientBtn');
     if (addClientBtn) {
-      addClientBtn.addEventListener('click', () => {
+      addClientBtn.addEventListener('click', async () => {
         document.getElementById('clientForm').reset();
-        this.populateClientModalBizSelect();
+        await this.populateClientModalBizSelect();
         ModalManager.open('clientModal', addClientBtn);
       });
     }
@@ -1062,11 +1062,17 @@ class SloaneApp {
     const container = document.getElementById('fullBizCards');
     if (!container) return;
 
+    if (!businesses || businesses.length === 0) {
+      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 32px;">No active business areas configured. Click "+ Add Business Area" above to create one.</div>`;
+      this.populateClientBizFilterOptions([]);
+      return;
+    }
+
     container.innerHTML = businesses.map(b => `
       <div class="card biz-card">
         <div>
           <div class="biz-card-header">
-            <span class="pill green">${escapeHtml(b.status)}</span>
+            <span class="pill green">${escapeHtml(b.status || 'Active')}</span>
             <span class="source-badge">Active Area</span>
           </div>
           <div class="biz-name">${escapeHtml(b.name)}</div>
@@ -1074,7 +1080,7 @@ class SloaneApp {
         </div>
         <div class="biz-stats">
           <div class="biz-stat-item">
-            <span class="biz-stat-n">${escapeHtml(b.clientCount)}</span>
+            <span class="biz-stat-n">${escapeHtml(b.clientCount !== undefined ? b.clientCount : 0)}</span>
             <span class="biz-stat-lbl">Clients</span>
           </div>
           <div class="biz-stat-item">
@@ -1102,8 +1108,14 @@ class SloaneApp {
     filter.value = currentVal || 'All';
   }
 
-  populateClientModalBizSelect() {
-    const businesses = StorageService.getBusinesses();
+  async populateClientModalBizSelect() {
+    let businesses = [];
+    try {
+      const res = await ApiService.getBusinesses();
+      businesses = res.data || [];
+    } catch (_) {
+      businesses = StorageService.getBusinesses();
+    }
     const select = document.getElementById('modalClientBiz');
     if (!select) return;
     select.innerHTML = businesses.map(b => `<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}</option>`).join('');
@@ -1595,12 +1607,17 @@ class SloaneApp {
       return;
     }
 
-    await ApiService.createBusiness({ name, type });
-    ModalManager.close('bizModal');
-    Toast.success(`Business area "${name}" added.`);
+    try {
+      await ApiService.createBusiness({ name, type });
+      ModalManager.close('bizModal');
+      Toast.success(`Business area "${name}" added.`);
 
-    await this.renderBusinesses();
-    await this.renderCommandCentre();
+      await this.renderBusinesses();
+      await this.renderCommandCentre();
+      await this.populateClientModalBizSelect();
+    } catch (err) {
+      Toast.error(`Could not add business area: ${err.message}`);
+    }
   }
 
   handleSaveBrain() {

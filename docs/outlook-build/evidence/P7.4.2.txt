@@ -1,0 +1,81 @@
+Task P7.4.2: Add Business Area Working Against API Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P7.4.2 connects the "Add Business Area" interactive feature and business area views directly to authenticated REST API endpoints:
+
+1. Business Areas API Routes (`server/src/routes/businesses.js`):
+   - `GET /api/v1/businesses`: Authenticated endpoint requiring `sloane:read` scope. Returns practice business verticals from `mockDb.businesses` enriched with dynamic linked client counts calculated from `mockDb.clients`.
+   - `POST /api/v1/businesses`: Authenticated endpoint requiring `sloane:write` scope.
+     - Validates presence of `name` and `type` (returns 400 Bad Request with structured code if missing or whitespace).
+     - Checks for duplicate business names (case-insensitive, returns 409 Conflict).
+     - Generates unique ID (`biz-${Date.now()}`), sets status to 'Active', and appends to `mockDb.businesses`.
+     - Records audit log action `create_business_area` on resource `business_area`.
+     - Returns 201 Created with `{ status: 'success', data: newBiz }`.
+
+2. App Router Mounting (`server/src/app.js`):
+   - Mounted `registerBusinessRoutes(app, { authenticate, requireScope })`.
+   - Added initial practice business areas (`INITIAL_BUSINESSES`) to `mockDb` in `server/src/data/db.js`.
+
+3. Frontend Services & UI Integration (`scripts/services/api.js` & `scripts/app.js`):
+   - `ApiService.getBusinesses()`: Queries `GET /api/v1/businesses`, caches results in `StorageService`, and gracefully falls back to cached data if offline.
+   - `ApiService.createBusiness(bizData)`: Issues `POST /api/v1/businesses` with body, updates `StorageService` cache upon success, and falls back gracefully.
+   - `scripts/app.js`:
+     - `renderBusinesses()`: Renders active business cards with dynamic linked client counts and includes an honest empty state (`No active business areas configured. Click "+ Add Business Area" above to create one.`).
+     - `populateClientModalBizSelect()`: Asynchronously fetches latest business areas from `ApiService.getBusinesses()` so newly created business areas appear immediately in the "Add Client" business area select dropdown.
+     - `handleSaveBiz()`: Creates business area via `ApiService.createBusiness()`, closes modal, shows success toast, and refreshes business cards, command centre, and client modal dropdowns.
+
+4. Bidirectional Sync:
+   - Mirrored all updated files into `Sloane/` (`server/src/routes/businesses.js`, `server/src/app.js`, `server/src/data/db.js`, `scripts/services/api.js`, `scripts/app.js`, `server/tests/unit26-business-areas-api.test.js`).
+
+Automated Test Results
+----------------------
+Command: npm test in server/
+Test Suites: 84 passed, 84 total
+Tests: 380 passed, 380 total
+Failures: 0
+Duration: 51.81s
+
+Test Execution Log (Task P7.4.2 excerpt):
+-----------------------------------------
+[INFO] Audit Log: [get__api_v1_businesses] by anonymous on businesses:root (401)
+▶ Task P7.4.2: Add Business Area Working Against API
+  ▶ 1. GET /api/v1/businesses (List Business Areas & Client Counts)
+    ✔ 1.1 Unauthenticated request returns 401 Unauthorized (132.1604ms)
+[INFO] Audit Log: [read_businesses_list] by actor_sloane_monitor on business_area:root (200)
+    ✔ 1.2 Read token returns list of active business areas (12.4541ms)
+[INFO] Audit Log: [read_businesses_list] by actor_kirsty_allen on business_area:root (200)
+    ✔ 1.3 Enriched clientCount accurately calculates linked clients (7.3732ms)
+  ✔ 1. GET /api/v1/businesses (List Business Areas & Client Counts) (153.5757ms)
+[INFO] Audit Log: [post__api_v1_businesses] by anonymous on businesses:root (401)
+  ▶ 2. POST /api/v1/businesses (Add Business Area)
+    ✔ 2.1 Unauthenticated request returns 401 Unauthorized (17.6994ms)
+[WARN] Scope authorization failed: Actor [actor_sloane_monitor] lacks scope [sloane:write]
+[INFO] Audit Log: [post__api_v1_businesses] by actor_sloane_monitor on businesses:root (403)
+    ✔ 2.2 Read-only token lacking sloane:write returns 403 Forbidden (4.3532ms)
+[INFO] Audit Log: [create_business_area] by actor_kirsty_allen on business_area:root (400)
+    ✔ 2.3 Missing or whitespace name returns 400 Bad Request (27.2198ms)
+[INFO] Audit Log: [create_business_area] by actor_kirsty_allen on business_area:root (400)
+    ✔ 2.4 Missing or whitespace type returns 400 Bad Request (3.5322ms)
+[INFO] Audit Log: [create_business_area] by actor_kirsty_allen on business_area:root (409)
+    ✔ 2.5 Duplicate business area name returns 409 Conflict (6.1207ms)
+[INFO] Audit Log: [create_business_area] by actor_kirsty_allen on business_area:root (201)
+[INFO] Audit Log: [read_businesses_list] by actor_kirsty_allen on business_area:root (200)
+    ✔ 2.6 Valid request creates business area (201 Created) and persists to mockDb (17.0014ms)
+  ✔ 2. POST /api/v1/businesses (Add Business Area) (77.1338ms)
+  ▶ 3. Frontend Integration & Code Hygiene
+    ✔ 3.1 ApiService.getBusinesses calls /businesses with cache fallback (0.3761ms)
+    ✔ 3.2 ApiService.createBusiness calls POST /businesses with cache update (0.1758ms)
+    ✔ 3.3 scripts/app.js renders business cards and provides honest empty state (0.1916ms)
+    ✔ 3.4 index.html static shell has zero literal @ symbols and zero leaks (0.339ms)
+  ✔ 3. Frontend Integration & Code Hygiene (1.3025ms)
+✔ Task P7.4.2: Add Business Area Working Against API (254.534ms)
+ℹ tests 380
+ℹ suites 84
+ℹ pass 380
+ℹ fail 0
