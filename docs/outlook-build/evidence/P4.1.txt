@@ -1,0 +1,32 @@
+Task P4.1: server/src/services/graphClient.js (bearer from vault, single-flight refresh, retry on 401, error handling)
+Recorded At: 2026-10-21T14:55:00+05:00
+Test Command: npm test
+Result: 238 passed across 41 suites (0 failing, 0 skipped, duration 21.63s)
+
+Automated Test Suite: server/tests/unit16-outlook-graph-client.test.js
+Test Output:
+▶ Task P4.1: Microsoft Graph Client & Token Lifecycle
+  ✔ 1. Throws OUTLOOK_NOT_CONNECTED when no vault record exists
+  ✔ 2. Throws OUTLOOK_RECONNECT_REQUIRED when connection status is reconnect_required
+  ✔ 3. Executes successful GET request with Bearer token against Graph base URL
+  ✔ 4. Auto-refreshes token when access token is expired or within 60s window before calling Graph
+  ✔ 5. Atomically persists rotated refresh token in encrypted vault
+  ✔ 6. Graph 401 Unauthorized: refreshes once and retries once successfully
+  ✔ 7. Double 401: transitions connection to reconnect_required and halts
+  ✔ 8. Refresh invalid_grant: sets status to reconnect_required and throws OUTLOOK_RECONNECT_REQUIRED
+  ✔ 9. Rate limit 429/503: honours Retry-After, caps at 60s, and surfaces "Microsoft is busy"
+  ✔ 10. Network timeout: surfaces "Sync error — could not reach Microsoft"
+  ✔ 11. Single-Flight Refresh: 5 concurrent requests trigger exactly ONE token refresh call
+✔ Task P4.1: Microsoft Graph Client & Token Lifecycle
+
+Verification Summary:
+- Implemented `server/src/services/graphClient.js` and synced to `Sloane/server/src/services/graphClient.js`.
+- Base URL configured as `https://graph.microsoft.com/v1.0`.
+- Bearer token dynamically resolved and verified from encrypted vault.
+- Proactive token refresh triggered when token is expired or expires within 60 seconds.
+- Single-Flight Refresh: Concurrent requests share a single in-flight refresh promise, preventing race conditions and Microsoft refresh token collision errors.
+- Rotated refresh tokens returned by Microsoft are atomically updated in the AES-256-GCM encrypted vault.
+- 401 Unauthorized handling: Transparently refreshes access token once and retries the Graph request once. On second consecutive 401, marks connection status as `reconnect_required` in vault and throws `OUTLOOK_RECONNECT_REQUIRED`.
+- Refresh `invalid_grant` error: Immediately transitions connection status to `reconnect_required` in vault and throws `OUTLOOK_RECONNECT_REQUIRED`.
+- Rate Limiting 429/503: Parses `Retry-After` header, caps at 60 seconds, surfaces "Sync error — Microsoft is busy, try again shortly", and updates `lastError` in connection record.
+- Network Timeout (8-second timeout): Surfaces "Sync error — could not reach Microsoft" and updates `lastError` in connection record.

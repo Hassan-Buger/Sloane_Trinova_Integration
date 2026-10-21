@@ -25,7 +25,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P3.3** Option A: JWKS fetch with cache and `id_token` verification. Option B: `GET /me`.
 
 ## Phase 4 — Graph client and token lifecycle
-- [ ] **P4.1** `server/src/services/graphClient.js` (bearer from vault, single-flight refresh, retry on 401, error handling).
+- [x] **P4.1** `server/src/services/graphClient.js` (bearer from vault, single-flight refresh, retry on 401, error handling).
 - [ ] **P4.2** Add Outlook-specific logging hygiene: extend `sanitizer.js` redaction keys with `access_token`, `refresh_token`, `id_token`, `client_secret`, `code_verifier`.
 
 ## Phase 5 — Settings API
