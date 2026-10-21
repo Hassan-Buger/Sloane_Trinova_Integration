@@ -38,7 +38,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 
 ## Phase 6 — Data endpoints
 - [x] **P6.1** `GET /api/v1/outlook/diary` and `GET /api/v1/outlook/flagged-emails`.
-- [ ] **P6.2** Pure mapping functions with fixture unit tests (including XSS escaping fixture).
+- [x] **P6.2** Pure mapping functions with fixture unit tests (including XSS escaping fixture).
 - [ ] **P6.3** Per-user 2-minute in-memory cache cleared on disconnect and sync-now.
 
 ## Phase 7 — Frontend

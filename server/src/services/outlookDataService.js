@@ -21,9 +21,10 @@ export const DATA_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes per §4.3
  */
 export function formatEventTimeRange(start, end, isAllDay = false) {
   if (isAllDay) return 'All day';
-  if (!start?.dateTime || !end?.dateTime) return '';
+  if (!start?.dateTime && !end?.dateTime) return '';
 
   const formatTimeStr = (dtStr) => {
+    if (!dtStr) return '';
     const match = String(dtStr).match(/T(\d{2}:\d{2})/);
     if (match) return match[1];
     const d = new Date(dtStr);
@@ -33,8 +34,8 @@ export function formatEventTimeRange(start, end, isAllDay = false) {
     return '';
   };
 
-  const startTime = formatTimeStr(start.dateTime);
-  const endTime = formatTimeStr(end.dateTime);
+  const startTime = formatTimeStr(start?.dateTime);
+  const endTime = formatTimeStr(end?.dateTime);
 
   if (startTime && endTime) {
     return `${startTime} - ${endTime}`;
