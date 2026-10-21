@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
 import { sessionStore } from '../src/services/sessionStore.js';
 import { outlookConnectionStore } from '../src/services/outlookConnectionStore.js';
-import { formatStatusResponse, isOutlookConfigured } from '../src/routes/outlookSettings.js';
+import { formatStatusResponse, isOutlookConfigured, setSyncActiveForTest } from '../src/routes/outlookSettings.js';
 import { GraphClientError } from '../src/services/graphClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -787,6 +787,182 @@ describe('Tasks P5.1 & P5.2: Outlook Settings Endpoints', () => {
       assert.ok(!res.raw.includes(SENSITIVE_TOKENS.refreshToken));
       assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
       assert.ok(!res.raw.includes('leak_check'));
+    });
+  });
+
+  // ==========================================
+  // P5.4: POST /api/v1/integrations/outlook/sync
+  // ==========================================
+  describe('Task P5.4: POST sync', () => {
+    test('29. POST /api/v1/integrations/outlook/sync without session returns 401 UNAUTHORIZED', async () => {
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST'
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'UNAUTHORIZED');
+    });
+
+    test('30. POST sync returns 404 OUTLOOK_NOT_CONNECTED when no connection in vault', async () => {
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 404);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_NOT_CONNECTED');
+    });
+
+    test('31. POST sync returns 401 when connection status is reconnect_required', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'reconnect_required',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_RECONNECT_REQUIRED');
+    });
+
+    test('32. POST sync returns 409 SYNC_IN_PROGRESS when a sync is already running', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      setSyncActiveForTest(true);
+      try {
+        const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+          method: 'POST',
+          headers: { Cookie: sessionCookie }
+        });
+
+        assert.equal(res.status, 409);
+        assert.equal(res.body?.error?.code, 'SYNC_IN_PROGRESS');
+      } finally {
+        setSyncActiveForTest(false);
+      }
+    });
+
+    test('33. POST sync returns 401 and transitions status to reconnect_required on Graph 401', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        calendarSyncEnabled: true
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new GraphClientError('OUTLOOK_RECONNECT_REQUIRED', 'Token revoked', { status: 401 });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 401);
+      assert.equal(res.body?.error?.code, 'OUTLOOK_RECONNECT_REQUIRED');
+
+      const reloaded = outlookConnectionStore.getConnection({
+        filePath: TEST_VAULT_PATH,
+        key: TEST_ENC_KEY
+      });
+      assert.equal(reloaded.status, 'reconnect_required');
+    });
+
+    test('34. POST sync returns 503 when Graph is busy (MICROSOFT_BUSY)', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        calendarSyncEnabled: true
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new GraphClientError('MICROSOFT_BUSY', 'Microsoft is busy', { status: 429 });
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 503);
+      assert.equal(res.body?.error?.code, 'MICROSOFT_BUSY');
+    });
+
+    test('35. POST sync returns 502 when Graph call fails with general network error', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        calendarSyncEnabled: true
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      mockGraphError = new Error('ECONNRESET: Connection reset');
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 502);
+      assert.equal(res.body?.error?.code, 'SYNC_FAILED');
+    });
+
+    test('36. POST sync succeeds: queries enabled sources, updates lastSyncAt in vault, and never exposes tokens', async () => {
+      outlookConnectionStore.saveConnection({
+        actorId: 'actor_kirsty_allen',
+        status: 'connected',
+        accountEmail: 'kirsty.allen@trinova.co.uk',
+        refreshToken: SENSITIVE_TOKENS.refreshToken,
+        accessToken: SENSITIVE_TOKENS.accessToken,
+        calendarSyncEnabled: true,
+        emailSyncEnabled: true,
+        mailFolderIds: ['folder_inbox_id_123']
+      }, { filePath: TEST_VAULT_PATH, key: TEST_ENC_KEY });
+
+      // Custom mock responses for calendar and emails
+      mockGraphResponse = {
+        value: [
+          { subject: 'Board Review', start: { dateTime: '2026-10-21T10:00:00Z' } },
+          { subject: 'Client Signing', start: { dateTime: '2026-10-21T14:00:00Z' } }
+        ]
+      };
+
+      const res = await makeRequest('/api/v1/integrations/outlook/sync', {
+        method: 'POST',
+        headers: { Cookie: sessionCookie }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.synced, true);
+      assert.ok(res.body.lastSyncAt);
+      assert.equal(res.body.status, 'connected');
+      assert.ok(typeof res.body.counts?.events === 'number');
+      assert.ok(typeof res.body.counts?.emails === 'number');
+
+      // Verify vault persistence
+      const reloaded = outlookConnectionStore.getConnection({
+        filePath: TEST_VAULT_PATH,
+        key: TEST_ENC_KEY
+      });
+      assert.equal(reloaded.lastSyncAt, res.body.lastSyncAt);
+      assert.equal(reloaded.lastError, null);
+
+      // Verify tokens never exposed in response
+      assert.equal(res.body.refreshToken, undefined);
+      assert.equal(res.body.accessToken, undefined);
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.refreshToken));
+      assert.ok(!res.raw.includes(SENSITIVE_TOKENS.accessToken));
     });
   });
 });

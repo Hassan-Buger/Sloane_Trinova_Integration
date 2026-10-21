@@ -1,0 +1,34 @@
+Task P5.4: Implement POST /api/v1/integrations/outlook/sync
+Recorded At: 2026-10-21T18:58:30+05:00
+Test Command: npm test
+Result: 279 passed across 47 suites (0 failing, 0 skipped, duration 22.20s)
+
+Automated Test Suite: server/tests/unit18-outlook-settings-routes.test.js
+Test Output:
+▶ Tasks P5.1 & P5.2: Outlook Settings Endpoints
+  ▶ Task P5.4: POST sync
+    ✔ 29. POST /api/v1/integrations/outlook/sync without session returns 401 UNAUTHORIZED (3.2595ms)
+    ✔ 30. POST sync returns 404 OUTLOOK_NOT_CONNECTED when no connection in vault (3.3106ms)
+    ✔ 31. POST sync returns 401 when connection status is reconnect_required (12.6875ms)
+    ✔ 32. POST sync returns 409 SYNC_IN_PROGRESS when a sync is already running (10.3149ms)
+    ✔ 33. POST sync returns 401 and transitions status to reconnect_required on Graph 401 (30.9949ms)
+    ✔ 34. POST sync returns 503 when Graph is busy (MICROSOFT_BUSY) (9.6378ms)
+    ✔ 35. POST sync returns 502 when Graph call fails with general network error (15.4208ms)
+    ✔ 36. POST sync succeeds: queries enabled sources, updates lastSyncAt in vault, and never exposes tokens (28.3069ms)
+  ✔ Task P5.4: POST sync (115.3079ms)
+✔ Tasks P5.1 & P5.2: Outlook Settings Endpoints (530.2307ms)
+
+Verification Summary:
+- Implemented `POST /api/v1/integrations/outlook/sync` in `server/src/routes/outlookSettings.js`.
+- Session authenticated (`authenticate` middleware) returning 401 UNAUTHORIZED if unauthenticated.
+- Rejects requests when no active connection exists in vault (404 OUTLOOK_NOT_CONNECTED).
+- Rejects requests when connection status is `reconnect_required` (401 OUTLOOK_RECONNECT_REQUIRED).
+- Implemented concurrency lock returning 409 SYNC_IN_PROGRESS if an active sync is already running.
+- Conditionally queries enabled sources:
+  - Calendar: `GET /me/calendarView?startDateTime=...&endDateTime=...&$select=subject,start,end,location,isAllDay,showAs&$orderby=start/dateTime` with London timezone preference.
+  - Flagged emails: queries each configured folder in `connection.mailFolderIds` (defaulting to Inbox) for `GET /me/mailFolders/{id}/messages?$filter=flag/flagStatus eq 'flagged'&$select=subject,from,receivedDateTime,importance,webLink&$orderby=receivedDateTime desc&$top=25`.
+- Atomically saves updated `lastSyncAt` timestamp to encrypted connection vault.
+- Returns `{ synced: true, lastSyncAt, counts: { events, emails }, status, emailSyncEnabled, calendarSyncEnabled }`.
+- Robust error handling: 401 + state transition to `reconnect_required` on Graph 401, 503 for MICROSOFT_BUSY, 502 for transient network failures.
+- Zero token leakage: tokens, keys, secrets never exposed in response body or raw payload.
+- Mirrored to `Sloane/server/src/routes/outlookSettings.js` and `Sloane/server/tests/unit18-outlook-settings-routes.test.js`.

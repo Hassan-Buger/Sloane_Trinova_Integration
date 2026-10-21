@@ -83,6 +83,17 @@ export function formatStatusResponse(status, connection = null) {
   };
 }
 
+// Concurrency lock for background synchronization
+let isSyncInProgress = false;
+
+export function isSyncActive() {
+  return isSyncInProgress;
+}
+
+export function setSyncActiveForTest(val) {
+  isSyncInProgress = Boolean(val);
+}
+
 /**
  * Registers Outlook settings endpoints on the application router.
  *
@@ -403,6 +414,184 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
           message: 'Failed to write updated settings to encrypted vault.'
         }
       });
+    }
+  });
+
+  /**
+   * POST /api/v1/integrations/outlook/sync
+   * Runs an immediate sync of enabled Outlook sources (calendar and/or flagged emails).
+   * Returns { synced: true, lastSyncAt, counts: { events, emails }, status }.
+   * Returns 409 if a sync is already running.
+   * Session required (401 if unauthenticated).
+   */
+  app.post('/api/v1/integrations/outlook/sync', authenticate, async (req, res) => {
+    // 1. Verify feature configuration
+    if (!isOutlookConfigured(options)) {
+      return res.status(503).json({
+        error: {
+          code: 'OUTLOOK_NOT_CONFIGURED',
+          message: 'Outlook integration is not configured on this server.'
+        }
+      });
+    }
+
+    // 2. Read active connection from vault
+    const vaultOptions = {
+      filePath: options.vaultPath,
+      key: options.vaultKey
+    };
+
+    let connection;
+    try {
+      connection = connectionStore.getConnection(vaultOptions);
+    } catch (err) {
+      logger.error('Failed to read Outlook connection store:', err);
+      return res.status(500).json({
+        error: {
+          code: 'VAULT_READ_ERROR',
+          message: 'Failed to access encrypted Outlook connection vault'
+        }
+      });
+    }
+
+    if (!connection) {
+      return res.status(404).json({
+        error: {
+          code: 'OUTLOOK_NOT_CONNECTED',
+          message: 'No active Outlook connection found. Connect an Outlook account before syncing.'
+        }
+      });
+    }
+
+    if (connection.status === 'reconnect_required') {
+      return res.status(401).json({
+        error: {
+          code: 'OUTLOOK_RECONNECT_REQUIRED',
+          message: 'Outlook connection requires re-authentication'
+        }
+      });
+    }
+
+    // 3. Concurrency check (409 if sync already in progress)
+    if (isSyncInProgress) {
+      return res.status(409).json({
+        error: {
+          code: 'SYNC_IN_PROGRESS',
+          message: 'A synchronization is already running. Please wait for it to complete.'
+        }
+      });
+    }
+
+    isSyncInProgress = true;
+
+    try {
+      let eventsCount = 0;
+      let emailsCount = 0;
+
+      // 4. Sync Calendar if enabled
+      if (connection.calendarSyncEnabled) {
+        const now = new Date();
+        const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+        const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
+
+        const calendarEndpoint = `/me/calendarView?startDateTime=${encodeURIComponent(startOfDay)}&endDateTime=${encodeURIComponent(endOfDay)}&$select=subject,start,end,location,isAllDay,showAs&$orderby=start/dateTime`;
+
+        const calRes = await graph.get(calendarEndpoint, {
+          ...options,
+          headers: { Prefer: 'outlook.timezone="GMT Standard Time"' },
+          vaultPath: options.vaultPath,
+          vaultKey: options.vaultKey
+        });
+
+        if (calRes && Array.isArray(calRes.value)) {
+          eventsCount = calRes.value.length;
+        }
+      }
+
+      // 5. Sync Flagged Emails if enabled
+      if (connection.emailSyncEnabled) {
+        const folders = Array.isArray(connection.mailFolderIds) && connection.mailFolderIds.length > 0
+          ? connection.mailFolderIds
+          : ['Inbox'];
+
+        const filterQuery = encodeURIComponent("flag/flagStatus eq 'flagged'");
+
+        for (const folderId of folders) {
+          const emailEndpoint = `/me/mailFolders/${encodeURIComponent(folderId)}/messages?$filter=${filterQuery}&$select=subject,from,receivedDateTime,importance,webLink&$orderby=receivedDateTime desc&$top=25`;
+
+          const emailRes = await graph.get(emailEndpoint, {
+            ...options,
+            vaultPath: options.vaultPath,
+            vaultKey: options.vaultKey
+          });
+
+          if (emailRes && Array.isArray(emailRes.value)) {
+            emailsCount += emailRes.value.length;
+          }
+        }
+      }
+
+      // 6. Update vault with successful sync timestamp
+      const lastSyncAt = new Date().toISOString();
+      const updated = connectionStore.saveConnection({
+        lastSyncAt,
+        lastError: null,
+        status: 'connected'
+      }, vaultOptions);
+
+      // Return status descriptor + counts
+      return res.json({
+        synced: true,
+        lastSyncAt,
+        counts: {
+          events: eventsCount,
+          emails: emailsCount
+        },
+        status: updated.status,
+        emailSyncEnabled: updated.emailSyncEnabled,
+        calendarSyncEnabled: updated.calendarSyncEnabled
+      });
+    } catch (syncErr) {
+      if (syncErr.code === 'OUTLOOK_RECONNECT_REQUIRED') {
+        try {
+          connectionStore.saveConnection({
+            status: 'reconnect_required',
+            lastError: 'Outlook connection requires re-authentication'
+          }, vaultOptions);
+        } catch {}
+
+        return res.status(401).json({
+          error: {
+            code: 'OUTLOOK_RECONNECT_REQUIRED',
+            message: 'Outlook connection requires re-authentication'
+          }
+        });
+      }
+
+      if (syncErr.code === 'MICROSOFT_BUSY') {
+        return res.status(503).json({
+          error: {
+            code: 'MICROSOFT_BUSY',
+            message: 'Sync error — Microsoft is busy, try again shortly.'
+          }
+        });
+      }
+
+      logger.warn('Outlook sync encountered transient error:', syncErr.message);
+      try {
+        connectionStore.saveConnection({
+          lastError: syncErr.message || 'Sync error — could not reach Microsoft'
+        }, vaultOptions);
+      } catch {}
+
+      return res.status(502).json({
+        error: {
+          code: 'SYNC_FAILED',
+          message: 'Sync error — could not reach Microsoft'
+        }
+      });
+    } finally {
+      isSyncInProgress = false;
     }
   });
 
