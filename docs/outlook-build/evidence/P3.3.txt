@@ -1,0 +1,56 @@
+Task P3.3: Option A: JWKS fetch with cache and id_token verification
+Recorded At: 2026-10-21T14:48:00+05:00
+Test Command: npm test
+Result: 227 passed across 40 suites (0 failing, 0 skipped, duration 22.25s)
+
+Decision: Option A (recommended) selected per Decision D0.1.
+Scopes: offline_access, Mail.Read, Calendars.Read, openid, profile, email.
+Account email parsed from preferred_username, email, or upn claim in id_token.
+Display name parsed from name claim in id_token.
+Token signature verified against Microsoft tenant JWKS keyset (in-memory cache with 1h TTL).
+
+Automated Test Suite: server/tests/unit15-outlook-jwks-identity.test.js
+Test Output:
+▶ Task P3.3: Microsoft Entra ID JWKS & id_token Verification (Option A)
+  ▶ JWT Parsing & Format Validation (parseJwt)
+    ✔ 1. Correctly decodes valid 3-segment JWT into header, payload, and binary signature
+    ✔ 2. Rejects non-string, empty, or missing token with descriptive error
+    ✔ 3. Rejects token with invalid segment count
+    ✔ 4. Rejects token with invalid base64url or malformed JSON in header/payload
+  ✔ JWT Parsing & Format Validation (parseJwt)
+  ▶ JWKS Retrieval & In-Memory Caching (getJwks)
+    ✔ 5. Fetches JWKS from tenant discovery URL and caches in memory
+    ✔ 6. Honors cache TTL and refetches when expired
+    ✔ 7. forceRefresh bypasses cache even within TTL
+    ✔ 8. Throws descriptive error on HTTP non-200 responses
+    ✔ 9. clearJwksCache purges cache and setJwksCache primes cache directly
+  ✔ JWKS Retrieval & In-Memory Caching (getJwks)
+  ▶ Cryptographic Signature Verification (verifyIdToken)
+    ✔ 10. Successfully verifies valid RS256 signed token against matching JWK
+    ✔ 11. Rejects non-RS256 algorithms (e.g., HS256, none)
+    ✔ 12. Rejects token missing kid in header
+    ✔ 13. Rejects token with unknown kid not found in JWKS
+    ✔ 14. Key rollover: automatically forces fresh JWKS fetch when kid is missing from cache
+    ✔ 15. Rejects token with tampered signature
+    ✔ 16. Rejects token with tampered payload
+    ✔ 17. Rejects token signed by different private key than the advertised JWK public key
+  ✔ Cryptographic Signature Verification (verifyIdToken)
+  ▶ Claims Validation & Attribute Extraction
+    ✔ 18. Rejects expired token past the 60-second clock skew tolerance
+    ✔ 19. Accepts token within 60-second clock skew tolerance
+    ✔ 20. Rejects token when nonce is expected but mismatched or absent
+    ✔ 21. Rejects token with mismatched audience
+    ✔ 22. Accepts array audience containing the client ID
+    ✔ 23. Rejects non-Microsoft untrusted issuer or issuer mismatch
+    ✔ 24. Falls back to email or upn claims when preferred_username is absent
+    ✔ 25. Rejects token missing any recognizable email claim
+  ✔ Claims Validation & Attribute Extraction
+✔ Task P3.3: Microsoft Entra ID JWKS & id_token Verification (Option A)
+
+Verification Summary:
+- Implemented `server/src/services/outlookIdentityService.js` and synced to `Sloane/server/src/services/outlookIdentityService.js`.
+- Option A verified: Zero extra Graph calls needed to read identity attributes.
+- High-performance in-memory JWKS caching with 1-hour TTL and automatic key rollover handling.
+- Full cryptographic signature verification (RS256 with SHA-256) using Node.js native `crypto.createPublicKey` and `crypto.verify`.
+- Comprehensive claims validation: `exp` (with 60-second clock skew tolerance), `aud`, `nonce`, and `iss`.
+- Extraction of `accountEmail`, `displayName`, and `tenantId`.

@@ -208,6 +208,17 @@ export async function verifyIdToken(idToken, options = {}) {
     }
   }
 
+  // Issuer check
+  if (options.issuer) {
+    if (payload.iss !== options.issuer) {
+      throw new Error(`Issuer mismatch: expected "${options.issuer}", got "${payload.iss}"`);
+    }
+  } else if (payload.iss && typeof payload.iss === 'string') {
+    if (!payload.iss.startsWith('https://login.microsoftonline.com/')) {
+      throw new Error(`Untrusted issuer: "${payload.iss}". Expected Microsoft Online issuer.`);
+    }
+  }
+
   // 4. Extract Identity Attributes
   const accountEmail = String(payload.preferred_username || payload.email || payload.upn || '').trim();
   if (!accountEmail) {
