@@ -43,7 +43,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 
 ## Phase 7 — Frontend
 - [x] **P7.1** Settings card per §4.1 (states: not connected, connected, reconnect required, sync error, syncing, disconnected).
-- [ ] **P7.2** Command Centre: remove hard-coded labels/pills, fetch live data from new endpoints.
+- [x] **P7.2** Command Centre: remove hard-coded labels/pills, fetch live data from new endpoints.
 - [ ] **P7.3** Remove remaining imports of demo arrays from the UI path.
 - [ ] **P7.4** Keep interactive features working against the API:
   - [ ] **P7.4.1** Client 360 (add client, add event, add note)

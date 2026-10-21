@@ -242,8 +242,8 @@
       <div class="top">
         <div class="greeting-block">
           <div class="eyebrow">
-            <span class="dot green"></span>
-            <span>Private CEO Command Centre · Outlook Connected</span>
+            <span class="dot" id="outlookEyebrowDot" style="background: var(--muted);"></span>
+            <span id="outlookEyebrowText">Private CEO Command Centre</span>
             <button id="trinovaStatusBtn" class="pill neutral" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); margin-left: 10px; font-size: 11px; padding: 2px 8px; transition: all 0.2s; background: var(--panel);" title="Click to view TriNova API integration status & settings">
               <span class="dot" id="trinovaStatusDot" style="width: 6px; height: 6px; background: var(--muted);"></span>
               <span id="trinovaStatusText">Trinova: Connecting...</span>
@@ -309,7 +309,7 @@
           <div class="card">
             <div class="card-header">
               <h2>Today's Diary (Outlook)</h2>
-              <span class="pill green">Connected</span>
+              <span class="pill green" id="diaryStatusPill" style="display: none;">Connected</span>
             </div>
             <div class="diary-list" id="diaryContainer">
               <!-- Dynamically Populated -->
@@ -373,7 +373,7 @@
           <div class="card">
             <div class="card-header">
               <h2>Emails Sloane Thinks Need You</h2>
-              <span class="pill blue">Outlook Radar</span>
+              <span class="pill blue" id="emailsRadarPill" style="display: none;">Outlook Radar</span>
             </div>
             <div id="attentionEmailsContainer">
               <!-- Dynamically Populated -->

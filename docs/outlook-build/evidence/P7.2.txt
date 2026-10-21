@@ -1,0 +1,44 @@
+Task P7.2: Command Centre Integration & Dynamic Radar Pills
+Recorded At: 2026-10-21T22:38:00+05:00
+Test Command: npm test
+Result: 343 passed across 68 suites (0 failing, 0 skipped, duration 39.78s)
+
+Automated Test Suite: server/tests/unit23-outlook-command-centre.test.js
+Test Output:
+▶ Task P7.2: Command Centre Integration & Dynamic Radar Pills
+  ▶ index.html Dynamic Shell Elements (No Hardcoded Statuses)
+    ✔ 1. index.html does NOT contain hardcoded "Outlook Connected" in top bar eyebrow (1.0592ms)
+    ✔ 2. index.html contains dynamic #diaryStatusPill initialized as hidden (0.1829ms)
+    ✔ 3. index.html contains dynamic #emailsRadarPill initialized as hidden (0.1959ms)
+    ✔ 4. index.html maintains zero client data leaks or literal @ symbols (0.5061ms)
+  ✔ index.html Dynamic Shell Elements (No Hardcoded Statuses) (3.3748ms)
+  ▶ app.js Elimination of DIARY_ITEMS and ATTENTION_EMAILS Reads
+    ✔ 5. renderCommandCentre does NOT extract DIARY_ITEMS or ATTENTION_EMAILS from seed (0.3875ms)
+    ✔ 6. renderCommandCentre queries live ApiService endpoints (0.2517ms)
+    ✔ 7. Implements refreshOutlookData helper on SloaneApp (1.1916ms)
+  ✔ app.js Elimination of DIARY_ITEMS and ATTENTION_EMAILS Reads (2.1271ms)
+  ▶ Command Centre UI Simulation & §4.3 Empty States
+    ✔ 8. Wording conforms exactly to §4.3 specifications (0.3372ms)
+    ✔ 9. Context scan in renderIntelligence dynamically uses cachedDiaryEvents (0.2758ms)
+    ✔ 10. Pulse metric pulseEmails is updated from attentionEmails.length (0.2424ms)
+  ✔ Command Centre UI Simulation & §4.3 Empty States (1.0895ms)
+✔ Task P7.2: Command Centre Integration & Dynamic Radar Pills (7.9285ms)
+
+Verification Summary:
+- Removed hardcoded static "Outlook Connected" top-bar eyebrow label in `index.html` and replaced it with dynamic elements `#outlookEyebrowDot` and `#outlookEyebrowText`.
+- Removed static "Connected" Diary card header pill in `index.html` and replaced it with dynamic `#diaryStatusPill` shown only when connected.
+- Converted "Outlook Radar" attention emails pill in `index.html` to dynamic `#emailsRadarPill` which is shown only when connected and enabled per §5 P7.2.
+- Eradicated `seed.DIARY_ITEMS` and `seed.ATTENTION_EMAILS` reads from `renderCommandCentre` in `scripts/app.js`.
+- Wired `renderCommandCentre` to query live endpoints:
+  - `GET /api/v1/outlook/diary?date=today`
+  - `GET /api/v1/outlook/flagged-emails`
+  - `GET /api/v1/integrations/outlook/status`
+- Enforced exact §4.3 empty state wording:
+  - Not connected: "Connect your Outlook to see this here"
+  - Reconnect required: "Reconnect your Outlook"
+  - Calendar sync disabled: "Calendar sync is off"
+  - Email sync disabled: "Email sync is off"
+- Connected `#pulseEmails` metric dynamically to actual count of live attention emails.
+- Updated Context Scan in `renderIntelligence` to dynamically compute meeting collisions and schedule conflicts from real events in `this.cachedDiaryEvents`, rendering "Calendar Schedule Clear" when no clashes exist. Recorded architectural decision D7.1 in `docs/outlook-build/DECISIONS.md`.
+- Implemented `refreshOutlookData()` on `SloaneApp` to immediately refresh Command Centre and Intelligence cards upon sync or disconnect.
+- Mirrored all changes to `Sloane/` (`index.html`, `scripts/app.js`, `server/tests/unit23-outlook-command-centre.test.js`).

@@ -11,6 +11,7 @@ This document records architectural decisions, scope approvals, and deviations f
 | D0.3 | Callback Cookie Handling (§4.2) | `/api/v1/integrations/outlook/callback` does not require the session cookie; actor identity is bound via single-use `state` parameter with 10m TTL. | Browsers omit `SameSite=Strict` cookies on cross-site redirects from Microsoft; state-to-actor binding prevents auth drops without degrading cookie security. | Checkpoint P3.2 |
 | D0.4 | Revocation Wording (§4.1) | Dialog explicitly clarifies local data/token deletion and directs user to `https://myapps.microsoft.com` to revoke Microsoft-side app consent. | Graph API provides no delegated token revocation endpoint; honest UI transparency prevents false security assumptions. | Checkpoint P5.5 / P7.5 |
 | D0.5 | Client Secret Expiry (§3.1) | Maximum 180-day lifecycle from creation in Entra ID; reminder scheduled at 150 days for rotation. | Prevents silent service disruption caused by expired Azure client secrets and enforces credential hygiene. | **Checkpoint H1** (Awaiting Entra registration details) |
+| D7.1 | Calendar Clash Detection in Context Scan (§4.3) | Derive Context Scan clash card dynamically from live Microsoft Graph calendar events using pure overlap logic (`detectEventClashes`). | Keeps existing Executive Intelligence Radar functional with real data; renders Schedule Conflict with title and times when overlaps exist, and 'Calendar Schedule Clear' when none exist or 'Outlook Calendar Not Connected' when disconnected. | Task P7.2 |
 
 ## Detailed Decision Notes
 

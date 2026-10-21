@@ -74,8 +74,14 @@ class SloaneApp {
     this.timelineEventTypeFilter = '';
     this.timelineSeverityFilter = '';
     this.aiConversationHistory = [];
+    this.cachedDiaryEvents = [];
     this.authEventsBound = false;
     this.appEventsBound = false;
+  }
+
+  async refreshOutlookData() {
+    await this.renderCommandCentre();
+    this.renderIntelligence();
   }
 
   async init() {
@@ -816,9 +822,7 @@ class SloaneApp {
   async renderCommandCentre() {
     const seed = await getSeedData();
     const TOP3_ITEMS = seed.TOP3_ITEMS || [];
-    const DIARY_ITEMS = seed.DIARY_ITEMS || [];
     const WAITING_SIGNOFF = seed.WAITING_SIGNOFF || [];
-    const ATTENTION_EMAILS = seed.ATTENTION_EMAILS || [];
 
     // 0. Render Red Alerts
     const redAlertsContainer = document.getElementById('redAlertsContainer');
@@ -855,25 +859,109 @@ class SloaneApp {
       `).join('');
     }
 
-    // 2. Render Today's Diary
+    // Live Outlook data fetching (§4.3 & Task P7.2)
+    let diaryEvents = [];
+    let attentionEmails = [];
+    let isOutlookConnected = false;
+    let diaryEmptyReason = 'Connect your Outlook to see this here';
+    let emailEmptyReason = 'Connect your Outlook to see this here';
+
+    try {
+      const [diaryRes, emailsRes, statusRes] = await Promise.all([
+        ApiService.getOutlookDiary('today').catch(err => ({ ok: false, error: err })),
+        ApiService.getOutlookFlaggedEmails().catch(err => ({ ok: false, error: err })),
+        ApiService.getOutlookStatus().catch(() => ({ ok: false }))
+      ]);
+
+      const status = statusRes?.data?.status || 'not_connected';
+      isOutlookConnected = status === 'connected';
+
+      // Update Top Bar Eyebrow
+      const eyebrowDot = document.getElementById('outlookEyebrowDot');
+      const eyebrowText = document.getElementById('outlookEyebrowText');
+      if (eyebrowDot && eyebrowText) {
+        if (status === 'connected') {
+          eyebrowDot.className = 'dot green';
+          eyebrowDot.style.background = '';
+          eyebrowText.textContent = 'Private CEO Command Centre · Outlook Connected';
+        } else if (status === 'reconnect_required') {
+          eyebrowDot.className = 'dot red';
+          eyebrowDot.style.background = '';
+          eyebrowText.textContent = 'Private CEO Command Centre · Outlook Reconnect Required';
+        } else {
+          eyebrowDot.className = 'dot';
+          eyebrowDot.style.background = 'var(--muted)';
+          eyebrowText.textContent = 'Private CEO Command Centre';
+        }
+      }
+
+      // Process Diary data
+      const diaryData = diaryRes?.data !== undefined ? diaryRes.data : diaryRes;
+      if (diaryData && diaryData.connected && diaryData.enabled && Array.isArray(diaryData.events)) {
+        diaryEvents = diaryData.events;
+      } else if (diaryData?.code === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
+        diaryEmptyReason = 'Reconnect your Outlook';
+      } else if (diaryData?.code === 'CALENDAR_SYNC_DISABLED') {
+        diaryEmptyReason = 'Calendar sync is off';
+      } else if (diaryData?.code === 'OUTLOOK_NOT_CONNECTED') {
+        diaryEmptyReason = 'Connect your Outlook to see this here';
+      } else if (diaryData?.message) {
+        diaryEmptyReason = diaryData.message;
+      }
+
+      // Process Flagged Emails data
+      const emailsData = emailsRes?.data !== undefined ? emailsRes.data : emailsRes;
+      if (emailsData && emailsData.connected && emailsData.enabled && Array.isArray(emailsData.emails)) {
+        attentionEmails = emailsData.emails;
+      } else if (emailsData?.code === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
+        emailEmptyReason = 'Reconnect your Outlook';
+      } else if (emailsData?.code === 'EMAIL_SYNC_DISABLED') {
+        emailEmptyReason = 'Email sync is off';
+      } else if (emailsData?.code === 'OUTLOOK_NOT_CONNECTED') {
+        emailEmptyReason = 'Connect your Outlook to see this here';
+      } else if (emailsData?.message) {
+        emailEmptyReason = emailsData.message;
+      }
+
+      this.cachedDiaryEvents = diaryEvents;
+    } catch (err) {
+      console.warn('[renderCommandCentre] Live Outlook fetch error:', err.message);
+    }
+
+    // 2. Render Today's Diary (Live Outlook)
     const diaryContainer = document.getElementById('diaryContainer');
+    const diaryPill = document.getElementById('diaryStatusPill');
+    if (diaryPill) {
+      if (isOutlookConnected) {
+        diaryPill.style.display = 'inline-flex';
+        diaryPill.className = 'pill green';
+        diaryPill.textContent = 'Connected';
+      } else {
+        diaryPill.style.display = 'none';
+      }
+    }
+
     if (diaryContainer) {
-      diaryContainer.innerHTML = DIARY_ITEMS.map(item => `
-        <div class="diary-item">
-          <div class="diary-item-left">
-            <span class="dot ${item.chip === 'URGENT' ? 'red' : 'green'}"></span>
-            <span class="diary-title">${escapeHtml(item.title)}</span>
+      if (diaryEvents.length > 0) {
+        diaryContainer.innerHTML = diaryEvents.map(item => `
+          <div class="diary-item ${item.isClash ? 'diary-clash' : ''}">
+            <div class="diary-item-left">
+              <span class="dot ${item.chip === 'URGENT' ? 'red' : 'green'}"></span>
+              <span class="diary-title">${escapeHtml(item.title)}</span>
+            </div>
+            <span class="timechip ${item.chip === 'URGENT' ? 'timechip-urgent' : ''}">${escapeHtml(item.time)}</span>
           </div>
-          <span class="timechip">${escapeHtml(item.time)}</span>
-        </div>
-      `).join('');
+        `).join('');
+      } else {
+        diaryContainer.innerHTML = `<div class="table-empty" style="padding: 24px;">${escapeHtml(diaryEmptyReason)}</div>`;
+      }
     }
 
     // 3. Render Businesses Preview Grid
     const { data: businesses } = await ApiService.getBusinesses();
     const cmdBizGrid = document.getElementById('cmdBizCards');
     if (cmdBizGrid) {
-      cmdBizGrid.innerHTML = businesses.slice(0, 6).map(b => `
+      cmdBizGrid.innerHTML = (businesses || []).slice(0, 6).map(b => `
         <div class="card" style="padding: 14px; cursor: pointer;" onclick="app.switchView('businesses')">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span class="pill green" style="font-size: 10px;">${escapeHtml(b.status)}</span>
@@ -899,28 +987,50 @@ class SloaneApp {
       `).join('');
     }
 
-    // 5. Render Attention Emails
+    // 5. Render Attention Emails (Live Outlook)
     const emailContainer = document.getElementById('attentionEmailsContainer');
+    const emailsRadarPill = document.getElementById('emailsRadarPill');
+    if (emailsRadarPill) {
+      if (isOutlookConnected) {
+        emailsRadarPill.style.display = 'inline-flex';
+      } else {
+        emailsRadarPill.style.display = 'none';
+      }
+    }
+
     if (emailContainer) {
-      emailContainer.innerHTML = ATTENTION_EMAILS.map(item => `
-        <div class="email-item">
-          <div class="item-main">
-            <div class="item-title">${escapeHtml(item.title)}</div>
-            <div class="item-sub">${escapeHtml(item.sub)}</div>
+      if (attentionEmails.length > 0) {
+        emailContainer.innerHTML = attentionEmails.map(item => `
+          <div class="email-item">
+            <div class="item-main">
+              <div class="item-title">${escapeHtml(item.title)}</div>
+              <div class="item-sub">${escapeHtml(item.sub)}</div>
+            </div>
+            <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${escapeHtml(item.priority)}</span>
           </div>
-          <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${escapeHtml(item.priority)}</span>
-        </div>
-      `).join('');
+        `).join('');
+      } else {
+        emailContainer.innerHTML = `<div class="table-empty" style="padding: 24px;">${escapeHtml(emailEmptyReason)}</div>`;
+      }
     }
 
     // 6. Update Pulse Metrics
-    const clients = StorageService.getClients();
-    document.getElementById('pulseSignoffs').textContent = WAITING_SIGNOFF.length;
-    document.getElementById('pulseEmails').textContent = ATTENTION_EMAILS.length;
-    document.getElementById('pulseOverdue').textContent = '4';
-    document.getElementById('pulseDue7d').textContent = '6';
-    document.getElementById('pulseBlocked').textContent = '1';
-    document.getElementById('pulseBizAreas').textContent = businesses.length;
+    const signoffCount = WAITING_SIGNOFF.length;
+    const emailCount = attentionEmails.length;
+    const bizCount = Array.isArray(businesses) ? businesses.length : 0;
+    const pulseSignoffs = document.getElementById('pulseSignoffs');
+    const pulseEmails = document.getElementById('pulseEmails');
+    const pulseOverdue = document.getElementById('pulseOverdue');
+    const pulseDue7d = document.getElementById('pulseDue7d');
+    const pulseBlocked = document.getElementById('pulseBlocked');
+    const pulseBizAreas = document.getElementById('pulseBizAreas');
+
+    if (pulseSignoffs) pulseSignoffs.textContent = signoffCount;
+    if (pulseEmails) pulseEmails.textContent = emailCount;
+    if (pulseOverdue) pulseOverdue.textContent = '4';
+    if (pulseDue7d) pulseDue7d.textContent = '6';
+    if (pulseBlocked) pulseBlocked.textContent = '1';
+    if (pulseBizAreas) pulseBizAreas.textContent = bizCount;
   }
 
   async renderBusinesses() {
@@ -1205,6 +1315,46 @@ class SloaneApp {
     const grid = document.getElementById('intelGridContainer');
     if (!grid) return;
 
+    const clashes = (this.cachedDiaryEvents || []).filter(e => e.isClash);
+    let clashCardHtml = '';
+    if (clashes.length > 0) {
+      clashCardHtml = `
+        <div class="card intel-card">
+          <div class="card-header">
+            <h2><span class="dot red"></span> Context Scan (Meetings & Calendar Conflicts)</h2>
+            <span class="pill red">${clashes.length} Clash${clashes.length > 1 ? 'es' : ''}</span>
+          </div>
+          <div class="intel-list">
+            ${clashes.map(c => `
+              <div class="intel-item">
+                <div class="intel-item-content">
+                  <div class="intel-title">Schedule Conflict: ${escapeHtml(c.title)}</div>
+                  <div class="intel-desc">Event at ${escapeHtml(c.time)} overlaps with another scheduled meeting today.</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      clashCardHtml = `
+        <div class="card intel-card">
+          <div class="card-header">
+            <h2><span class="dot green"></span> Context Scan (Meetings & Calendar Conflicts)</h2>
+            <span class="pill green">Clear</span>
+          </div>
+          <div class="intel-list">
+            <div class="intel-item">
+              <div class="intel-item-content">
+                <div class="intel-title">Calendar Schedule Clear</div>
+                <div class="intel-desc">No meeting collisions or conflicting times detected for today.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     grid.innerHTML = `
       <div class="card intel-card">
         <div class="card-header">
@@ -1254,20 +1404,7 @@ class SloaneApp {
         </div>
       </div>
 
-      <div class="card intel-card">
-        <div class="card-header">
-          <h2><span class="dot blue"></span> Context Scan (Meetings & Calendar Conflicts)</h2>
-          <span class="pill blue">1 Clash</span>
-        </div>
-        <div class="intel-list">
-          <div class="intel-item">
-            <div class="intel-item-content">
-              <div class="intel-title">Diary Clash Detected: 13:30 Today</div>
-              <div class="intel-desc">Hamza Malik compliance catchup overlaps with scheduled 13:45 urgent signing review. Recommend shifting review by 30 mins.</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      ${clashCardHtml}
 
       <div class="card intel-card">
         <div class="card-header">
