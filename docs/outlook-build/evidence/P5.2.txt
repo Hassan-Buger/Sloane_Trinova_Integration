@@ -1,0 +1,35 @@
+Task P5.2: Implement PATCH /api/v1/integrations/outlook/settings
+Recorded At: 2026-10-21T18:33:15+05:00
+Test Command: npm test
+Result: 264 passed across 45 suites (0 failing, 0 skipped, duration 16.80s)
+
+Automated Test Suite: server/tests/unit18-outlook-settings-routes.test.js
+Test Output:
+▶ Tasks P5.1 & P5.2: Outlook Settings Endpoints
+  ▶ Task P5.2: PATCH settings
+    ✔ 11. PATCH /api/v1/integrations/outlook/settings without session returns 401 UNAUTHORIZED (3.0928ms)
+    ✔ 12. PATCH returns 404 OUTLOOK_NOT_CONNECTED when no connection exists in vault (2.3284ms)
+    ✔ 13. PATCH returns 422 VALIDATION_ERROR when body is empty (10.3614ms)
+    ✔ 14. PATCH rejects non-boolean emailSyncEnabled or calendarSyncEnabled with 422 (12.7154ms)
+    ✔ 15. PATCH rejects empty mailFolderIds list with 422 (9.9874ms)
+    ✔ 16. PATCH rejects non-string or whitespace mailFolderIds elements with 422 (8.5866ms)
+    ✔ 17. PATCH rejects folder IDs that do not exist in Microsoft Graph with 422 INVALID_MAIL_FOLDER (8.3615ms)
+    ✔ 18. PATCH returns 401 when Graph throws OUTLOOK_RECONNECT_REQUIRED (10.6071ms)
+    ✔ 19. PATCH returns 503 when Graph is busy (MICROSOFT_BUSY) (8.0472ms)
+    ✔ 20. PATCH returns 502 when Graph call fails with general network error (8.2924ms)
+    ✔ 21. PATCH successfully updates sync toggles and valid mailFolderIds into vault (18.0769ms)
+  ✔ Task P5.2: PATCH settings (101.3767ms)
+✔ Tasks P5.1 & P5.2: Outlook Settings Endpoints (227.014ms)
+
+Verification Summary:
+- Implemented `PATCH /api/v1/integrations/outlook/settings` in `server/src/routes/outlookSettings.js`.
+- Enforced session authentication (`authenticate` middleware) returning 401 if unauthenticated.
+- Rejects requests when no active Outlook connection exists in vault (404 OUTLOOK_NOT_CONNECTED).
+- Validates boolean types for `emailSyncEnabled` and `calendarSyncEnabled` (422 VALIDATION_ERROR on non-booleans).
+- Strictly rejects empty folder lists (`mailFolderIds: []`) with 422 VALIDATION_ERROR as mandated by SPEC.
+- Rejects non-string and whitespace folder ID entries with 422 VALIDATION_ERROR.
+- Verifies folder IDs against live Microsoft Graph (`GET /me/mailFolders`), rejecting invalid folder IDs with 422 INVALID_MAIL_FOLDER.
+- Gracefully maps Graph errors: 401 OUTLOOK_RECONNECT_REQUIRED, 503 MICROSOFT_BUSY, and 502 GRAPH_FOLDER_LOOKUP_FAILED.
+- Atomically persists valid updates into the AES-256-GCM encrypted vault.
+- Sanitizes API responses using `formatStatusResponse`, strictly guaranteeing zero token leakage.
+- Mirrored all files to `Sloane/server/src/routes/outlookSettings.js` and `Sloane/server/tests/unit18-outlook-settings-routes.test.js`.

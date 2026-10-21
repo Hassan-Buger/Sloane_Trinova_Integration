@@ -30,7 +30,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 
 ## Phase 5 — Settings API
 - [x] **P5.1** `GET /api/v1/integrations/outlook/status`.
-- [ ] **P5.2** `PATCH /api/v1/integrations/outlook/settings`.
+- [x] **P5.2** `PATCH /api/v1/integrations/outlook/settings`.
 - [ ] **P5.3** `GET /api/v1/integrations/outlook/folders`.
 - [ ] **P5.4** `POST /api/v1/integrations/outlook/sync`.
 - [ ] **P5.5** `POST /api/v1/integrations/outlook/disconnect`.
