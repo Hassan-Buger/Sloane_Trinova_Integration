@@ -382,6 +382,26 @@ export const ApiService = {
     };
   },
 
+  /**
+   * Retrieves tasks from TriNova GET /api/v1/tasks.
+   */
+  async getTasks(params = {}) {
+    try {
+      const query = new URLSearchParams(params).toString();
+      const res = await this.request(`/tasks${query ? '?' + query : ''}`);
+      return {
+        status: 'success',
+        data: res.data || []
+      };
+    } catch (err) {
+      console.warn('Could not fetch tasks from TriNova:', err.message);
+      return {
+        status: 'fallback',
+        data: []
+      };
+    }
+  },
+
   /* ==========================================================================
      3. Statutory Deadlines & Companies House Sync
      ========================================================================== */

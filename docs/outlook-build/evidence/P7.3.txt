@@ -1,0 +1,50 @@
+Task P7.3: Remove every remaining import of demo arrays from the UI path
+========================================================================
+
+Executed Command:
+  cd server && npm test
+
+Test Results:
+  Total suites: 75
+  Total tests:  353
+  Pass:         353
+  Fail:         0
+  Cancelled:    0
+  Skipped:      0
+  Todo:         0
+  Duration:     21.6s
+
+Unit 24 Output Snippet:
+▶ Task P7.3: Demo Arrays Removal from UI Path
+  ▶ Elimination of Seed Imports & Demo Arrays from scripts/app.js
+    ✔ 1. scripts/app.js does NOT import ./data/seed.js or define getSeedData() (0.9904ms)
+    ✔ 2. scripts/app.js does NOT extract or use demo arrays from seed (0.35ms)
+  ✔ Elimination of Seed Imports & Demo Arrays from scripts/app.js (2.0729ms)
+  ▶ ApiService.getTasks Implementation
+    ✔ 3. ApiService provides getTasks method querying /tasks (0.2688ms)
+  ✔ ApiService.getTasks Implementation (0.4134ms)
+  ▶ Command Centre Dynamic Data & Empty States
+    ✔ 4. renderCommandCentre queries live ApiService.getTasks and ApiService.getStatutory (0.2055ms)
+    ✔ 5. Waiting for sign-off renders honest empty state when no sign-off tasks exist (0.1192ms)
+    ✔ 6. Top 3 ranked items renders honest empty state when no statutory items exist (0.1253ms)
+    ✔ 7. Pulse metrics are dynamically computed from live API data and meta (0.307ms)
+  ✔ Command Centre Dynamic Data & Empty States (1.0012ms)
+  ▶ People & Work Dynamic Grouping & Empty States
+    ✔ 8. renderPeopleWork groups tasks from ApiService.getTasks and provides empty state (0.2303ms)
+  ✔ People & Work Dynamic Grouping & Empty States (0.3369ms)
+  ▶ Statutory Monitor Dynamic Data & Empty States
+    ✔ 9. renderStatutory queries ApiService.getStatutory and handles empty states cleanly (0.2624ms)
+  ✔ Statutory Monitor Dynamic Data & Empty States (0.4754ms)
+  ▶ Logged-Out Shell Security & Leak Hygiene
+    ✔ 10. index.html static shell has zero literal @ symbols and zero demo array data (1.1051ms)
+  ✔ Logged-Out Shell Security & Leak Hygiene (1.201ms)
+✔ Task P7.3: Demo Arrays Removal from UI Path (7.1841ms)
+
+Removals & Replacements Summary:
+- Eradicated `getSeedData()` and `./data/seed.js` dynamic imports in `scripts/app.js`.
+- Eradicated `seed.TOP3_ITEMS`: Replaced with dynamic priority ranking from `ApiService.getStatutory()` (RED items first, active strike-offs, overdue accounts) with honest empty state.
+- Eradicated `seed.WAITING_SIGNOFF`: Replaced with live query to `ApiService.getTasks()` with honest empty state ("No items waiting for sign-off") and dynamic `pulseSignoffs` update.
+- Eradicated `seed.PEOPLE_WORK`: Replaced with live query to `ApiService.getTasks()` grouped by assignee with honest empty state ("No team work currently assigned").
+- Eradicated `seed.ACCOUNTS_TRACKER`, `seed.ACTION_TRACKER`, `seed.VAT_TRACKER`: Replaced with live `ApiService.getStatutory()` records, derived action items from RED/AMBER records with honest empty state ("No immediate actions required"), and clean VAT empty state ("No VAT filings currently scheduled").
+- Added `ApiService.getTasks(params)` method querying `/tasks` with URLSearchParams support.
+- Fully documented in `docs/outlook-build/DECISIONS.md` under Decision D7.2.

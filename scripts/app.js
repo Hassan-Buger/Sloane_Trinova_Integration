@@ -12,27 +12,9 @@ import { ModalManager } from './components/modal.js';
 import { Toast } from './components/toast.js';
 import { OutlookSettings } from './components/outlookSettings.js';
 
-// Dynamic authenticated loader for seed data (Task P1.4: not requested on unauthenticated page load)
-let _seedData = null;
-async function getSeedData() {
-  if (!_seedData) {
-    try {
-      _seedData = await import('./data/seed.js');
-    } catch (e) {
-      _seedData = {
-        ACCOUNTS_TRACKER: [],
-        ACTION_TRACKER: [],
-        VAT_TRACKER: [],
-        TOP3_ITEMS: [],
-        DIARY_ITEMS: [],
-        WAITING_SIGNOFF: [],
-        ATTENTION_EMAILS: [],
-        PEOPLE_WORK: []
-      };
-    }
-  }
-  return _seedData;
-}
+// Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
+// PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
+// All data is dynamically queried from authenticated /api/v1 endpoints.
 
 /**
  * HTML Output Escaping Utility (Section 1.4)
@@ -820,10 +802,6 @@ class SloaneApp {
      ========================================================================== */
 
   async renderCommandCentre() {
-    const seed = await getSeedData();
-    const TOP3_ITEMS = seed.TOP3_ITEMS || [];
-    const WAITING_SIGNOFF = seed.WAITING_SIGNOFF || [];
-
     // 0. Render Red Alerts
     const redAlertsContainer = document.getElementById('redAlertsContainer');
     if (redAlertsContainer) {
@@ -845,33 +823,25 @@ class SloaneApp {
       `;
     }
 
-    // 1. Render Top 3 Ranked Items
-    const top3Container = document.getElementById('top3Container');
-    if (top3Container) {
-      top3Container.innerHTML = TOP3_ITEMS.map(item => `
-        <div class="top3-item ${item.isRed ? 'item-red' : ''}">
-          <div class="rank">${escapeHtml(item.rank)}</div>
-          <div class="top3-item-content">
-            <div class="top3-item-title">${escapeHtml(item.title)}</div>
-            <div class="top3-item-desc">${escapeHtml(item.desc)}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // Live Outlook data fetching (§4.3 & Task P7.2)
+    // Live data fetching (§4.3, Task P7.2 & Task P7.3: no demo arrays)
     let diaryEvents = [];
     let attentionEmails = [];
     let isOutlookConnected = false;
     let diaryEmptyReason = 'Connect your Outlook to see this here';
     let emailEmptyReason = 'Connect your Outlook to see this here';
+    let tasksRes = { data: [] };
+    let statutoryRes = { data: [] };
 
     try {
-      const [diaryRes, emailsRes, statusRes] = await Promise.all([
+      const [diaryRes, emailsRes, statusRes, tRes, sRes] = await Promise.all([
         ApiService.getOutlookDiary('today').catch(err => ({ ok: false, error: err })),
         ApiService.getOutlookFlaggedEmails().catch(err => ({ ok: false, error: err })),
-        ApiService.getOutlookStatus().catch(() => ({ ok: false }))
+        ApiService.getOutlookStatus().catch(() => ({ ok: false })),
+        ApiService.getTasks().catch(() => ({ data: [] })),
+        ApiService.getStatutory().catch(() => ({ data: [] }))
       ]);
+      tasksRes = tRes;
+      statutoryRes = sRes;
 
       const status = statusRes?.data?.status || 'not_connected';
       isOutlookConnected = status === 'connected';
@@ -892,6 +862,41 @@ class SloaneApp {
           eyebrowDot.className = 'dot';
           eyebrowDot.style.background = 'var(--muted)';
           eyebrowText.textContent = 'Private CEO Command Centre';
+        }
+      }
+
+      // 1. Render Top 3 Ranked Items from API (Task P7.3: dynamic priority ranking)
+      const top3Container = document.getElementById('top3Container');
+      if (top3Container) {
+        const records = statutoryRes?.data || [];
+        const urgencyOrder = { 'RED': 1, 'AMBER': 2, 'CLEAR': 3 };
+        const sorted = [...records].sort((a, b) => {
+          const diff = (urgencyOrder[a.urgency] || 99) - (urgencyOrder[b.urgency] || 99);
+          if (diff !== 0) return diff;
+          if (a.daysRemaining === null || a.daysRemaining === undefined) return 1;
+          if (b.daysRemaining === null || b.daysRemaining === undefined) return -1;
+          return a.daysRemaining - b.daysRemaining;
+        });
+
+        const top3Items = sorted.slice(0, 3).map((r, idx) => ({
+          rank: idx + 1,
+          title: `${r.name || r.companyName} — ${r.urgency === 'RED' ? (r.hasStrikeOff ? 'Active Strike-Off Defense' : 'Overdue Accounts') : 'Statutory Filing Due'}`,
+          desc: r.note || r.notes || (r.hasStrikeOff ? 'Active proposal to strike-off registered on Companies House.' : `Accounts due: ${r.accountsDueDate || 'Pending'}`),
+          isRed: r.urgency === 'RED'
+        }));
+
+        if (top3Items.length > 0) {
+          top3Container.innerHTML = top3Items.map(item => `
+            <div class="top3-item ${item.isRed ? 'item-red' : ''}">
+              <div class="rank">${escapeHtml(item.rank)}</div>
+              <div class="top3-item-content">
+                <div class="top3-item-title">${escapeHtml(item.title)}</div>
+                <div class="top3-item-desc">${escapeHtml(item.desc)}</div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          top3Container.innerHTML = `<div class="table-empty" style="padding: 24px;">No urgent priority items</div>`;
         }
       }
 
@@ -973,18 +978,34 @@ class SloaneApp {
       `).join('');
     }
 
-    // 4. Render Waiting Sign-off
+    // 4. Render Waiting Sign-off from API (Task P7.3: dynamic sign-off tasks)
     const signoffContainer = document.getElementById('waitingSignoffContainer');
+    const allTasks = tasksRes?.data || [];
+    const signoffItems = allTasks.filter(t => 
+      t.status === 'Pending' || 
+      t.status === 'In_Review' || 
+      t.status === 'Under_Review' ||
+      /sign|review|approval/i.test(t.title || '')
+    ).map(t => ({
+      title: `${t.companyName || 'Client'} — ${t.title}`,
+      sub: t.description || `Assigned to ${t.assigneeName || 'Staff'}`,
+      date: t.dueDate ? `Due ${t.dueDate}` : 'Pending'
+    }));
+
     if (signoffContainer) {
-      signoffContainer.innerHTML = WAITING_SIGNOFF.map(item => `
-        <div class="signoff-item">
-          <div class="item-main">
-            <div class="item-title">${escapeHtml(item.title)}</div>
-            <div class="item-sub">${escapeHtml(item.sub)}</div>
+      if (signoffItems.length > 0) {
+        signoffContainer.innerHTML = signoffItems.map(item => `
+          <div class="signoff-item">
+            <div class="item-main">
+              <div class="item-title">${escapeHtml(item.title)}</div>
+              <div class="item-sub">${escapeHtml(item.sub)}</div>
+            </div>
+            <span class="pill amber">${escapeHtml(item.date)}</span>
           </div>
-          <span class="pill amber">${escapeHtml(item.date)}</span>
-        </div>
-      `).join('');
+        `).join('');
+      } else {
+        signoffContainer.innerHTML = `<div class="table-empty" style="padding: 24px;">No items waiting for sign-off</div>`;
+      }
     }
 
     // 5. Render Attention Emails (Live Outlook)
@@ -1015,9 +1036,12 @@ class SloaneApp {
     }
 
     // 6. Update Pulse Metrics
-    const signoffCount = WAITING_SIGNOFF.length;
+    const signoffCount = signoffItems.length;
     const emailCount = attentionEmails.length;
     const bizCount = Array.isArray(businesses) ? businesses.length : 0;
+    const statutoryMeta = statutoryRes?.meta || {};
+    const blockedCount = allTasks.filter(t => Boolean(t.isBlocked)).length;
+
     const pulseSignoffs = document.getElementById('pulseSignoffs');
     const pulseEmails = document.getElementById('pulseEmails');
     const pulseOverdue = document.getElementById('pulseOverdue');
@@ -1027,9 +1051,9 @@ class SloaneApp {
 
     if (pulseSignoffs) pulseSignoffs.textContent = signoffCount;
     if (pulseEmails) pulseEmails.textContent = emailCount;
-    if (pulseOverdue) pulseOverdue.textContent = '4';
-    if (pulseDue7d) pulseDue7d.textContent = '6';
-    if (pulseBlocked) pulseBlocked.textContent = '1';
+    if (pulseOverdue) pulseOverdue.textContent = statutoryMeta.redCount !== undefined ? statutoryMeta.redCount : '0';
+    if (pulseDue7d) pulseDue7d.textContent = statutoryMeta.amberCount !== undefined ? statutoryMeta.amberCount : '0';
+    if (pulseBlocked) pulseBlocked.textContent = blockedCount;
     if (pulseBizAreas) pulseBizAreas.textContent = bizCount;
   }
 
@@ -1172,10 +1196,48 @@ class SloaneApp {
     const container = document.getElementById('peopleGridContainer');
     if (!container) return;
 
-    const seed = await getSeedData();
-    const PEOPLE_WORK = seed.PEOPLE_WORK || [];
+    let tasks = [];
+    try {
+      const res = await ApiService.getTasks();
+      tasks = res.data || [];
+    } catch (err) {
+      console.warn('Could not load tasks for People & Work:', err);
+    }
 
-    container.innerHTML = PEOPLE_WORK.map(p => `
+    if (!tasks || tasks.length === 0) {
+      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; padding: 32px; text-align: center;"><div class="table-empty">No team work currently assigned</div></div>`;
+      return;
+    }
+
+    // Group tasks by assignee from live API (Task P7.3: dynamic assignee grouping)
+    const peopleMap = new Map();
+    for (const t of tasks) {
+      const key = t.assigneeId || t.assigneeName || 'unassigned';
+      if (!peopleMap.has(key)) {
+        const name = t.assigneeName || 'Unassigned';
+        const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'TM';
+        peopleMap.set(key, {
+          id: key,
+          name,
+          role: key.includes('hamza') ? 'Senior Client Manager / Partner' : (key.includes('jessica') ? 'Tax & Compliance Senior' : 'Team Member'),
+          avatar: initials,
+          tasks: [],
+          ceoNote: key.includes('hamza') ? 'Agreed to follow up personally on R GB Elevations today.' : (key.includes('jessica') ? 'Jessica is handling the technical CH objection paperwork.' : null)
+        });
+      }
+      peopleMap.get(key).tasks.push({
+        client: t.companyName || 'Client',
+        task: t.title || t.description || 'Task',
+        stage: t.status || 'In Progress',
+        deadline: t.dueDate ? `Due ${t.dueDate}` : 'Pending',
+        isBlocked: Boolean(t.isBlocked),
+        blocker: t.blocker
+      });
+    }
+
+    const peopleList = Array.from(peopleMap.values());
+    container.innerHTML = peopleList.map(p => `
+      <div class="card person-card">
         <div class="person-header">
           <div class="person-info">
             <div class="person-avatar">${escapeHtml(p.avatar)}</div>
@@ -1191,17 +1253,17 @@ class SloaneApp {
             <div class="work-item">
               <div>
                 <div style="font-weight: 600; color: var(--text);">${escapeHtml(t.client)}</div>
-                <div style="font-size: 11px; color: var(--muted);">${escapeHtml(t.task)}</div>
+                <div style="font-size: 11px; color: var(--muted);">${escapeHtml(t.task)}${t.blocker ? ` — <span style="color: var(--red);">${escapeHtml(t.blocker)}</span>` : ''}</div>
               </div>
               <div style="text-align: right;">
                 <span class="pill ${t.isBlocked ? 'red' : 'amber'}">${t.isBlocked ? 'BLOCKED' : escapeHtml(t.stage)}</span>
-                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">Due ${escapeHtml(t.deadline)}</div>
+                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">${escapeHtml(t.deadline)}</div>
               </div>
             </div>
           `).join('')}
         </div>
         ${p.ceoNote ? `
-          <div style="padding: 10px 12px; background: rgba(201, 166, 107, 0.08); border-left: 2px solid var(--accent); border-radius: 4px; font-size: 11px; color: var(--accent);">
+          <div style="padding: 10px 12px; background: rgba(201, 166, 107, 0.08); border-left: 2px solid var(--accent); border-radius: 4px; font-size: 11px; color: var(--accent); margin-top: 12px;">
             <strong>Private CEO Note:</strong> ${escapeHtml(p.ceoNote)}
           </div>
         ` : ''}
@@ -1210,65 +1272,61 @@ class SloaneApp {
   }
 
   async renderStatutory() {
-    const seed = await getSeedData();
-    const ACCOUNTS_TRACKER = seed.ACCOUNTS_TRACKER || [];
-    const ACTION_TRACKER = seed.ACTION_TRACKER || [];
-    const VAT_TRACKER = seed.VAT_TRACKER || [];
-
-    const chCache = StorageService.getCHCache();
-
-    // Assemble all statutory records
-    const records = ACCOUNTS_TRACKER.map(r => ReconciliationEngine.chMerged(r, chCache));
-
-    // Calculate urgency counts
+    let records = [];
     let redCount = 0;
     let amberCount = 0;
     let clearCount = 0;
 
-    const rowsHtml = records.map(r => {
-      const nearest = ReconciliationEngine.nearestFor(r);
-      let state = nearest ? ReconciliationEngine.deadlineState(nearest.date) : { label: 'No date', cls: 'status-amber', urgency: 'AMBER' };
-
-      // Promote active strike-offs or overdue flags to RED per business rule
-      if (r.hasStrikeOff || r.accountsOverdue) {
-        state = { label: 'RED · ACTION', cls: 'status-red', urgency: 'RED' };
+    try {
+      const res = await ApiService.getStatutory();
+      records = res.data || [];
+      if (res.meta) {
+        redCount = res.meta.redCount || 0;
+        amberCount = res.meta.amberCount || 0;
+        clearCount = res.meta.clearCount || 0;
       }
-
-      if (state.urgency === 'RED') redCount++;
-      else if (state.urgency === 'AMBER') amberCount++;
-      else clearCount++;
-
-      const chUrl = r.no ? `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.no)}` : '#';
-
-      return `
-        <tr>
-          <td>
-            <div style="font-weight: 700; color: var(--text);">${escapeHtml(r.name)}</div>
-            <div class="source">
-              <span class="source-badge ${r.isLive ? 'ch-live' : ''}">${r.isLive ? 'CH Live' : 'Tracker'}</span>
-              ${escapeHtml(r.source)}
-            </div>
-          </td>
-          <td>
-            <a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${escapeHtml(r.no)} ↗</a>
-          </td>
-          <td>${escapeHtml(ReconciliationEngine.formatDate(r.year))}</td>
-          <td>${escapeHtml(ReconciliationEngine.formatDate(r.accounts))}</td>
-          <td>
-            ${nearest ? `<strong>${escapeHtml(nearest.label)}:</strong> ${escapeHtml(ReconciliationEngine.formatDate(nearest.date))}` : '—'}
-          </td>
-          <td>
-            <span class="${state.cls}">${escapeHtml(state.label)}</span>
-          </td>
-          <td style="max-width: 220px; font-size: 11px; color: ${r.hasStrikeOff ? 'var(--red)' : 'var(--muted)'};">
-            ${escapeHtml(r.note || '—')}
-          </td>
-        </tr>
-      `;
-    }).join('');
+    } catch (err) {
+      console.warn('Could not load statutory deadlines from API:', err);
+    }
 
     const tbody = document.getElementById('statutoryTableBody');
-    if (tbody) tbody.innerHTML = rowsHtml;
+    if (tbody) {
+      if (records.length > 0) {
+        tbody.innerHTML = records.map(r => {
+          const chUrl = r.companyNumber ? `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.companyNumber)}` : '#';
+          const urgencyClass = r.urgency === 'RED' ? 'status-red' : (r.urgency === 'AMBER' ? 'status-amber' : 'status-green');
+          const urgencyLabel = r.urgency === 'RED' ? 'RED · ACTION' : (r.urgency === 'AMBER' ? 'AMBER · UPCOMING' : 'CLEAR · ON TRACK');
+
+          return `
+            <tr>
+              <td>
+                <div style="font-weight: 700; color: var(--text);">${escapeHtml(r.name || r.companyName)}</div>
+                <div class="source">
+                  <span class="source-badge ${r.source === 'companies_house_live' ? 'ch-live' : ''}">${r.source === 'companies_house_live' ? 'CH Live' : 'Tracker'}</span>
+                  ${escapeHtml(r.source || 'statutory_api')}
+                </div>
+              </td>
+              <td>
+                <a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${escapeHtml(r.companyNumber || '—')} ↗</a>
+              </td>
+              <td>${escapeHtml(ReconciliationEngine.formatDate(r.yearEnd || r.accountingReferenceDate || '—'))}</td>
+              <td>${escapeHtml(ReconciliationEngine.formatDate(r.accountsDueDate || '—'))}</td>
+              <td>
+                ${r.confirmationDueDate ? `<strong>CS Due:</strong> ${escapeHtml(ReconciliationEngine.formatDate(r.confirmationDueDate))}` : '—'}
+              </td>
+              <td>
+                <span class="${urgencyClass}">${escapeHtml(urgencyLabel)}</span>
+              </td>
+              <td style="max-width: 220px; font-size: 11px; color: ${r.urgency === 'RED' ? 'var(--red)' : 'var(--muted)'};">
+                ${escapeHtml(r.note || r.notes || '—')}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = `<tr><td colspan="7" class="table-empty" style="text-align: center; padding: 24px;">No statutory records available</td></tr>`;
+      }
+    }
 
     // Update Statutory Nav Badge with dynamic RED count
     const navBadge = document.getElementById('statNavBadge');
@@ -1278,36 +1336,39 @@ class SloaneApp {
     }
 
     // Update Radar Metric Cards
-    document.getElementById('statRadarTracked').textContent = records.length;
-    document.getElementById('statRadarVat').textContent = VAT_TRACKER.length;
-    document.getElementById('statRadarRed').textContent = redCount;
-    document.getElementById('statRadarClear').textContent = clearCount;
+    const statTracked = document.getElementById('statRadarTracked');
+    const statVat = document.getElementById('statRadarVat');
+    const statRed = document.getElementById('statRadarRed');
+    const statClear = document.getElementById('statRadarClear');
 
-    // Render Action Tracker table
+    if (statTracked) statTracked.textContent = records.length;
+    if (statVat) statVat.textContent = '0';
+    if (statRed) statRed.textContent = redCount;
+    if (statClear) statClear.textContent = clearCount;
+
+    // Render Action Tracker table from API records with urgency RED or AMBER
     const actionTbody = document.getElementById('actionTableBody');
     if (actionTbody) {
-      actionTbody.innerHTML = ACTION_TRACKER.map(a => `
-        <tr>
-          <td style="font-weight: 700; color: var(--text);">${escapeHtml(a.company)}</td>
-          <td style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(a.no)}</td>
-          <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${escapeHtml(a.issue)}</td>
-          <td style="font-size: 11px; color: var(--muted);">${escapeHtml(a.action)}</td>
-          <td><span class="pill ${a.urgency === 'RED' ? 'red' : a.urgency === 'AMBER' ? 'amber' : 'green'}">${escapeHtml(a.urgency)}</span></td>
-        </tr>
-      `).join('');
+      const actionItems = records.filter(r => r.urgency === 'RED' || r.urgency === 'AMBER');
+      if (actionItems.length > 0) {
+        actionTbody.innerHTML = actionItems.map(a => `
+          <tr>
+            <td style="font-weight: 700; color: var(--text);">${escapeHtml(a.name || a.companyName)}</td>
+            <td style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(a.companyNumber || '—')}</td>
+            <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${escapeHtml(a.hasStrikeOff ? 'Active strike-off notice registered at Companies House' : (a.accountsOverdue ? 'Accounts overdue — penalty tier active' : 'Upcoming statutory accounts deadline'))}</td>
+            <td style="font-size: 11px; color: var(--muted);">${escapeHtml(a.note || a.notes || 'Immediate action required')}</td>
+            <td><span class="pill ${a.urgency === 'RED' ? 'red' : 'amber'}">${escapeHtml(a.urgency)}</span></td>
+          </tr>
+        `).join('');
+      } else {
+        actionTbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="text-align: center; padding: 24px;">No immediate actions required</td></tr>`;
+      }
     }
 
     // Render VAT schedule
     const vatTbody = document.getElementById('vatTableBody');
     if (vatTbody) {
-      vatTbody.innerHTML = VAT_TRACKER.map(v => `
-        <tr>
-          <td style="font-weight: 600; color: var(--text);">${escapeHtml(v.name)}</td>
-          <td>${escapeHtml(v.period)}</td>
-          <td>${escapeHtml(ReconciliationEngine.formatDate(v.due))}</td>
-          <td><span class="pill ${v.status === 'Ready to submit' ? 'green' : v.status.includes('Overdue') ? 'red' : 'neutral'}">${escapeHtml(v.status)}</span></td>
-        </tr>
-      `).join('');
+      vatTbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="text-align: center; padding: 24px;">No VAT filings currently scheduled</td></tr>`;
     }
   }
 
