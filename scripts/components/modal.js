@@ -92,7 +92,7 @@ export const ModalManager = {
       if (e.key !== 'Tab') return;
 
       const focusable = Array.from(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
-        .filter(el => !el.disabled && el.offsetParent !== null);
+        .filter(el => !el.disabled && !el.hidden && el.getAttribute('aria-hidden') !== 'true');
 
       if (focusable.length === 0) return;
 

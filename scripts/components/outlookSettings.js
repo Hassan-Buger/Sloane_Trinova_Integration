@@ -655,6 +655,12 @@ export const OutlookSettings = {
    * - Resets state and re-renders card as not_connected
    */
   async confirmDisconnect() {
+    const btnConfirm = document.getElementById('btnConfirmOutlookDisconnect');
+    if (btnConfirm) {
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = 'Disconnecting...';
+    }
+
     try {
       await ApiService.disconnectOutlook();
       ModalManager.close('outlookDisconnectModal');
@@ -696,6 +702,11 @@ export const OutlookSettings = {
       console.error('[OutlookSettings] Disconnect failed:', err);
       ModalManager.close('outlookDisconnectModal');
       this.setBanner(`Disconnect failed: ${err.message}`, 'error');
+    } finally {
+      if (btnConfirm) {
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = 'Disconnect Account';
+      }
     }
   }
 };

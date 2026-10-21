@@ -50,7 +50,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
   - [x] **P7.4.2** Add Business Area
   - [x] **P7.4.3** CEO Brain notes
   - [x] **P7.4.4** Ask Sloane
-- [ ] **P7.5** Disconnect confirm dialog and reconnect banner (`ModalManager`, ESC closes, focus trapped).
+- [x] **P7.5** Disconnect confirm dialog and reconnect banner (`ModalManager`, ESC closes, focus trapped).
 
 ## Phase 8 — Verification and report
 - [ ] **P8.1** Automated regression and frontend smoke tests.

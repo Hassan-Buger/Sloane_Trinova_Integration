@@ -865,6 +865,46 @@ class SloaneApp {
         }
       }
 
+      // Render Reconnect Banner if status is reconnect_required (§4.1 & Task P7.5)
+      const reconnectBannerEl = document.getElementById('outlookReconnectBanner');
+      if (reconnectBannerEl) {
+        if (status === 'reconnect_required' && !this._dismissedReconnectBanner) {
+          reconnectBannerEl.style.display = 'block';
+          reconnectBannerEl.innerHTML = `
+            <div class="sourcebanner" style="background: rgba(255, 93, 103, 0.1); border: 1px solid var(--red-border); color: #ffb4b9; padding: 12px 16px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 16px;">⚠️</span>
+                <div style="font-size: 12.5px; line-height: 1.4;">
+                  <strong style="color: var(--red);">Outlook Reconnect Required:</strong>
+                  <span style="color: var(--text);">Microsoft authorization has expired or consent was revoked. Reconnect your account to resume diary and email sync.</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <a href="/api/v1/integrations/outlook/connect" class="btn btn-primary" id="btnReconnectOutlookBanner" style="padding: 6px 14px; font-size: 11.5px; text-decoration: none;">
+                  🔗 Reconnect Now
+                </a>
+                <button type="button" class="btn btn-secondary" id="btnDismissReconnectBanner" style="padding: 6px 10px; font-size: 11px;">
+                  ✕
+                </button>
+              </div>
+            </div>
+          `;
+          const dismissBtn = document.getElementById('btnDismissReconnectBanner');
+          if (dismissBtn) {
+            dismissBtn.addEventListener('click', () => {
+              this._dismissedReconnectBanner = true;
+              reconnectBannerEl.style.display = 'none';
+            });
+          }
+        } else {
+          if (status !== 'reconnect_required') {
+            this._dismissedReconnectBanner = false;
+          }
+          reconnectBannerEl.style.display = 'none';
+          reconnectBannerEl.innerHTML = '';
+        }
+      }
+
       // 1. Render Top 3 Ranked Items from API (Task P7.3: dynamic priority ranking)
       const top3Container = document.getElementById('top3Container');
       if (top3Container) {

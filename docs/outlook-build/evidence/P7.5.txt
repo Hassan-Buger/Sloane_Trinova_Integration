@@ -1,0 +1,91 @@
+Task P7.5: Disconnect Confirm Dialog & Reconnect Banner Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P7.5 verifies and completes the accessible Disconnect confirmation dialog workflow and the Reconnect notification banners across the application:
+
+1. Accessible Disconnect Confirmation Modal (#outlookDisconnectModal):
+   - Defined in index.html with accessibility attributes: role="dialog", aria-modal="true", aria-labelledby="outlookDisconnectTitle", and aria-hidden="true" (when closed).
+   - Dialog copy strictly satisfies SPEC.md §4.1:
+     - Clear warning: "Are you sure you want to disconnect your Microsoft Outlook account?"
+     - Exact honest revocation guidance: "This deletes Sloane's copy of your Outlook access and clears diary and email data from the dashboard; to fully remove Sloane's access from your Microsoft account, use https://myapps.microsoft.com (or the link Microsoft shows under your account's connected apps)."
+     - Truthfulness constraint: explicitly avoids false claims that Microsoft has revoked external consent.
+     - Token erasure guarantee: "Zero tokens will remain on the server. You can reconnect at any time."
+   - Focusable controls:
+     - Modal header close button (`.modal-close-btn` with `data-close-modal`)
+     - External guidance link to `https://myapps.microsoft.com` (`rel="noopener noreferrer"`)
+     - Cancel button (`#btnCancelOutlookDisconnect` with `data-close-modal`)
+     - Confirm Disconnect button (`#btnConfirmOutlookDisconnect`)
+
+2. ModalManager Accessibility & Ergonomics:
+   - Traps focus strictly between first and last focusable elements (`button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])`) on `Tab` and `Shift+Tab`.
+   - Global `keydown` event listener safely dismisses active modal upon `Escape` key press.
+   - Click-outside handler closes modal when clicking backdrop (`.modal-overlay` or `.modal-backdrop`).
+   - Locks background body scroll on open (`overflow = 'hidden'`) and restores when all modals close.
+   - Saves `lastFocusedElement` on trigger open and automatically restores focus upon modal dismissal.
+
+3. Disconnect Execution & Post-Revocation Notice:
+   - `confirmDisconnect()` in `scripts/components/outlookSettings.js` disables `#btnConfirmOutlookDisconnect` during transit with a loading label (`Disconnecting...`) to prevent double-submits.
+   - Invokes `POST /api/v1/integrations/outlook/disconnect` which deletes the vault record, clears in-memory caches, and returns honest revocation guidance with `zeroResidualTokens: true`.
+   - Closes modal via `ModalManager.close('outlookDisconnectModal')`.
+   - Renders post-disconnect revocation notice banner in Settings view directing user to `https://myapps.microsoft.com`.
+   - Re-renders card in `not_connected` state and calls `window.app.refreshOutlookData()` to reset Command Centre diary and email panels to honest empty states.
+
+4. Reconnect Banner (§4.1 & §4.4):
+   - When Outlook connection status is `reconnect_required` (e.g. refresh token rejected, `invalid_grant`, or consent revoked):
+     - Command Centre dynamically renders `#outlookReconnectBanner` with warning icon, explanation, direct action link (`/api/v1/integrations/outlook/connect`), and dismiss button.
+     - Eyebrow dot turns red with `Private CEO Command Centre · Outlook Reconnect Required`.
+     - Settings card displays `reconnect_required` status pill with Reconnect and Disconnect actions.
+   - When status returns to `connected` or `not_connected`, `#outlookReconnectBanner` is hidden and dismissal flags are reset.
+
+5. Security & Static Shell Hygiene:
+   - `index.html` static shell contains 0 literal `@` symbols and 0 client entity leaks.
+   - Server-side vault contains 0 residual tokens after disconnect.
+
+Automated Test Results
+----------------------
+Command: npm test in server/
+Test Suites: 100 passed, 100 total
+Tests: 425 passed, 425 total
+Failures: 0
+Duration: 27.64s
+
+Test Execution Log (Task P7.5 excerpt):
+---------------------------------------
+▶ Task P7.5: Disconnect Confirm Dialog & Reconnect Banner
+  ▶ 1. Disconnect Confirmation Modal Accessibility & §4.1 Copy
+    ✔ 1.1 index.html contains accessible #outlookDisconnectModal structure (1.9709ms)
+    ✔ 1.2 Modal contains honest §4.1 revocation guidance and myapps link (1.1237ms)
+    ✔ 1.3 Modal contains distinct dismiss and confirm buttons (0.7001ms)
+  ✔ 1. Disconnect Confirmation Modal Accessibility & §4.1 Copy (4.9707ms)
+  ▶ 2. ModalManager Controller & Focus Trapping Standards
+    ✔ 2.1 modal.js implements global Escape key listener (0.4591ms)
+    ✔ 2.2 modal.js traps focus within modal bounds on Tab and Shift+Tab (0.4467ms)
+    ✔ 2.3 modal.js locks body scroll on open and restores on close (1.1066ms)
+    ✔ 2.4 modal.js preserves and restores trigger focus element (0.4731ms)
+  ✔ 2. ModalManager Controller & Focus Trapping Standards (2.9546ms)
+  ▶ 3. Disconnect Execution & Post-Revocation Notice
+    ✔ 3.1 outlookSettings.js wires disconnect trigger to ModalManager.open with trigger element (0.464ms)
+    ✔ 3.2 confirmDisconnect disables confirm button during transit (0.4768ms)
+    ✔ 3.3 confirmDisconnect renders §4.1 revocation guidance banner in settings view (0.6025ms)
+[INFO] Outlook connection purged and disconnected
+[INFO] Audit Log: [post__api_v1_integrations_outlook_disconnect] by actor_kirsty_allen on integrations:root (200)
+    ✔ 3.4 POST /api/v1/integrations/outlook/disconnect returns 200 and §4.1 revocation guidance (137.3024ms)
+  ✔ 3. Disconnect Execution & Post-Revocation Notice (139.5814ms)
+  ▶ 4. Reconnect Banner & Command Centre Integration
+    ✔ 4.1 index.html contains #outlookReconnectBanner in Command Centre view (0.8269ms)
+    ✔ 4.2 scripts/app.js renders #outlookReconnectBanner when status is reconnect_required (1.1277ms)
+    ✔ 4.3 scripts/app.js dismiss button hides banner and records dismissal flag (0.9663ms)
+    ✔ 4.4 outlookSettings.js renders Reconnect banner in Settings card (0.5427ms)
+  ✔ 4. Reconnect Banner & Command Centre Integration (3.9352ms)
+  ▶ 5. Security, Token Hygiene & Static Shell Leaks
+    ✔ 5.1 index.html static shell has zero literal @ symbols (0.648ms)
+    ✔ 5.2 index.html static shell has zero client entity leaks (1.44ms)
+    ✔ 5.3 Zero token leakage in vault after disconnect (0.3114ms)
+  ✔ 5. Security, Token Hygiene & Static Shell Leaks (2.7879ms)
+✔ Task P7.5: Disconnect Confirm Dialog & Reconnect Banner (167.0806ms)
