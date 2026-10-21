@@ -1,0 +1,45 @@
+Task P7.1: Settings Card per §4.1 (States, Escaping, Modals, Anti-XSS)
+Recorded At: 2026-10-21T21:25:00+05:00
+Test Command: npm test
+Result: 333 passed across 64 suites (0 failing, 0 skipped, duration 32.72s)
+
+Automated Test Suite: server/tests/unit22-outlook-settings-frontend.test.js
+Test Output:
+▶ Task P7.1: Settings Card per §4.1 & Frontend Architecture
+  ▶ index.html Shell & Accessibility Structure
+    ✔ 1. index.html contains Settings navigation button and view section (2.6067ms)
+    ✔ 2. index.html contains accessible Disconnect Confirmation Modal per §4.1 and §5 P7.5 (0.9058ms)
+    ✔ 3. Disconnect modal contains exact §4.1 revocation text and honest guidance (0.5783ms)
+    ✔ 4. index.html complies with data-free logged-out shell: zero literal @ and zero client leaks (1.1808ms)
+  ✔ index.html Shell & Accessibility Structure (8.6008ms)
+  ▶ formatSyncTimestamp Helper
+    ✔ 5. Formats null or invalid timestamps gracefully (0.9406ms)
+    ✔ 6. Formats valid timestamps with Europe/London time and relative duration (23.8642ms)
+  ✔ formatSyncTimestamp Helper (25.3656ms)
+  ▶ OutlookSettings State Renderers (§4.1)
+    ✔ 7. renderNotConnected: displays Not connected, privacy boundaries, and Connect link (0.3768ms)
+    ✔ 8. renderConnected: renders Connected, metadata, sync toggles, folders, sync-now and disconnect (1.1089ms)
+    ✔ 9. renderReconnectRequired: renders warning banner, reconnect button, and disconnect button (0.4397ms)
+    ✔ 10. renderSyncError: renders short reason and last successful sync time (1.1837ms)
+    ✔ 11. renderFolderCheckboxes: maps folder IDs and display names (0.3078ms)
+  ✔ OutlookSettings State Renderers (§4.1) (3.9817ms)
+  ▶ Strict XSS Sanitization in OutlookSettings
+    ✔ 12. Prevents XSS via malicious accountEmail, displayName, lastError, and folder names (0.4246ms)
+  ✔ Strict XSS Sanitization in OutlookSettings (0.5867ms)
+  ▶ ApiService Outlook Integration Methods
+    ✔ 13. ApiService provides all required Outlook endpoint helpers (0.3015ms)
+  ✔ ApiService Outlook Integration Methods (0.478ms)
+✔ Task P7.1: Settings Card per §4.1 & Frontend Architecture (41.0936ms)
+
+Verification Summary:
+- Implemented `scripts/components/outlookSettings.js` supporting all required states:
+  - Not connected: displays status badge, security/privacy boundaries, and "Connect Outlook account" button linking to `/api/v1/integrations/outlook/connect`.
+  - Connected: displays status badge, connected account email, account holder name, Europe/London + relative last sync time, email & calendar sync toggles, monitored mail folders multi-select with display names, "Sync now" button, and "Disconnect" button.
+  - Reconnect required: displays warning banner, previous account info, reconnect button, and disconnect button.
+  - Sync error: displays status line with short reason, last successful sync timestamp, and retry sync button.
+  - Syncing: disables "Sync now" button, shows "Syncing...", and updates UI upon completion.
+  - Disconnected: opens accessible modal, displays §4.1 honest revocation guidance directing user to https://myapps.microsoft.com, purges local state, and resets to not_connected.
+- Enforced strict `escapeHtml` sanitization across all server-derived strings (`accountEmail`, `displayName`, `lastError`, folder names) and verified immunity against `<script>` and `<img>` attribute XSS injection.
+- Added Settings navigation button (`#nav-settings`) and view section (`#view-settings`) in `index.html` with zero literal `@` or client credential leaks.
+- Extended `ApiService` with full suite of Outlook endpoints (`getOutlookStatus`, `updateOutlookSettings`, `getOutlookFolders`, `syncOutlook`, `disconnectOutlook`, `getOutlookDiary`, `getOutlookFlaggedEmails`) and enforced `X-Requested-With: sloane` header for CSRF protection.
+- Mirrored all changes to `Sloane/` (`index.html`, `scripts/app.js`, `scripts/services/api.js`, `scripts/components/outlookSettings.js`, `styles/views.css`, `server/tests/unit22-outlook-settings-frontend.test.js`).

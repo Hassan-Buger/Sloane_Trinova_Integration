@@ -10,6 +10,7 @@ import { ApiService } from './services/api.js';
 import { AuthService } from './services/auth.js';
 import { ModalManager } from './components/modal.js';
 import { Toast } from './components/toast.js';
+import { OutlookSettings } from './components/outlookSettings.js';
 
 // Dynamic authenticated loader for seed data (Task P1.4: not requested on unauthenticated page load)
 let _seedData = null;
@@ -81,6 +82,7 @@ class SloaneApp {
     // Initialize component managers
     ModalManager.init();
     Toast.init();
+    OutlookSettings.init();
 
     // Bind authentication UI events
     this.bindAuthEvents();
@@ -109,8 +111,12 @@ class SloaneApp {
     // Check live Trinova backend connection
     await this.checkTrinovaBackend();
 
-    // Switch to default view
-    this.switchView('command');
+    // Switch to initial view (check for Outlook connect/error param)
+    if (typeof window !== 'undefined' && window.location && window.location.search && (window.location.search.includes('outlook=') || window.location.search.includes('outlook_error='))) {
+      OutlookSettings.checkUrlParams();
+    } else {
+      this.switchView('command');
+    }
   }
 
   showLoginView() {
@@ -781,6 +787,10 @@ class SloaneApp {
       targetSection.classList.remove('hidden');
     }
 
+    if (viewId === 'settings') {
+      OutlookSettings.loadStatus();
+    }
+
     // Close mobile/tablet navigation drawer if open
     this.closeNavDrawer();
 
@@ -796,6 +806,7 @@ class SloaneApp {
     await this.renderStatutory();
     this.renderIntelligence();
     this.renderBrain();
+    await OutlookSettings.loadStatus();
   }
 
   /* ==========================================================================
@@ -2105,5 +2116,9 @@ class SloaneApp {
 }
 
 // Instantiate and attach globally for inline handlers
-window.app = new SloaneApp();
-document.addEventListener('DOMContentLoaded', () => window.app.init());
+if (typeof window !== 'undefined') {
+  window.app = new SloaneApp();
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', () => window.app.init());
+  }
+}

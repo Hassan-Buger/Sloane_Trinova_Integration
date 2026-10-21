@@ -42,7 +42,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P6.3** Per-user 2-minute in-memory cache cleared on disconnect and sync-now.
 
 ## Phase 7 — Frontend
-- [ ] **P7.1** Settings card per §4.1 (states: not connected, connected, reconnect required, sync error, syncing, disconnected).
+- [x] **P7.1** Settings card per §4.1 (states: not connected, connected, reconnect required, sync error, syncing, disconnected).
 - [ ] **P7.2** Command Centre: remove hard-coded labels/pills, fetch live data from new endpoints.
 - [ ] **P7.3** Remove remaining imports of demo arrays from the UI path.
 - [ ] **P7.4** Keep interactive features working against the API:

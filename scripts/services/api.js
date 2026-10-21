@@ -85,6 +85,7 @@ export const ApiService = {
 
     const headers = {
       'Accept': 'application/json',
+      'X-Requested-With': 'sloane',
       ...options.headers
     };
 
@@ -1100,5 +1101,44 @@ export const ApiService = {
         }
       };
     }
+  },
+
+  /* ==========================================================================
+     Outlook Integration API (§4.1 - §4.3)
+     ========================================================================== */
+
+  async getOutlookStatus() {
+    return this.request('/integrations/outlook/status');
+  },
+
+  async updateOutlookSettings(settings = {}) {
+    return this.request('/integrations/outlook/settings', {
+      method: 'PATCH',
+      body: settings
+    });
+  },
+
+  async getOutlookFolders() {
+    return this.request('/integrations/outlook/folders');
+  },
+
+  async syncOutlook() {
+    return this.request('/integrations/outlook/sync', {
+      method: 'POST'
+    });
+  },
+
+  async disconnectOutlook() {
+    return this.request('/integrations/outlook/disconnect', {
+      method: 'POST'
+    });
+  },
+
+  async getOutlookDiary(date = 'today') {
+    return this.request(`/outlook/diary?date=${encodeURIComponent(date)}`);
+  },
+
+  async getOutlookFlaggedEmails() {
+    return this.request('/outlook/flagged-emails');
   }
 };

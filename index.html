@@ -210,6 +210,14 @@
             </span>
           </button>
         </li>
+        <li>
+          <button class="nav-btn" data-view="settings" id="nav-settings">
+            <span class="nav-btn-content">
+              <span>⚙️</span>
+              <span>Settings</span>
+            </span>
+          </button>
+        </li>
       </ul>
 
       <!-- Pinned Profile Footer -->
@@ -736,6 +744,32 @@
         </div>
       </section>
 
+      <!-- ====================================================================
+           View 8: Settings View (§4.1 & Task P7.1)
+           ==================================================================== -->
+      <section class="view hidden" id="view-settings">
+        <div class="settings-wrapper">
+          
+          <div class="card-header" style="margin-bottom: 16px;">
+            <div>
+              <h2 style="font-size: 18px;">Executive Settings & Integrations</h2>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                Manage executive connections, synchronization schedules, and external accounts.
+              </p>
+            </div>
+          </div>
+
+          <!-- Alert Notification Banner -->
+          <div id="outlookAlertBanner" style="display: none; margin-bottom: 16px;"></div>
+
+          <!-- Outlook Integration Card per §4.1 -->
+          <div class="card" id="outlookSettingsCard" style="padding: 22px;">
+            <!-- Populated dynamically by OutlookSettings component post-session -->
+          </div>
+
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1163,6 +1197,37 @@
           <button type="submit" class="btn btn-primary" id="btnSubmitTimelineEvent">Save to Timeline</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Outlook Disconnect Confirmation (§4.1 & §5 P7.5) -->
+  <div class="modal-overlay" id="outlookDisconnectModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="outlookDisconnectTitle">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="dot red"></span>
+          <h3 id="outlookDisconnectTitle" style="margin: 0; font-size: 15px; color: var(--red);">Disconnect Outlook Account</h3>
+        </div>
+        <button class="modal-close-btn" data-close-modal aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <p style="font-size: 13px; line-height: 1.5; color: var(--text); margin-bottom: 14px;">
+          Are you sure you want to disconnect your Microsoft Outlook account?
+        </p>
+        <div class="sourcebanner" style="background: rgba(255, 93, 103, 0.08); border-color: var(--red-border); color: #ffb4b9; margin-bottom: 16px; font-size: 12px; line-height: 1.5;">
+          <span>⚠️</span>
+          <div>
+            This deletes Sloane's copy of your Outlook access and clears diary and email data from the dashboard; to fully remove Sloane's access from your Microsoft account, use <a href="https://myapps.microsoft.com" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">https://myapps.microsoft.com</a> (or the link Microsoft shows under your account's connected apps).
+          </div>
+        </div>
+        <p style="font-size: 11.5px; color: var(--muted); margin: 0;">
+          Zero tokens will remain on the server. You can reconnect at any time.
+        </p>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px;">
+        <button type="button" class="btn btn-secondary" data-close-modal id="btnCancelOutlookDisconnect">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmOutlookDisconnect">Disconnect Account</button>
+      </div>
     </div>
   </div>
 
