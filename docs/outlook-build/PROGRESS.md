@@ -53,7 +53,7 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 - [x] **P7.5** Disconnect confirm dialog and reconnect banner (`ModalManager`, ESC closes, focus trapped).
 
 ## Phase 8 — Verification and report
-- [ ] **P8.1** Automated regression and frontend smoke tests.
+- [x] **P8.1** Automated regression and frontend smoke tests.
 - [ ] **P8.2** Logged-out leak check (§6.1 script).
 - [ ] **P8.3** Human checkpoint H3: Kirsty connects real account.
 - [ ] **P8.4** Final report (§8).

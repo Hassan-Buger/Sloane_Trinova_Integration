@@ -1,0 +1,75 @@
+Task P8.1: Automated Regression & Frontend Smoke Tests Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P8.1 satisfies the automated regression and frontend smoke testing criteria defined in docs/outlook-build/SPEC.md §5 (Task P8.1) and §6.1:
+1. `cd server && npm test` is 100% green with zero regressions across all 105 test suites (443 passed, 0 failed).
+2. Dedicated frontend smoke test suite created in `server/tests/unit30-frontend-smoke.test.js` validating:
+   a. Empty Login Field Verification:
+      - `index.html` #loginEmail input contains NO static `value="..."` attribute.
+      - Placeholder is generic (`Corporate email address`), free of user names or company specifics.
+      - #loginPassword contains NO static `value="..."` attribute and no password strings.
+      - Sloane mirror (`Sloane/index.html`) consistently maintains empty login field.
+      - `AuthService.getRememberedEmail()` strictly returns `''` when unremembered.
+      - `AuthService.isAuthenticated()` returns `false` before explicit login.
+   b. Logged-Out View Security & Leak Prevention (§6.1):
+      - Static shell `index.html` matches 0 sensitive client entities (`woofington`, `jenkins`, `alpha delta`, `cfi awarding`, `rgb elevations`, `kirsty`) and 0 literal `@` characters.
+      - Unauthenticated HTTP fetch of `GET /` and `GET /index.html` returns 200 OK with zero sensitive entity hits and zero literal `@` characters.
+      - Anonymous request to `GET /scripts/data/seed.js` returns 404 (strictly protected).
+      - Unauthenticated access to data APIs (`/api/v1/clients`, `/api/v1/tasks`, `/api/v1/outlook/diary`, `/api/v1/outlook/flagged-emails`, `/api/v1/integrations/outlook/status`) returns 401 Unauthorized with no data leakage.
+   c. OutlookSettings States Render Cleanly & Securely (§4.1):
+      - State `not_connected`: renders unconfigured card, status badge, Connect button linking to `/api/v1/integrations/outlook/connect`, and AES-256-GCM encryption explanation. Does not render sync toggles or disconnect button.
+      - State `connected`: renders account email, display name, relative sync time (`formatSyncTimestamp`), email sync toggle, calendar sync toggle, folder select list, Sync now button, and Disconnect button.
+      - State `reconnect_required`: renders warning badge, explanation of expired/revoked consent, direct Reconnect link, and Disconnect option.
+      - State `sync_error`: renders error pill with short reason, warning banner, and retry sync button.
+      - State `syncing`: renders syncing status indicator and disabled sync button.
+      - Disconnect modal & post-confirmation guidance: renders exact honest §4.1 copy directing user to `https://myapps.microsoft.com` without claiming Microsoft revoked anything.
+      - Anti-XSS: dynamic server values (`accountEmail`, `displayName`, `lastError`, folder names) are strictly escaped with `escapeHtml` across all Settings states.
+
+Automated Test Results
+----------------------
+Command: npm test in server/
+Test Suites: 105 passed, 105 total
+Tests: 443 passed, 443 total
+Failures: 0
+Duration: 30.44s
+
+Test Execution Log (Task P8.1 excerpt):
+---------------------------------------
+▶ Task P8.1: Frontend Smoke Tests & Logged-Out Boundary
+  ▶ 1. Empty Login Field Verification
+    ✔ 1.1 index.html #loginEmail has no static value attribute or hardcoded credentials (1.6833ms)
+    ✔ 1.2 index.html #loginPassword has no static value attribute (0.3854ms)
+    ✔ 1.3 Sloane/index.html mirror also maintains empty login field (1.7967ms)
+    ✔ 1.4 AuthService.getRememberedEmail() returns empty string when unremembered (0.6305ms)
+    ✔ 1.5 AuthService.isAuthenticated() is false before explicit login (0.2095ms)
+  ✔ 1. Empty Login Field Verification (5.9731ms)
+  ▶ 2. Logged-Out View Security & Leak Prevention (§6.1)
+    ✔ 2.1 index.html static shell matches zero sensitive entities or unencoded @ (1.2352ms)
+    ✔ 2.2 GET / and GET /index.html return 200 with zero sensitive hits (84.9681ms)
+    ✔ 2.3 GET /scripts/data/seed.js returns 404 for anonymous requests (6.2047ms)
+    ✔ 2.4 Authenticated data API routes return 401 when accessed without session (34.1141ms)
+  ✔ 2. Logged-Out View Security & Leak Prevention (§6.1) (128.5388ms)
+  ▶ 3. Settings States Render Smoke Tests (§4.1 & §5)
+    ✔ 3.1 State "not_connected" renders clean unconfigured card with Connect link (1.3859ms)
+    ✔ 3.2 State "connected" renders account details, sync controls, folders, and actions (42.8637ms)
+    ✔ 3.3 State "reconnect_required" renders warning badge and direct reconnect action (0.479ms)
+    ✔ 3.4 State "sync_error" renders sync error badge, error description, and retry action (0.7922ms)
+    ✔ 3.5 State "syncing" renders syncing state with disabled action button (0.3356ms)
+    ✔ 3.6 Disconnect modal and guidance render exact honest §4.1 revocation copy (1.0537ms)
+    ✔ 3.7 Anti-XSS: dynamic server values are escaped across all Settings states (0.6195ms)
+  ✔ 3. Settings States Render Smoke Tests (§4.1 & §5) (48.6873ms)
+  ▶ 4. formatSyncTimestamp Smoke Tests
+    ✔ 4.1 Gracefully handles null, undefined, or malformed timestamps (0.2744ms)
+    ✔ 4.2 Returns London time and relative minutes for recent syncs (1.3013ms)
+  ✔ 4. formatSyncTimestamp Smoke Tests (1.8603ms)
+✔ Task P8.1: Frontend Smoke Tests & Logged-Out Boundary (203.7795ms)
+ℹ tests 443
+ℹ suites 105
+ℹ pass 443
+ℹ fail 0
