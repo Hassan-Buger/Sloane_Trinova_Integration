@@ -49,7 +49,15 @@ export const StorageService = {
   getClients() {
     try {
       const data = safeStorage.getItem(STORAGE_KEYS.CLIENTS);
-      return data ? JSON.parse(data) : INITIAL_CLIENTS;
+      if (!data) return INITIAL_CLIENTS;
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(c => {
+          const crn = (c.no || c.company_number || '').trim();
+          return !['12345678', '08923412', '11223344', '07788991'].includes(crn);
+        });
+      }
+      return INITIAL_CLIENTS;
     } catch (e) {
       return INITIAL_CLIENTS;
     }
@@ -60,6 +68,17 @@ export const StorageService = {
       safeStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
     } catch (e) {
       console.error('Failed to save clients to storage', e);
+    }
+  },
+
+  deleteClient(clientId) {
+    try {
+      const clients = this.getClients().filter(c => (c.id !== clientId && c.clientId !== clientId && c.rawId !== clientId));
+      this.saveClients(clients);
+      return true;
+    } catch (e) {
+      console.error('Failed to delete client from storage', e);
+      return false;
     }
   },
 

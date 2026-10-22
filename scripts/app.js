@@ -716,8 +716,11 @@ class SloaneApp {
     const syncClientsBtn = document.getElementById('btnForceSyncClients');
     const syncTrinovaToolbarBtn = document.getElementById('clientSyncTrinovaBtn');
     const handleSyncClientsClick = async () => {
-      Toast.info('Fetching live client entities from TriNova...');
-      this.logToTrinovaConsole('Executing GET /api/v1/clients...');
+      Toast.info('Connecting to live TriNova portal and syncing fresh records...');
+      this.logToTrinovaConsole('Executing GET /api/v1/clients against live TriNova...');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('sloane_clients_v2');
+      }
       const res = await ApiService.getClients({ search: this.searchQuery, biz: this.selectedBizFilter });
       await this.renderClients();
       this.logToTrinovaConsole(`Client sync complete. Loaded ${res.data.length} records (Source: ${res.source}).`);
@@ -1233,7 +1236,10 @@ class SloaneApp {
           <td style="max-width: 180px; font-size: 11px; color: var(--muted);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span>${safeNotes}</span>
-              <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="View Timeline" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px; color: var(--red); border-color: rgba(239, 68, 68, 0.3);" title="Remove Client" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">✕</button>
+              </div>
             </div>
           </td>
         </tr>
@@ -1252,6 +1258,19 @@ class SloaneApp {
     if (modalTlSelect) {
       modalTlSelect.innerHTML = clientOptions;
       if (this.activeClient360Id) modalTlSelect.value = this.activeClient360Id;
+    }
+  }
+
+  async deleteClient(clientId, clientName = 'this client') {
+    if (!confirm(`Are you sure you want to remove "${clientName}" from Sloane?`)) {
+      return;
+    }
+    try {
+      await ApiService.deleteClient(clientId);
+      Toast.success(`Client "${clientName}" removed.`);
+      await this.renderClients();
+    } catch (err) {
+      Toast.error(`Failed to remove client: ${err.message}`);
     }
   }
 

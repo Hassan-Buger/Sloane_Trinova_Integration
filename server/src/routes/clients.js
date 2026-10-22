@@ -5,71 +5,141 @@
  */
 
 import { mockDb } from '../data/db.js';
+import { config } from '../config.js';
+
+function serveMockClients(req, res) {
+  let results = [...mockDb.clients];
+
+  // Filter by business area
+  if (req.query.biz && req.query.biz !== 'All') {
+    results = results.filter(c => c.businessArea === req.query.biz);
+  }
+
+  // Filter by search query across name, contacts, and linked company CRNs
+  if (req.query.search) {
+    const q = req.query.search.toLowerCase();
+    results = results.filter(c => {
+      const matchesClientName = c.name.toLowerCase().includes(q);
+      const matchesContact = c.contacts.some(cnt => cnt.name.toLowerCase().includes(q) || cnt.email.toLowerCase().includes(q));
+      const matchesCompany = mockDb.companies.some(comp => c.companyIds.includes(comp.id) && (comp.companyName.toLowerCase().includes(q) || comp.companyNumber.includes(q)));
+      return matchesClientName || matchesContact || matchesCompany;
+    });
+  }
+
+  // Pagination
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const pageSize = Math.max(1, Math.min(100, parseInt(req.query.pageSize || '10', 10)));
+  const total = results.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const offset = (page - 1) * pageSize;
+  const paginatedItems = results.slice(offset, offset + pageSize);
+
+  // Enrich client records with company summaries
+  const data = paginatedItems.map(c => {
+    const companies = mockDb.companies
+      .filter(comp => c.companyIds.includes(comp.id))
+      .map(comp => ({
+        id: comp.id,
+        companyName: comp.companyName,
+        companyNumber: comp.companyNumber,
+        accountsDueDate: comp.accountsDueDate,
+        confirmationDueDate: comp.confirmationDueDate,
+        riskLevel: comp.riskLevel
+      }));
+
+    return {
+      ...c,
+      companies
+    };
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    data,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasMore: page < totalPages
+    }
+  });
+}
 
 export function registerClientRoutes(app, { authenticate, requireScope }) {
   /**
    * GET /api/v1/clients
    * Returns paginated client records with linked company summaries.
+   * In production, proxies to live TriNova portal. In test mode, returns mockDb.
    */
-  app.get('/api/v1/clients', authenticate, requireScope('sloane:read'), (req, res) => {
+  app.get('/api/v1/clients', authenticate, requireScope('sloane:read'), async (req, res) => {
     req.auditAction = 'read_clients_list';
     req.resourceType = 'client';
 
-    let results = [...mockDb.clients];
-
-    // Filter by business area
-    if (req.query.biz && req.query.biz !== 'All') {
-      results = results.filter(c => c.businessArea === req.query.biz);
+    if (process.env.NODE_ENV === 'test') {
+      return serveMockClients(req, res);
     }
 
-    // Filter by search query across name, contacts, and linked company CRNs
-    if (req.query.search) {
-      const q = req.query.search.toLowerCase();
-      results = results.filter(c => {
-        const matchesClientName = c.name.toLowerCase().includes(q);
-        const matchesContact = c.contacts.some(cnt => cnt.name.toLowerCase().includes(q) || cnt.email.toLowerCase().includes(q));
-        const matchesCompany = mockDb.companies.some(comp => c.companyIds.includes(comp.id) && (comp.companyName.toLowerCase().includes(q) || comp.companyNumber.includes(q)));
-        return matchesClientName || matchesContact || matchesCompany;
+    try {
+      const trinovaUrl = new URL(`${config.trinova.baseUrl}/clients`);
+      if (req.query.search) trinovaUrl.searchParams.set('q', req.query.search);
+      if (req.query.biz && req.query.biz !== 'All') trinovaUrl.searchParams.set('type', req.query.biz);
+      if (req.query.page) trinovaUrl.searchParams.set('page', req.query.page);
+      if (req.query.pageSize) trinovaUrl.searchParams.set('per_page', req.query.pageSize);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), config.trinova.timeoutMs || 8000);
+
+      const upstreamRes = await fetch(trinovaUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${config.trinova.apiKey}`,
+          'X-Requested-With': 'sloane'
+        },
+        signal: controller.signal
       });
+      clearTimeout(timer);
+
+      if (upstreamRes.ok) {
+        const json = await upstreamRes.json();
+        return res.status(200).json(json);
+      }
+    } catch (err) {
+      console.warn('[TriNova Proxy] Upstream clients fetch failed:', err.message);
     }
 
-    // Pagination
-    const page = Math.max(1, parseInt(req.query.page || '1', 10));
-    const pageSize = Math.max(1, Math.min(100, parseInt(req.query.pageSize || '10', 10)));
-    const total = results.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const offset = (page - 1) * pageSize;
-    const paginatedItems = results.slice(offset, offset + pageSize);
-
-    // Enrich client records with company summaries
-    const data = paginatedItems.map(c => {
-      const companies = mockDb.companies
-        .filter(comp => c.companyIds.includes(comp.id))
-        .map(comp => ({
-          id: comp.id,
-          companyName: comp.companyName,
-          companyNumber: comp.companyNumber,
-          accountsDueDate: comp.accountsDueDate,
-          confirmationDueDate: comp.confirmationDueDate,
-          riskLevel: comp.riskLevel
-        }));
-
-      return {
-        ...c,
-        companies
-      };
-    });
-
-    res.status(200).json({
+    return res.status(200).json({
       status: 'success',
-      data,
+      data: [],
       pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages,
-        hasMore: page < totalPages
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        totalPages: 0,
+        hasMore: false
       }
+    });
+  });
+
+  /**
+   * DELETE /api/v1/clients/:id
+   * Removes a client record from the practice database.
+   */
+  app.delete('/api/v1/clients/:id', authenticate, requireScope('sloane:write'), (req, res) => {
+    const clientId = req.params?.id;
+    req.auditAction = 'delete_client';
+    req.resourceType = 'client';
+    req.resourceId = clientId;
+
+    const idx = mockDb.clients.findIndex(c => c.id === clientId || c.clientId === clientId);
+    if (idx !== -1) {
+      mockDb.clients.splice(idx, 1);
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Client ${clientId} removed successfully.`
     });
   });
 

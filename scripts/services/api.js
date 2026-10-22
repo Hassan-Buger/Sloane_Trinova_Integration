@@ -23,9 +23,23 @@ if (typeof localStorage !== 'undefined') {
   try {
     localStorage.removeItem('sloane_trinova_api_token');
     const storedUrl = localStorage.getItem('sloane_trinova_base_url');
-    if (storedUrl && (storedUrl.includes('testnova-production-7b65.up.railway.app') || storedUrl.includes('testnova'))) {
+    if (storedUrl && (storedUrl.includes('testnova-production-7b65.up.railway.app') || storedUrl.includes('testnova') || storedUrl.includes('localhost:4000') || storedUrl.includes('sloanetrinovaintegration-production.up.railway.app'))) {
       localStorage.removeItem('sloane_trinova_base_url');
     }
+    // Clean out legacy mock client records from localStorage by CRN
+    const cachedClientsStr = localStorage.getItem('sloane_clients_v2');
+    if (cachedClientsStr) {
+      const cached = JSON.parse(cachedClientsStr);
+      if (Array.isArray(cached)) {
+        const cleaned = cached.filter(c => {
+          const crn = (c.no || c.company_number || '').trim();
+          return !['12345678', '08923412', '11223344', '07788991'].includes(crn);
+        });
+        localStorage.setItem('sloane_clients_v2', JSON.stringify(cleaned));
+      }
+    }
+    localStorage.removeItem('sloane_clients_v1');
+    localStorage.removeItem('sloane_clients');
   } catch (_) {}
 }
 
@@ -76,7 +90,20 @@ export const ApiService = {
    * Internal HTTP request helper with timeout and auth headers.
    */
   async request(endpoint, options = {}) {
-    const url = `${this.config.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    const isSloaneInternal = endpoint.startsWith('/outlook') ||
+                             endpoint.startsWith('/integrations/outlook') ||
+                             endpoint.startsWith('/ai') ||
+                             endpoint.startsWith('/ceo-brain') ||
+                             endpoint.startsWith('/notes') ||
+                             endpoint.startsWith('/auth/login') ||
+                             endpoint.startsWith('/auth/logout') ||
+                             endpoint.startsWith('/auth/session');
+
+    let base = this.config.baseUrl;
+    if (isSloaneInternal && typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file:')) {
+      base = `${window.location.origin}/api/v1`;
+    }
+    const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const timeoutMs = options.timeout || 9000;
 
@@ -93,13 +120,6 @@ export const ApiService = {
       headers['Content-Type'] = 'application/json';
       if (!headers['Idempotency-Key']) {
         headers['Idempotency-Key'] = this.generateIdempotencyKey();
-      }
-    }
-
-    // Direct authorization for live TriNova portal endpoint
-    if (this.config.baseUrl && (this.config.baseUrl.includes('trinovaaccounting.co.uk') || this.config.baseUrl.includes('portal.trinova'))) {
-      if (!headers['Authorization']) {
-        headers['Authorization'] = 'Bearer tn_sec_live_sloane_readwrite_2026';
       }
     }
 
@@ -264,6 +284,9 @@ export const ApiService = {
             notes: item.notes || item.primary_contact?.address || '',
             isLiveTriNova: true
           };
+        }).filter(c => {
+          const crn = (c.no || '').trim();
+          return !['12345678', '08923412', '11223344', '07788991'].includes(crn);
         });
 
         // Cache live data locally
@@ -365,6 +388,17 @@ export const ApiService = {
         data: newClient
       };
     }
+  },
+
+  /**
+   * Deletes a client entity and removes from local storage.
+   */
+  async deleteClient(clientId) {
+    try {
+      await this.request(`/clients/${clientId}`, { method: 'DELETE' });
+    } catch (_) {}
+    StorageService.deleteClient(clientId);
+    return { status: 'success', message: 'Client removed' };
   },
 
   /**
