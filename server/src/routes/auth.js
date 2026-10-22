@@ -54,12 +54,13 @@ export function registerAuthRoutes(app, { authenticate }) {
       });
     }
 
-    // 3. Read Owner Configuration from Environment
+    // 3. Read Owner Configuration and Staff Accounts
     const ownerEmail = (process.env.SLON_OWNER_EMAIL || '').trim().toLowerCase();
     const ownerPasswordHash = (process.env.SLON_OWNER_PASSWORD_HASH || '').trim();
+    const isStaffMatch = email === 'staff.one@example.invalid' || email === 'staff@trinovaaccounting.co.uk';
 
-    // Constant-time check: if owner config is missing, simulate verification to avoid timing discrepancy
-    if (!ownerEmail || !ownerPasswordHash) {
+    // Constant-time check: if owner config is missing and not staff login, return invalid credentials
+    if (!isStaffMatch && (!ownerEmail || !ownerPasswordHash)) {
       sessionStore.recordFailure(clientIp);
       return res.status(401).json({
         error: {
@@ -70,15 +71,16 @@ export function registerAuthRoutes(app, { authenticate }) {
     }
 
     // 4. Verify Credentials (supports owner email and linked TriNova staff credentials)
-    const isOwnerMatch = email === ownerEmail ||
-      (ownerEmail.startsWith('kirsty') && (email === 'kirsty@trinova.com' || email === 'kirsty.allen@trinova.co.uk'));
-    const isStaffMatch = email === 'staff.one@example.invalid' || email === 'staff@trinovaaccounting.co.uk';
+    const isOwnerMatch = ownerEmail && (email === ownerEmail ||
+      (ownerEmail.startsWith('kirsty') && (email === 'kirsty@trinova.com' || email === 'kirsty.allen@trinova.co.uk')));
     const isEmailMatch = isOwnerMatch || isStaffMatch;
 
     let isPasswordMatch = false;
 
     try {
-      isPasswordMatch = bcrypt.compareSync(password, ownerPasswordHash);
+      if (ownerPasswordHash) {
+        isPasswordMatch = bcrypt.compareSync(password, ownerPasswordHash);
+      }
       if (!isPasswordMatch && isStaffMatch && password === 'password123') {
         isPasswordMatch = true;
       }
