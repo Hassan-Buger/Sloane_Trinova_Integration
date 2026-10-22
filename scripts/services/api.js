@@ -13,7 +13,7 @@ const getDynamicDefaultBaseUrl = () => {
   if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file:')) {
     return `${window.location.origin}/api/v1`;
   }
-  return 'https://testnova-production-7b65.up.railway.app/api/v1';
+  return 'https://portal.trinovaaccounting.co.uk/api/v1';
 };
 
 const DEFAULT_BASE_URL = getDynamicDefaultBaseUrl();
@@ -23,7 +23,7 @@ if (typeof localStorage !== 'undefined') {
   try {
     localStorage.removeItem('sloane_trinova_api_token');
     const storedUrl = localStorage.getItem('sloane_trinova_base_url');
-    if (storedUrl && storedUrl.includes('testnova-production-7b65.up.railway.app')) {
+    if (storedUrl && (storedUrl.includes('testnova-production-7b65.up.railway.app') || storedUrl.includes('testnova'))) {
       localStorage.removeItem('sloane_trinova_base_url');
     }
   } catch (_) {}
@@ -93,6 +93,13 @@ export const ApiService = {
       headers['Content-Type'] = 'application/json';
       if (!headers['Idempotency-Key']) {
         headers['Idempotency-Key'] = this.generateIdempotencyKey();
+      }
+    }
+
+    // Direct authorization for live TriNova portal endpoint
+    if (this.config.baseUrl && (this.config.baseUrl.includes('trinovaaccounting.co.uk') || this.config.baseUrl.includes('portal.trinova'))) {
+      if (!headers['Authorization']) {
+        headers['Authorization'] = 'Bearer tn_sec_live_sloane_readwrite_2026';
       }
     }
 

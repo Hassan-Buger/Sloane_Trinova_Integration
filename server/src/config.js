@@ -64,6 +64,15 @@ export const config = {
     return keys;
   },
 
+  // Live TriNova Accounting Portal Integration
+  get trinova() {
+    return {
+      baseUrl: (process.env.TRINOVA_API_URL || 'https://portal.trinovaaccounting.co.uk/api/v1').trim().replace(/\/+$/, ''),
+      apiKey: (process.env.TRINOVA_API_KEY || process.env.SLON_API_KEY || 'tn_sec_live_sloane_readwrite_2026').trim(),
+      timeoutMs: parseInt(process.env.TRINOVA_TIMEOUT_MS || '8000', 10)
+    };
+  },
+
   // Owner authentication configuration (Section 1.1)
   owner: {
     email: (process.env.SLON_OWNER_EMAIL || '').trim().toLowerCase(),

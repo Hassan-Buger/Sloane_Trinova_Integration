@@ -115,7 +115,7 @@ export const StorageService = {
 
   // --- Trinova Configuration ---
   getTrinovaApiUrl() {
-    return safeStorage.getItem(STORAGE_KEYS.TRINOVA_API_URL) || 'https://testnova-production-7b65.up.railway.app/api/v1';
+    return safeStorage.getItem(STORAGE_KEYS.TRINOVA_API_URL) || 'https://portal.trinovaaccounting.co.uk/api/v1';
   },
 
   setTrinovaApiUrl(url) {

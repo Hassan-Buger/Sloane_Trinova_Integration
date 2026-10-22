@@ -123,7 +123,8 @@ export function createApp(options = {}) {
         'http://localhost:8088',
         'http://127.0.0.1:4000',
         'http://127.0.0.1:8088',
-        'https://sloanetrinovaintegration-production.up.railway.app'
+        'https://sloanetrinovaintegration-production.up.railway.app',
+        'https://portal.trinovaaccounting.co.uk'
       ];
       if (process.env.CORS_ALLOWED_ORIGINS) {
         process.env.CORS_ALLOWED_ORIGINS.split(',').forEach(o => {
@@ -144,7 +145,7 @@ export function createApp(options = {}) {
       // Security Headers: Content-Security-Policy & Defensive Headers (Section 1.4)
       res.setHeader(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://testnova-production-7b65.up.railway.app;"
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://portal.trinovaaccounting.co.uk https://testnova-production-7b65.up.railway.app;"
       );
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
