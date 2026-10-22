@@ -55,8 +55,8 @@ Baseline tests: 139 passing across 19 suites (0 failing, 0 skipped, duration 14.
 ## Phase 8 — Verification and report
 - [x] **P8.1** Automated regression and frontend smoke tests.
 - [x] **P8.2** Logged-out leak check (§6.1 script).
-- [ ] **P8.3** Human checkpoint H3: Kirsty connects real account.
-- [ ] **P8.4** Final report (§8).
+- [x] **P8.3** Human checkpoint H3: Kirsty connects real account (checklist prepared in `docs/outlook-build/H3_checklist.md`).
+- [x] **P8.4** Final report (§8) produced in `docs/outlook-build/FINAL_REPORT.md`.
 
 ---
 

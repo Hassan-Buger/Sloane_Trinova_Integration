@@ -1,0 +1,27 @@
+Task P8.4: Final Report Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P8.4 produces the comprehensive Final Report specified in docs/outlook-build/SPEC.md §8:
+- File authored at: `docs/outlook-build/FINAL_REPORT.md`
+- Contains all 7 mandated sections:
+  1. What was built (one line per task ID, P0.1 through P8.4, with status 'done')
+  2. App-registration scopes used (exact list, Option A identity rationale, admin consent status: NO)
+  3. Deviations and decisions (link to DECISIONS.md, summary of D0.1-D0.5, D7.1, D7.2)
+  4. Security checks (§6.1 logged-out leak check: 12/12 passed, 0 hits; §6.2 token-leak check: passed; §6.3 vault-at-rest check: passed)
+  5. Test results (before: 139 passed across 19 suites; after: 443 passed across 105 suites; +304 tests, +86 suites, 0 failures)
+  6. Screenshots (logged_out.png verified; connected & empty state status explained per §8 item 6 protocol without mocks)
+  7. Known gaps and risks (client secret expiry 180-day cycle, myapps.microsoft.com manual consent revocation, in-memory OAuth state limits, mockDb boundary)
+
+Verification Summary
+--------------------
+- Full regression suite verified via `npm test` in `server/`: 443 passed across 105 suites (100% green).
+- Evidence recorded for all phases P0 through P8 in `docs/outlook-build/evidence/`.
+- `docs/outlook-build/PROGRESS.md` updated with all tasks checked off.
+- `context/progress-tracker.md` updated with full Phase 7 and Phase 8 records.
+- Bidirectional mirror sync to `Sloane/` maintained.
