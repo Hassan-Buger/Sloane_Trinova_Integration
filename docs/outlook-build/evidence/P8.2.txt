@@ -1,0 +1,52 @@
+Task P8.2: Logged-Out Leak Check Verification Evidence
+================================================================================
+
+Date: 2026-10-22
+Author: Antigravity
+Status: COMPLETE & VERIFIED
+
+Overview
+--------
+Task P8.2 executes the logged-out leak check verification script specified in docs/outlook-build/SPEC.md §6.1:
+- Executed in a fresh process with no session cookies or remembered state.
+- Real secrets supplied via environment variables:
+  * SLON_API_KEY
+  * SLON_OWNER_EMAIL
+  * SLON_OWNER_PASSWORD_HASH
+  * STORAGE_PRESIGNED_TOKEN_SECRET
+  * OUTLOOK_TOKEN_ENC_KEY
+  * OUTLOOK_CLIENT_ID
+- Queried all 12 specified paths using HTTP GET requests.
+- Each response body was inspected with the exact case-insensitive regex:
+  woofington|jenkins|alpha delta|cfi awarding|rgb elevations|@[a-z0-9.-]+\.(co\.uk|com|org)|refresh_token|access_token|client_secret|password123|tn_sec_|documenso_webhook
+- Acceptance Criteria (§6.1):
+  1. Every endpoint must yield `sensitive_hits=0`.
+  2. `/scripts/data/seed.js` must return HTTP `404 Not Found`.
+  3. Every `/api/v1/*` data route must return HTTP `401 Unauthorized` without data leakage.
+
+Verification Execution Output
+-----------------------------
+BASE=http://localhost:4000
+Target BASE: http://127.0.0.1:4000
+Grep Pattern: woofington|jenkins|alpha delta|cfi awarding|rgb elevations|@[a-z0-9.-]+\.(co\.uk|com|org)|refresh_token|access_token|client_secret|password123|tn_sec_|documenso_webhook
+
+/                                      status=200  sensitive_hits=0
+/index.html                            status=200  sensitive_hits=0
+/scripts/app.js                        status=200  sensitive_hits=0
+/scripts/services/api.js               status=200  sensitive_hits=0
+/scripts/services/auth.js              status=200  sensitive_hits=0
+/scripts/data/seed.js                  status=404  sensitive_hits=0
+/styles/views.css                      status=200  sensitive_hits=0
+/api/v1/clients                        status=401  sensitive_hits=0
+/api/v1/tasks                          status=401  sensitive_hits=0
+/api/v1/outlook/diary                  status=401  sensitive_hits=0
+/api/v1/outlook/flagged-emails         status=401  sensitive_hits=0
+/api/v1/integrations/outlook/status    status=401  sensitive_hits=0
+
+Summary
+-------
+12 of 12 paths checked:
+- 0 sensitive entity hits found across all endpoints.
+- `/scripts/data/seed.js` strictly returns 404.
+- All `/api/v1/*` endpoints reject anonymous access with 401 Unauthorized.
+- Status: PASSED (100% compliance with SPEC.md §6.1).

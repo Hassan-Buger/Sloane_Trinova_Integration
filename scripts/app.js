@@ -50,7 +50,7 @@ class SloaneApp {
     this.searchQuery = '';
     this.selectedBizFilter = 'All';
     this.selectedBrainEntryForTrinova = null;
-    this.activeClient360Id = 'cli_woofington_grp';
+    this.activeClient360Id = null;
     this.activeClientTab = 'overview';
     this.timelineEvents = [];
     this.timelineEventTypeFilter = '';
@@ -802,23 +802,12 @@ class SloaneApp {
      ========================================================================== */
 
   async renderCommandCentre() {
-    // 0. Render Red Alerts
+    // 0. Render Red Alerts placeholder
     const redAlertsContainer = document.getElementById('redAlertsContainer');
     if (redAlertsContainer) {
       redAlertsContainer.innerHTML = `
-        <div class="alert-item">
-          <span class="dot red" style="margin-top: 4px;"></span>
-          <div class="alert-item-content">
-            <div class="alert-title">CRITICAL: Woofington Park Strike-Off Proposal</div>
-            <div class="alert-desc">First Gazette publication registered. Immediate accounts filing required to protect entity.</div>
-          </div>
-        </div>
-        <div class="alert-item" style="margin-bottom: 0;">
-          <span class="dot red" style="margin-top: 4px;"></span>
-          <div class="alert-item-content">
-            <div class="alert-title">OVERDUE: R GB Elevations Ltd Accounts</div>
-            <div class="alert-desc">50 days past deadline. Penalty tier active. Final bank records pending.</div>
-          </div>
+        <div style="font-size: 11.5px; color: var(--muted); padding: 8px 0;">
+          Checking statutory alerts...
         </div>
       `;
     }
@@ -842,6 +831,28 @@ class SloaneApp {
       ]);
       tasksRes = tRes;
       statutoryRes = sRes;
+
+      // Render Red Alerts dynamically from statutory filings
+      if (redAlertsContainer) {
+        const urgentItems = (statutoryRes?.data || []).filter(s => s.status === 'Overdue' || s.risk === 'Critical');
+        if (urgentItems.length > 0) {
+          redAlertsContainer.innerHTML = urgentItems.slice(0, 2).map(item => `
+            <div class="alert-item">
+              <span class="dot red" style="margin-top: 4px;"></span>
+              <div class="alert-item-content">
+                <div class="alert-title">${escapeHtml(item.type || 'Statutory Filing')}: ${escapeHtml(item.clientName || item.name || 'Client')}</div>
+                <div class="alert-desc">${escapeHtml(item.reason || item.description || 'Statutory deadline overdue. Immediate filing required.')}</div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          redAlertsContainer.innerHTML = `
+            <div style="font-size: 11.5px; color: var(--muted); padding: 8px 0;">
+              No active critical red alerts on file.
+            </div>
+          `;
+        }
+      }
 
       const status = statusRes?.data?.status || 'not_connected';
       isOutlookConnected = status === 'connected';
@@ -1190,7 +1201,7 @@ class SloaneApp {
 
     tbody.innerHTML = clients.map(c => {
       const riskClass = c.risk === 'High' ? 'red' : c.risk === 'Medium' ? 'amber' : 'green';
-      const clientId = sanitizeId(c.id || c.clientId || 'cli_woofington_grp');
+      const clientId = sanitizeId(c.id || c.clientId || 'client_record');
       const safeName = escapeHtml(c.name);
       const safeBiz = escapeHtml(c.biz || '—');
       const safeNo = escapeHtml(c.no);
@@ -1472,25 +1483,19 @@ class SloaneApp {
       <div class="card intel-card">
         <div class="card-header">
           <h2><span class="dot red"></span> Critical Scan (Compliance & HMRC)</h2>
-          <span class="pill red">3 Issues</span>
+          <span class="pill red">Active</span>
         </div>
         <div class="intel-list">
           <div class="intel-item intel-critical">
             <div class="intel-item-content">
-              <div class="intel-title">Woofington Park Limited — Active Strike-Off Proposal</div>
-              <div class="intel-desc">First Gazette publication active. Objection window closes in 6 days. Overdue accounts must be lodged immediately to preserve entity.</div>
+              <div class="intel-title">Corporate Statutory Filings & Compliance</div>
+              <div class="intel-desc">Statutory filings, late filing penalty tiers, and registry notices monitored across client portfolios.</div>
             </div>
           </div>
           <div class="intel-item intel-critical">
             <div class="intel-item-content">
-              <div class="intel-title">R GB Elevations Ltd — Statutory Accounts Overdue (50d)</div>
-              <div class="intel-desc">Accounts due date 31/07/2026 missed. Higher statutory late filing penalty tier active. Bank statements obtained today.</div>
-            </div>
-          </div>
-          <div class="intel-item intel-critical">
-            <div class="intel-item-content">
-              <div class="intel-title">Monarch Craft Brewers Ltd — Overdue Verification</div>
-              <div class="intel-desc">Filing tracker records accounts overdue. Client contact required to verify whether submission was completed externally.</div>
+              <div class="intel-title">Registry Verification Tracker</div>
+              <div class="intel-desc">Cross-referencing live Companies House submission status with practice management records.</div>
             </div>
           </div>
         </div>
@@ -1499,19 +1504,19 @@ class SloaneApp {
       <div class="card intel-card">
         <div class="card-header">
           <h2><span class="dot amber"></span> Chase Scan (Delegated Work & Promises)</h2>
-          <span class="pill amber">2 Stalled</span>
+          <span class="pill amber">Active</span>
         </div>
         <div class="intel-list">
           <div class="intel-item intel-chase">
             <div class="intel-item-content">
-              <div class="intel-title">Sarah Jenkins (Woofington Park) — Balance Sheet Signature</div>
-              <div class="intel-desc">Promised signature by 4:00 PM today. Follow-up reminder scheduled on Hamza's calendar.</div>
+              <div class="intel-title">Delegated Action Items & Follow-ups</div>
+              <div class="intel-desc">Partner instructions and statutory balance sheet sign-offs tracked to completion.</div>
             </div>
           </div>
           <div class="intel-item intel-chase">
             <div class="intel-item-content">
-              <div class="intel-title">Jessica Taylor — Woofington Emergency CH Defense Lodgment</div>
-              <div class="intel-desc">Blocker: awaiting signed balance sheet before electronically submitting defense paperwork to Companies House.</div>
+              <div class="intel-title">Pending Information Requests</div>
+              <div class="intel-desc">Awaiting client banking records and electronic approvals for scheduled submissions.</div>
             </div>
           </div>
         </div>
@@ -1527,8 +1532,8 @@ class SloaneApp {
         <div class="intel-list">
           <div class="intel-item">
             <div class="intel-item-content">
-              <div class="intel-title">All Key Practice Clients Contacted within 45 Days</div>
-              <div class="intel-desc">Communication cadence across Trinova Accounting and CFI Awarding is in full compliance with SLA targets.</div>
+              <div class="intel-title">All Key Practice Clients Monitored</div>
+              <div class="intel-desc">Communication cadence across practice business areas is in full compliance with SLA targets.</div>
             </div>
           </div>
         </div>
@@ -1577,23 +1582,16 @@ class SloaneApp {
         <div class="alert-item">
           <span class="dot red" style="margin-top: 4px;"></span>
           <div class="alert-item-content">
-            <div class="alert-title">CRITICAL: Woofington Park Limited Strike-off Notice</div>
-            <div class="alert-desc">Objection deadline is imminent. Action required before 25 September 2026.</div>
-          </div>
-        </div>
-        <div class="alert-item">
-          <span class="dot red" style="margin-top: 4px;"></span>
-          <div class="alert-item-content">
-            <div class="alert-title">CRITICAL: R GB Elevations Ltd Accounts Overdue</div>
-            <div class="alert-desc">50 days past statutory due date. Higher penalty tier in effect.</div>
+            <div class="alert-title">Compliance Scan Active</div>
+            <div class="alert-desc">Safety-net engine monitoring statutory filings, pending accounts, and overdue tasks.</div>
           </div>
         </div>
         <div class="diary-item">
           <div class="diary-item-left">
             <span class="dot amber"></span>
-            <span class="diary-title">Chase: Sarah Jenkins balance sheet signature</span>
+            <span class="diary-title">Follow-up: Pending client document signatures</span>
           </div>
-          <span class="timechip">By 16:00</span>
+          <span class="timechip">Today</span>
         </div>
       </div>
     `;
@@ -1739,7 +1737,7 @@ class SloaneApp {
       clients = StorageService.getClients();
     }
     const match = clients.find(c => c.name === companyName);
-    const companyId = match ? (match.rawId || match.id) : 'comp_woofington_park_01';
+    const companyId = match ? (match.rawId || match.id) : (clients[0]?.id || 'comp_default_01');
 
     try {
       this.logToTrinovaConsole(`Posting internal note to TriNova for company ${companyName} (${visibility})...`);
@@ -1825,7 +1823,7 @@ class SloaneApp {
   }
 
   async renderTimeline(clientId = this.activeClient360Id, forceToast = false) {
-    clientId = sanitizeId(clientId) || 'cli_woofington_grp';
+    clientId = sanitizeId(clientId) || 'client_default';
     this.activeClient360Id = clientId;
 
     const container = document.getElementById('timelineEventsContainer');
@@ -1842,9 +1840,9 @@ class SloaneApp {
     // Retrieve client metadata to populate header
     const clientRes = await ApiService.getClients();
     const clients = clientRes.data || [];
-    const activeClient = clients.find(c => (c.id || c.clientId) === clientId) || {
-      name: 'Woofington Group',
-      biz: 'Trinova Accounting',
+    const activeClient = clients.find(c => (c.id || c.clientId) === clientId) || clients[0] || {
+      name: 'Client Account',
+      biz: 'General Practice',
       clientType: 'Corporate Group',
       status: 'Active'
     };
@@ -2227,10 +2225,11 @@ class SloaneApp {
 
     // Detect target client from query if mentioned, or preserve active conversational context
     const qLower = query.toLowerCase();
-    if (/woofington/i.test(qLower)) this.activeAiClientId = 'cli_woofington_grp';
-    else if (/rgb|elevation/i.test(qLower)) this.activeAiClientId = 'cli_rgb_elevations';
-    else if (/alpha|delta/i.test(qLower)) this.activeAiClientId = 'cli_alpha_delta';
-    else if (/cfi|awarding/i.test(qLower)) this.activeAiClientId = 'cli_cfi_awarding';
+    try {
+      const knownClients = StorageService.getClients() || [];
+      const matched = knownClients.find(c => c.name && qLower.includes(c.name.toLowerCase()));
+      if (matched) this.activeAiClientId = matched.id;
+    } catch (_) {}
 
     const targetClientId = this.activeAiClientId || null;
 
@@ -2391,7 +2390,7 @@ class SloaneApp {
                 <div class="ai-evidence-item">
                   <span style="color: #c5d1de;">${escapeHtml(ev.reason || 'Record cited')}</span>
                   ${ev.timeline_event_id ? `
-                    <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${sanitizeId(ev.timeline_event_id)}', '${sanitizeId(targetClientId || 'cli_woofington_grp')}')">
+                    <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${sanitizeId(ev.timeline_event_id)}', '${sanitizeId(targetClientId || '')}')">
                       View Event #${escapeHtml(ev.timeline_event_id.substring(0, 12))} ↗
                     </button>
                   ` : ''}

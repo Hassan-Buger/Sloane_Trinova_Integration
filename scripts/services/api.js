@@ -489,7 +489,7 @@ export const ApiService = {
     // Simulated/verified live Companies House dataset
     const simulatedLiveResponses = {
       "12345678": {
-        name: "Woofington Park Limited",
+        name: "Corporate Client Entity 1",
         companyStatus: "active",
         detail: "active-proposal-to-strike-off",
         accounts: "2026-08-31",
@@ -499,7 +499,7 @@ export const ApiService = {
         checked: new Date().toISOString()
       },
       "08923412": {
-        name: "R GB Elevations Ltd",
+        name: "Corporate Client Entity 2",
         companyStatus: "active",
         detail: null,
         accounts: "2026-07-31",
@@ -509,7 +509,7 @@ export const ApiService = {
         checked: new Date().toISOString()
       },
       "11223344": {
-        name: "Alpha Delta Creative Ltd",
+        name: "Corporate Client Entity 3",
         companyStatus: "active",
         detail: null,
         accounts: "2026-09-30",
@@ -519,7 +519,7 @@ export const ApiService = {
         checked: new Date().toISOString()
       },
       "02110099": {
-        name: "Monarch Craft Brewers Ltd",
+        name: "Corporate Client Entity 4",
         companyStatus: "active",
         detail: null,
         accounts: "2026-07-31",
@@ -594,7 +594,7 @@ export const ApiService = {
     }
 
     const companyId = notePayload.companyId || notePayload.rawId || 1;
-    const companyName = notePayload.companyName || 'Woofington Park Limited';
+    const companyName = notePayload.companyName || 'Corporate Client';
     const visibility = notePayload.visibility || 'staff_only';
     const idempotencyKey = notePayload.idempotencyKey || this.generateIdempotencyKey();
 
@@ -905,56 +905,13 @@ export const ApiService = {
     }
 
     if (!targetClient) {
-      if (/woofington/i.test(mLower)) {
-        targetClient = clients.find(c => /woofington/i.test(c.name)) || {
-          id: 'cli_woofington_grp',
-          name: 'Woofington Park Limited',
-          risk: 'High',
-          dirs: 'Sarah Jenkins, Mark Jenkins',
-          owner: 'Kirsty Allen',
-          fee: '£1,850',
-          no: '12345678'
-        };
-      } else if (/rgb|elevation/i.test(mLower)) {
-        targetClient = clients.find(c => /rgb|elevation/i.test(c.name)) || {
-          id: 'cli_rgb_elevations',
-          name: 'R GB Elevations Ltd',
-          risk: 'High',
-          dirs: 'Robert Brown',
-          owner: 'Hamza Malik',
-          fee: '£2,400',
-          no: '08923412'
-        };
-      } else if (/alpha|delta/i.test(mLower)) {
-        targetClient = clients.find(c => /alpha|delta/i.test(c.name)) || {
-          id: 'cli_alpha_delta',
-          name: 'Alpha Delta Creative Ltd',
-          risk: 'Medium',
-          dirs: 'Amanda Smith',
-          owner: 'Kirsty Allen',
-          fee: '£1,500',
-          no: '11223344'
-        };
-      } else if (/cfi|awarding/i.test(mLower)) {
-        targetClient = clients.find(c => /cfi|awarding/i.test(c.name)) || {
-          id: 'cli_cfi_awarding',
-          name: 'CFI Awarding Body Ltd',
-          risk: 'Low',
-          dirs: 'Kirsty Allen, David Foster',
-          owner: 'Kirsty Allen',
-          no: '07788991'
-        };
-      }
+      targetClient = clients.find(c => c.name && mLower.includes(c.name.toLowerCase()));
     }
 
     // Check conversational context from history
     if (!targetClient && Array.isArray(payload.history)) {
       const historyText = payload.history.map(h => (typeof h.content === 'string' ? h.content : '')).join(' ').toLowerCase();
-      if (/woofington/i.test(historyText)) {
-        targetClient = clients.find(c => /woofington/i.test(c.name));
-      } else if (/rgb|elevation/i.test(historyText)) {
-        targetClient = clients.find(c => /rgb|elevation/i.test(c.name));
-      }
+      targetClient = clients.find(c => c.name && historyText.includes(c.name.toLowerCase()));
     }
 
     let responseData = null;
@@ -964,7 +921,7 @@ export const ApiService = {
     if (isGreeting) {
       responseData = {
         response_type: 'conversational',
-        answer: 'Hello Kirsty. I am Sloane, your Executive Command Centre assistant. How can I assist you with practice intelligence, statutory obligations, or director instructions right now?',
+        answer: 'Hello. I am Sloane, your Executive Command Centre assistant. How can I assist you with practice intelligence, statutory obligations, or director instructions right now?',
         risk_level: null,
         key_reasons: [],
         recommended_actions: [],
@@ -998,7 +955,7 @@ export const ApiService = {
     else if (/^(who\s+are\s+you|what\s+can\s+you\s+help|what\s+do\s+you\s+do|explain\s+what\s+you\s+can)\b/i.test(mLower)) {
       responseData = {
         response_type: 'general_knowledge',
-        answer: 'I am Sloane, your executive assistant for TriNova Group. I monitor statutory obligations and filing deadlines, cross-reference Companies House records, track client timelines with immutable provenance, manage Documenso digital signing workflows, and brief you on high-risk practice entities.',
+        answer: 'I am Sloane, your executive assistant. I monitor statutory obligations and filing deadlines, cross-reference Companies House records, track client timelines with immutable provenance, manage Documenso digital signing workflows, and brief you on high-risk practice entities.',
         risk_level: null,
         key_reasons: [],
         recommended_actions: [],
@@ -1008,146 +965,104 @@ export const ApiService = {
 
     // D. Red-Flagged Company Count
     else if (/how\s+many.*(red|flagged)/i.test(mLower) || /count.*(red|high)/i.test(mLower)) {
-      const redList = clients.filter(c => c.risk === 'High' || /woofington|rgb|monarch|artemis/i.test(c.name));
-      const redNames = redList.length > 0 ? redList.map(c => c.name).slice(0, 4) : ['Woofington Park Limited', 'R GB Elevations Ltd', 'Monarch Craft Brewers Ltd', 'Artemis BioHealth Labs Ltd'];
+      const redList = clients.filter(c => c.risk === 'High');
+      const redCount = redList.length > 0 ? redList.length : 2;
+      const redNames = redList.length > 0 ? redList.map(c => c.name).slice(0, 4) : ['Critical Monitored Account 1', 'Critical Monitored Account 2'];
 
       responseData = {
         response_type: 'practice_assessment',
-        answer: `According to practice records, there are ${redNames.length} entities flagged RED at high statutory risk: ${redNames.join(', ')}.`,
+        answer: `According to practice records, there are ${redCount} entities flagged RED at high statutory risk: ${redNames.join(', ')}.`,
         risk_level: 'red',
         key_reasons: [
-          `${redNames.length} practice entities require immediate intervention to prevent penalties or dissolution.`,
-          "Woofington Park Limited: Active strike-off notice on Companies House register.",
-          "R GB Elevations Ltd: Statutory accounts overdue since 31/07/2026."
+          `${redCount} practice entities require immediate intervention to prevent penalties or dissolution.`,
+          "Statutory accounts or confirmation statements overdue on registry records."
         ],
         recommended_actions: [
-          { action: "Submit strike-off defense objection for Woofington Park Limited", priority: "high", reason: "Dissolution defense" },
-          { action: "Chase Robert Brown for R GB bank records", priority: "high", reason: "Filing penalty mitigation" }
+          { action: "Submit statutory filing defense with Companies House", priority: "high", reason: "Dissolution defense" },
+          { action: "Chase client directors for missing accounting records", priority: "high", reason: "Filing penalty mitigation" }
         ],
-        evidence: [
-          { timeline_event_id: "evt_woof_004", reason: "Active strike-off notice registered at Companies House" }
-        ]
+        evidence: []
       };
     }
 
-    // E. Focused Client: Woofington Park
-    else if (targetClient && (/woofington/i.test(targetClient.name) || /woofington/i.test(mLower))) {
-      const isDirector = /director|who|contact|email|sarah|mark|call/i.test(mLower);
+    // E. Focused Client
+    else if (targetClient) {
+      const isDirector = /director|who|contact|email|call/i.test(mLower);
       const isTimeline = /timeline|recent|happened|event|history/i.test(mLower);
 
       if (isDirector) {
         responseData = {
           response_type: 'practice_assessment',
-          answer: "The registered directors for Woofington Park Limited are Sarah Jenkins and Mark Jenkins. Sarah Jenkins is the primary operational director handling the accounts sign-off and banking records.",
+          answer: `The registered director(s) for ${targetClient.name} are ${targetClient.dirs || 'on record'}.`,
           risk_level: "neutral",
           key_reasons: [
-            "Company: Woofington Park Limited (Co. No: 12345678).",
-            "Officers on file: Sarah Jenkins, Mark Jenkins.",
-            "Key contact: Sarah Jenkins (awaiting signed balance sheet)."
+            `Company: ${targetClient.name} (Co. No: ${targetClient.no || 'Active'}).`,
+            `Officers on file: ${targetClient.dirs || 'Primary Director'}.`
           ],
           recommended_actions: [
-            { action: "Contact Sarah Jenkins to obtain signed balance sheet today", priority: "high", reason: "Unblocks accounts submission" }
+            { action: `Contact ${targetClient.dirs || 'director'} to obtain signed documents`, priority: "high", reason: "Unblocks accounts submission" }
           ],
-          evidence: [
-            { timeline_event_id: "evt_woof_003", reason: "Draft accounts prepared and dispatched to Sarah Jenkins" }
-          ]
+          evidence: []
         };
       } else if (isTimeline) {
         responseData = {
           response_type: 'practice_assessment',
-          answer: "Woofington Park's chronological timeline shows an urgent escalation: an active strike-off notice was registered at Companies House following overdue accounts, while accounts preparation was completed and draft sent to the director.",
-          risk_level: "red",
+          answer: `${targetClient.name}'s chronological timeline records statutory filing tracking and accounts preparation activities.`,
+          risk_level: targetClient.risk === 'High' ? "red" : "amber",
           key_reasons: [
-            "Active strike-off notice registered by Companies House.",
-            "Task 'Accounts preparation' completed by team and draft sent to Sarah Jenkins.",
-            "Outstanding client information request regarding bank reconciliation."
+            `Statutory accounts and filing records for ${targetClient.name}.`,
+            "Practice task status monitored under client file."
           ],
           recommended_actions: [
-            { action: "Chase Sarah Jenkins for electronic signature on balance sheet", priority: "high", reason: "Unblocks submission" },
-            { action: "Confirm receipt of strike-off suspension from Companies House", priority: "high", reason: "Filing defense" }
+            { action: `Review upcoming statutory deliverables for ${targetClient.name}`, priority: "high", reason: "Compliance" }
           ],
-          evidence: [
-            { timeline_event_id: "evt_woof_004", reason: "Companies House strike-off notice registered" },
-            { timeline_event_id: "evt_woof_003", reason: "Accounts draft sent to client" }
-          ]
+          evidence: []
         };
       } else {
         responseData = {
           response_type: 'practice_assessment',
-          answer: "Woofington Park Limited is currently flagged at critical statutory risk because an active proposal to strike off has been registered at Companies House, and statutory accounts for year ended 30/11/2025 are overdue since 31/08/2026.",
-          risk_level: "red",
+          answer: `${targetClient.name} is currently managed with risk rating ${targetClient.risk || 'Normal'}.`,
+          risk_level: targetClient.risk === 'High' ? "red" : "neutral",
           key_reasons: [
-            "Active proposal to strike off registered at Companies House (Immediate action required).",
-            "Statutory accounts overdue since 31/08/2026 for year ended 30/11/2025.",
-            "Draft accounts were sent to client; awaiting signed balance sheet from Sarah Jenkins."
+            `Entity: ${targetClient.name} (Co. No: ${targetClient.no || 'Active'}).`,
+            `Assigned partner: ${targetClient.owner || 'Practice Partner'}.`
           ],
           recommended_actions: [
-            { action: "Submit urgent objection to strike-off with Companies House", priority: "high", reason: "Halt dissolution" },
-            { action: "Contact Sarah Jenkins to obtain signed balance sheet today", priority: "high", reason: "Filing requirement" }
+            { action: `Review ${targetClient.name} statutory schedule`, priority: "normal", reason: "Periodic review" }
           ],
-          evidence: [
-            { timeline_event_id: "evt_woof_004", reason: "Active strike-off notice served at Companies House" },
-            { timeline_event_id: "evt_woof_003", reason: "Draft accounts sent to client" }
-          ]
+          evidence: []
         };
       }
     }
 
-    // F. Focused Client: R GB Elevations
-    else if (targetClient && (/rgb|elevation/i.test(targetClient.name) || /rgb/i.test(mLower))) {
-      responseData = {
-        response_type: 'practice_assessment',
-        answer: "R GB Elevations Ltd is currently rated RED due to overdue statutory accounts since 31/07/2026 and missing Q4 bank statements from director Robert Brown.",
-        risk_level: "red",
-        key_reasons: [
-          "Statutory accounts overdue since 31/07/2026 with late filing penalties increasing.",
-          "Missing bank statements preventing final reconciliation.",
-          "Confirmation statement due on 12/11/2026."
-        ],
-        recommended_actions: [
-          { action: "Chase Robert Brown for missing statements immediately", priority: "high", reason: "Overdue filing" },
-          { action: "Submit electronic accounts as soon as statements reconciled", priority: "high", reason: "Minimize penalties" }
-        ],
-        evidence: [
-          { timeline_event_id: "evt_rgb_001", reason: "Statutory tracker: Accounts overdue since 31/07/2026" }
-        ]
-      };
-    }
-
-    // G. Practice Morning Priorities / Executive Review
+    // F. Practice Morning Priorities / Executive Review
     else if (/deadline|focus|today|morning|priorit|urgent\s+statutory/i.test(mLower)) {
       responseData = {
         response_type: 'practice_assessment',
-        answer: "Practice morning priorities indicate critical statutory risks requiring immediate CEO attention, led by strike-off defense for Woofington Park and overdue accounts for R GB Elevations.",
+        answer: "Practice morning priorities indicate critical statutory risks requiring immediate attention across flagged overdue accounts.",
         risk_level: "red",
         key_reasons: [
-          "Woofington Park Limited: Active strike-off notice on Companies House record.",
-          "R GB Elevations Ltd: Statutory accounts overdue since 31/07/2026.",
-          "Monarch Craft Brewers Ltd: Accounts overdue since 31/07/2026.",
-          "Artemis BioHealth Labs Ltd: Overdue statutory filing requiring cessation check."
+          "Urgent statutory filings requiring immediate director submission.",
+          "Overdue confirmation statements and late penalty avoidance."
         ],
         recommended_actions: [
-          { action: "Halt Woofington Park strike-off with Companies House", priority: "high", reason: "Immediate dissolution risk" },
-          { action: "Instruct team to chase Robert Brown for RGB Elevations bank records", priority: "high", reason: "Penalty mitigation" },
+          { action: "Halt active strike-off notices with Companies House", priority: "high", reason: "Immediate dissolution risk" },
+          { action: "Chase client directors for missing bank reconciliation records", priority: "high", reason: "Penalty mitigation" },
           { action: "Review VAT submission queue for upcoming obligations", priority: "normal", reason: "Upcoming deadline" }
         ],
-        evidence: [
-          { timeline_event_id: "evt_woof_004", reason: "Companies House register strike-off proposal" }
-        ]
+        evidence: []
       };
     }
 
-    // H. Default Practice Context
+    // G. Default Practice Context
     else {
       responseData = {
         response_type: 'practice_assessment',
-        answer: targetClient
-          ? `${targetClient.name} is currently managed under ${targetClient.biz || 'Trinova Accounting'} with assigned director(s) ${targetClient.dirs || 'on file'}. Practice risk rating is ${targetClient.risk || 'Medium'}.`
-          : "Sloane has analyzed the active practice portfolio. Practice statutory monitors indicate 4 critical action items requiring CEO attention.",
-        risk_level: targetClient?.risk === 'High' ? 'red' : 'amber',
+        answer: "Sloane has analyzed the active practice portfolio. Practice statutory monitors indicate action items requiring executive attention.",
+        risk_level: 'amber',
         key_reasons: [
-          targetClient ? `Client entity: ${targetClient.name} (${targetClient.no || 'Active'})` : "Active portfolio monitoring across statutory deadlines.",
-          targetClient ? `Assigned partner/owner: ${targetClient.owner || 'Kirsty Allen'}` : "Entities flagged for review in Statutory Radar."
+          "Active portfolio monitoring across statutory deadlines.",
+          "Entities flagged for review in Statutory Radar."
         ],
         recommended_actions: [
           { action: "Review statutory obligations in Client 360", priority: "normal", reason: "Portfolio review" }
@@ -1182,17 +1097,17 @@ export const ApiService = {
         source: 'grounded_rules_engine',
         data: {
           critical_risks: [
-            { client: 'Woofington Park Limited', reason: 'Active strike-off notice on Companies House', priority: 'high' },
-            { client: 'R GB Elevations Ltd', reason: 'Accounts overdue since 31/07/2026', priority: 'high' }
+            { client: 'Priority Client Record 1', reason: 'Active strike-off notice on Companies House', priority: 'high' },
+            { client: 'Priority Client Record 2', reason: 'Statutory accounts overdue', priority: 'high' }
           ],
           upcoming_deadlines: [
-            { client: 'Alpha Delta Creative Ltd', due_date: '2026-09-30', type: 'Accounts' },
-            { client: 'Apex Pinnacle Logistics Ltd', due_date: '2026-09-30', type: 'Accounts' }
+            { client: 'Monitored Client Record A', due_date: '2026-09-30', type: 'Accounts' },
+            { client: 'Monitored Client Record B', due_date: '2026-09-30', type: 'Accounts' }
           ],
           priorities: [
-            'Halt Woofington Park strike-off with Companies House',
-            'Follow up with Robert Brown for RGB bank records',
-            'Finalize August VAT returns queue'
+            'Halt active strike-off notices with Companies House',
+            'Follow up with client directors for outstanding records',
+            'Finalize periodic VAT returns queue'
           ]
         }
       };
