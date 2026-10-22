@@ -50,7 +50,8 @@ function isDirectExecution() {
 if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
   validateStartup();
   const app = createApp();
-  app.listen(config.port, () => {
-    logger.info(`Trinova API Server listening on port ${config.port} [env: ${config.env}]`);
+  const host = process.env.HOST || '0.0.0.0';
+  app.listen(config.port, host, () => {
+    logger.info(`Trinova API Server listening on ${host}:${config.port} [env: ${config.env}]`);
   });
 }

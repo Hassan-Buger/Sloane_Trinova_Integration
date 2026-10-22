@@ -1,0 +1,7 @@
+# Railway ignore rules
+.git
+context/
+docs/
+_baseline/
+scratch/
+*.log

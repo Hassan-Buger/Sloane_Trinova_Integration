@@ -327,9 +327,11 @@ export function createApp(options = {}) {
       });
     },
 
-    listen(port, callback) {
+    listen(port, hostOrCallback, callback) {
       const server = http.createServer(app.handler);
-      return server.listen(port, callback);
+      const host = typeof hostOrCallback === 'string' ? hostOrCallback : '0.0.0.0';
+      const cb = typeof hostOrCallback === 'function' ? hostOrCallback : callback;
+      return server.listen(port, host, cb);
     }
   };
 
