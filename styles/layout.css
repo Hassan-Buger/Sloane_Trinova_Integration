@@ -396,6 +396,10 @@ h1 {
   animation: fadeIn 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.client-tab-content.hidden {
+  display: none;
+}
+
 .view.hidden {
   display: none !important;
 }

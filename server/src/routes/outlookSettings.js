@@ -279,7 +279,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(503).json({
         error: {
           code: 'OUTLOOK_NOT_CONFIGURED',
-          message: 'Outlook integration is not configured on this server.'
+          message: 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.'
         }
       });
     }
@@ -298,7 +298,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(500).json({
         error: {
           code: 'VAULT_READ_ERROR',
-          message: 'Failed to access encrypted Outlook connection vault'
+          message: 'Sloane could not open its saved Outlook connection. Please tell your Sloane administrator.'
         }
       });
     }
@@ -307,7 +307,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(404).json({
         error: {
           code: 'OUTLOOK_NOT_CONNECTED',
-          message: 'No active Outlook connection found. Connect an Outlook account before listing folders.'
+          message: 'Outlook is not connected yet. Connect it in Settings first.'
         }
       });
     }
@@ -316,7 +316,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(401).json({
         error: {
           code: 'OUTLOOK_RECONNECT_REQUIRED',
-          message: 'Outlook connection requires re-authentication'
+          message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
         }
       });
     }
@@ -342,7 +342,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
         return res.status(401).json({
           error: {
             code: 'OUTLOOK_RECONNECT_REQUIRED',
-            message: 'Outlook connection requires re-authentication'
+            message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }
         });
       }
@@ -377,7 +377,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(503).json({
         error: {
           code: 'OUTLOOK_NOT_CONFIGURED',
-          message: 'Outlook integration is not configured on this server.'
+          message: 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.'
         }
       });
     }
@@ -396,7 +396,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(500).json({
         error: {
           code: 'VAULT_READ_ERROR',
-          message: 'Failed to access encrypted Outlook connection vault'
+          message: 'Sloane could not open its saved Outlook connection. Please tell your Sloane administrator.'
         }
       });
     }
@@ -405,7 +405,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(404).json({
         error: {
           code: 'OUTLOOK_NOT_CONNECTED',
-          message: 'No active Outlook connection found. Connect an Outlook account before modifying settings.'
+          message: 'Outlook is not connected yet. Connect it in Settings first.'
         }
       });
     }
@@ -530,7 +530,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(500).json({
         error: {
           code: 'VAULT_SAVE_ERROR',
-          message: 'Failed to write updated settings to encrypted vault.'
+          message: 'Sloane could not save your Outlook settings. Please try again.'
         }
       });
     }
@@ -549,7 +549,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(503).json({
         error: {
           code: 'OUTLOOK_NOT_CONFIGURED',
-          message: 'Outlook integration is not configured on this server.'
+          message: 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.'
         }
       });
     }
@@ -568,7 +568,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(500).json({
         error: {
           code: 'VAULT_READ_ERROR',
-          message: 'Failed to access encrypted Outlook connection vault'
+          message: 'Sloane could not open its saved Outlook connection. Please tell your Sloane administrator.'
         }
       });
     }
@@ -577,7 +577,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(404).json({
         error: {
           code: 'OUTLOOK_NOT_CONNECTED',
-          message: 'No active Outlook connection found. Connect an Outlook account before syncing.'
+          message: 'Outlook is not connected yet. Connect it in Settings first.'
         }
       });
     }
@@ -586,7 +586,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(401).json({
         error: {
           code: 'OUTLOOK_RECONNECT_REQUIRED',
-          message: 'Outlook connection requires re-authentication'
+          message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
         }
       });
     }
@@ -596,7 +596,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(409).json({
         error: {
           code: 'SYNC_IN_PROGRESS',
-          message: 'A synchronization is already running. Please wait for it to complete.'
+          message: 'A refresh is already running. Please wait a moment.'
         }
       });
     }
@@ -683,14 +683,14 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
         try {
           connectionStore.saveConnection({
             status: 'reconnect_required',
-            lastError: 'Outlook connection requires re-authentication'
+            lastError: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }, vaultOptions);
         } catch {}
 
         return res.status(401).json({
           error: {
             code: 'OUTLOOK_RECONNECT_REQUIRED',
-            message: 'Outlook connection requires re-authentication'
+            message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }
         });
       }
@@ -735,7 +735,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(503).json({
         error: {
           code: 'OUTLOOK_NOT_CONFIGURED',
-          message: 'Outlook integration is not configured on this server.'
+          message: 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.'
         }
       });
     }
@@ -771,7 +771,7 @@ export function registerOutlookSettingsRoutes(app, { authenticate }, options = {
       return res.status(500).json({
         error: {
           code: 'DISCONNECT_FAILED',
-          message: 'Failed to purge Outlook connection from vault'
+          message: 'Sloane could not remove the Outlook connection. Please try again.'
         }
       });
     }

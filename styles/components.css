@@ -618,6 +618,10 @@ textarea.form-control {
   border-color: rgba(201, 166, 107, 0.4);
 }
 
+.toast.toast-warning {
+  border-color: var(--amber-border);
+}
+
 @keyframes toastIn {
   from {
     opacity: 0;

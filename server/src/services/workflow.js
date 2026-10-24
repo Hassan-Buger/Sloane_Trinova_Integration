@@ -44,7 +44,7 @@ export class WorkflowEngine {
       return { valid: false, message: 'Target workflow status is required.' };
     }
     if (currentStatus === targetStatus) {
-      return { valid: false, message: `Company is already in workflow state '${currentStatus}'.` };
+      return { valid: false, message: `The company is already at the "${currentStatus}" stage.` };
     }
 
     const allowed = this.PERMITTED_WORKFLOW_TRANSITIONS[currentStatus];
@@ -58,7 +58,7 @@ export class WorkflowEngine {
     if (!allowed.includes(targetStatus)) {
       return {
         valid: false,
-        message: `Transition from '${currentStatus}' to '${targetStatus}' is not permitted by Trinova workflow rules. Permitted transitions from '${currentStatus}': [${allowed.join(', ')}].`
+        message: `The company cannot move from "${currentStatus}" to "${targetStatus}" directly. From "${currentStatus}" it can move to: ${allowed.join(', ')}.`
       };
     }
 
@@ -70,14 +70,14 @@ export class WorkflowEngine {
    */
   static validateTaskCompletion(task, completionPayload = {}) {
     if (!task) {
-      return { valid: false, code: 'TASK_NOT_FOUND', message: 'Task does not exist.' };
+      return { valid: false, code: 'TASK_NOT_FOUND', message: 'We could not find that task.' };
     }
 
     if (task.status === 'Completed') {
       return {
         valid: false,
         code: 'TASK_ALREADY_COMPLETED',
-        message: `Task '${task.id}' has already been marked as Completed.`
+        message: 'This task is already done.'
       };
     }
 
@@ -85,7 +85,7 @@ export class WorkflowEngine {
       return {
         valid: false,
         code: 'TASK_CANCELLED',
-        message: `Task '${task.id}' is cancelled and cannot be directly completed.`
+        message: 'This task was cancelled, so it cannot be ticked off. Change its status first if you want to use it again.'
       };
     }
 
@@ -94,7 +94,7 @@ export class WorkflowEngine {
       return {
         valid: false,
         code: 'BLOCKED_TASK_REQUIRES_RESOLUTION',
-        message: `Task is currently blocked ('${task.blocker}'). Completion requires a resolution or completion notes.`
+        message: `This task is marked as stuck ("${task.blocker}"). Say how it was sorted out before you tick it off.`
       };
     }
 

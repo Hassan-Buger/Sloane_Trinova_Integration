@@ -9,8 +9,10 @@
  */
 
 import { ContextBuilder } from '../services/ai/contextBuilder.js';
-import { claudeService } from '../services/ai/claudeService.js';
 import { mockDb } from '../data/db.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { buildDeadlineList } from './statutory.js';
+import { claudeService } from '../services/ai/claudeService.js';
 import { config } from '../config.js';
 
 // Simple sliding window in-memory rate limiter (Section 38)
@@ -93,7 +95,7 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       return res.status(429).json({
         error: {
           code: 'RATE_LIMIT_EXCEEDED',
-          message: 'Too many AI requests. Please wait a moment before sending another query.'
+          message: 'You are asking very quickly. Please wait a moment, then ask again.'
         }
       });
     }
@@ -109,7 +111,7 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       return res.status(422).json({
         error: {
           code: 'VALIDATION_FAILED',
-          message: 'The "message" field is required and cannot be empty.'
+          message: 'Please type a question first.'
         }
       });
     }
@@ -118,7 +120,7 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       return res.status(422).json({
         error: {
           code: 'MESSAGE_TOO_LONG',
-          message: 'AI query exceeds maximum allowed length of 1000 characters.'
+          message: 'That question is too long. Please keep it under 1,000 characters.'
         }
       });
     }
@@ -141,7 +143,7 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
         return res.status(404).json({
           error: {
             code: 'CLIENT_NOT_FOUND',
-            message: `Client with ID "${clientId}" does not exist in TriNova.`
+            message: 'We could not find that client. Refresh the Clients page and try again.'
           }
         });
       }
@@ -203,31 +205,40 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
         actor: req.actor
       });
 
-      // Build structured briefing
-      const clientSummaries = allowedContext.executiveOverview?.clientSummaries || [];
-      const criticalTasks = allowedContext.executiveOverview?.criticalOrBlockedTasks || [];
+      // Built only from what is really saved in Sloane (no example facts)
+      const deadlines = buildDeadlineList().filter(d => !d.isDissolved);
+      const redFilings = deadlines.filter(d => d.urgency === 'RED');
+      const openTasks = (mockDb.tasks || []).filter(t => !['Completed', 'Cancelled'].includes(t.status));
+      const stuckTasks = openTasks.filter(t => t.isBlocked);
+      const clientCount = clientDirectory.all().length;
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-      const highRisk = clientSummaries.filter(c => c.overallRisk === 'High');
-      const medRisk = clientSummaries.filter(c => c.overallRisk === 'Medium');
+      const soon = deadlines
+        .filter(d => typeof d.daysRemaining === 'number' && d.daysRemaining >= 0 && d.daysRemaining <= 30)
+        .sort((a, b) => a.daysRemaining - b.daysRemaining)
+        .slice(0, 8);
+      const dueTasks = [...openTasks]
+        .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
+        .slice(0, 5);
 
+      const nothingYet = deadlines.length === 0 && openTasks.length === 0 && clientCount === 0;
       const briefing = {
         date: new Date().toISOString().split('T')[0],
-        summary: `Good morning, Kirsty. You have ${clientSummaries.length} active practice groups, with ${highRisk.length} high-priority risk and ${criticalTasks.length} urgent task blockers requiring action.`,
+        summary: nothingYet
+          ? 'Good morning, Kirsty. There is nothing to report yet: no clients, deadlines or tasks are saved in Sloane.'
+          : `Good morning, Kirsty. ${plural(redFilings.length, 'filing is', 'filings are')} RED and ${plural(stuckTasks.length, 'task is', 'tasks are')} stuck, across ${plural(clientCount, 'client', 'clients')}.`,
         priorities: [
-          'Halt strike-off for Woofington Park Limited by filing objection and accounts',
-          'Finalize 50-day overdue accounts for R GB Elevations Ltd with Hamza Malik'
+          ...redFilings.slice(0, 3).map(d => `${d.name}: ${d.urgencyReason}`),
+          ...stuckTasks.slice(0, 3).map(t => `Unblock "${t.title}"${t.blocker ? ` (${t.blocker})` : ''}`)
         ],
-        critical_risks: highRisk.map(c => `${c.name}: Critical statutory exposure`),
-        upcoming_deadlines: [
-          'Woofington Park strike-off defense — Due today',
-          'CFI Awarding Body VAT Q3 return — Due 2026-09-26'
-        ],
-        recommended_focus: [
-          'Verify Sarah Jenkins signature on Woofington balance sheet',
-          '13:30 compliance check-in with Hamza Malik'
-        ],
-        client_count: clientSummaries.length,
-        blocked_tasks_count: criticalTasks.length
+        critical_risks: redFilings.map(d => `${d.name}: ${d.urgencyReason}`),
+        upcoming_deadlines: soon.map(d => {
+          const what = d.nearestDeadline && d.nearestDeadline.type === 'confirmation_statement' ? 'yearly update' : 'accounts';
+          return `${d.name}: ${what} due ${d.nearestDeadline ? d.nearestDeadline.date : 'soon'} (${plural(d.daysRemaining, 'day', 'days')})`;
+        }),
+        recommended_focus: dueTasks.map(t => `${t.title}${t.companyName ? ` for ${t.companyName}` : ''}${t.dueDate ? `, due ${t.dueDate}` : ''}`),
+        client_count: clientCount,
+        blocked_tasks_count: stuckTasks.length
       };
 
       req.auditAction = 'ai_executive_briefing_generated';
@@ -244,7 +255,7 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       return res.status(500).json({
         error: {
           code: 'BRIEFING_GENERATION_FAILED',
-          message: 'Unable to generate executive briefing.'
+          message: 'Sloane could not put your morning briefing together just now. Please try again.'
         }
       });
     }

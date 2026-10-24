@@ -68,7 +68,8 @@ export const config = {
   get trinova() {
     return {
       baseUrl: (process.env.TRINOVA_API_URL || 'https://portal.trinovaaccounting.co.uk/api/v1').trim().replace(/\/+$/, ''),
-      apiKey: (process.env.TRINOVA_API_KEY || process.env.SLON_API_KEY || 'tn_sec_live_sloane_readwrite_2026').trim(),
+      // No default key. Sloane's own SLON_API_KEY must never be sent to another service either.
+      apiKey: (process.env.TRINOVA_API_KEY || '').trim(),
       timeoutMs: parseInt(process.env.TRINOVA_TIMEOUT_MS || '8000', 10)
     };
   },

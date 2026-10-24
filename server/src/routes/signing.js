@@ -11,6 +11,8 @@
  */
 
 import { mockDb } from '../data/db.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { sendError } from './helpers.js';
 import { requireIdempotency } from '../middleware/idempotency.js';
 import { signingService } from '../services/signingService.js';
 import { documentStorage } from '../services/storageDriver.js';
@@ -26,14 +28,9 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
     req.resourceType = 'signing_request';
     req.resourceId = companyId;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
-      return res.status(404).json({
-        error: {
-          code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' not found.`
-        }
-      });
+      return sendError(res, 404, 'COMPANY_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.');
     }
 
     const requests = (mockDb.signingRequests || []).filter(r => r.companyId === companyId);
@@ -64,7 +61,7 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'SIGNING_REQUEST_NOT_FOUND',
-          message: `Signing request with ID '${id}' not found.`
+          message: 'We could not find that signing request. It may already have been removed.'
         }
       });
     }
@@ -98,8 +95,12 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
 
       res.status(201).json({
         status: 'success',
-        message: 'Signing request successfully created and invitation tokens generated.',
-        data: signingRequest
+        message: 'Signing request recorded.',
+        data: signingRequest,
+        meta: {
+          // Sloane records the request but does not contact signers or a signing service yet.
+          delivery: 'not_sent'
+        }
       });
     } catch (err) {
       return res.status(err.status || 422).json({
@@ -165,7 +166,7 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'SIGNING_REQUEST_NOT_FOUND',
-          message: `Signing request with ID '${id}' not found.`
+          message: 'We could not find that signing request. It may already have been removed.'
         }
       });
     }
@@ -174,7 +175,7 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
       return res.status(400).json({
         error: {
           code: 'SIGNED_DOCUMENT_NOT_READY',
-          message: `Signing request '${id}' is in status '${signingReq.status}'. Signed document is only available once fully completed.`
+          message: 'The signed copy is only available once everyone has signed.'
         }
       });
     }
@@ -209,7 +210,7 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'SIGNING_REQUEST_NOT_FOUND',
-          message: `Signing request with ID '${id}' not found.`
+          message: 'We could not find that signing request. It may already have been removed.'
         }
       });
     }
@@ -218,7 +219,7 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
       return res.status(400).json({
         error: {
           code: 'AUDIT_CERTIFICATE_NOT_READY',
-          message: `Signing request '${id}' is in status '${signingReq.status}'. Audit certificate is only available once fully completed.`
+          message: 'The signing certificate is only available once everyone has signed.'
         }
       });
     }
@@ -239,5 +240,30 @@ export function registerSigningRoutes(app, { authenticate, requireScope }) {
         expiresAt
       }
     });
+  });
+
+  /**
+   * POST /api/v1/signing-requests/:id/cancel
+   * Withdraws a signing request that is still waiting for signatures.
+   */
+  app.post('/api/v1/signing-requests/:id/cancel', authenticate, requireScope('sloane:write'), (req, res) => {
+    const { id } = req.params;
+    req.auditAction = 'signing_request_cancelled';
+    req.resourceType = 'signing_request';
+    req.resourceId = id;
+
+    const signingReq = (mockDb.signingRequests || []).find(r => r.id === id);
+    if (!signingReq) {
+      return sendError(res, 404, 'SIGNING_REQUEST_NOT_FOUND', 'We could not find that signing request. It may already have been removed.');
+    }
+    if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(signingReq.status)) {
+      return sendError(res, 409, 'SIGNING_REQUEST_CLOSED',
+        `This signing request is already ${signingReq.status.toLowerCase()}, so it cannot be cancelled.`);
+    }
+
+    signingReq.status = 'CANCELLED';
+    signingReq.cancelledAt = new Date().toISOString();
+    signingReq.updatedAt = signingReq.cancelledAt;
+    res.status(200).json({ status: 'success', message: 'Signing request cancelled.', data: signingReq });
   });
 }

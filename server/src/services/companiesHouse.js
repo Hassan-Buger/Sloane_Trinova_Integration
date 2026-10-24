@@ -56,7 +56,7 @@ export class CompaniesHouseService {
     if (this.requestTimestamps.length >= this.rateLimitMax) {
       const oldest = this.requestTimestamps[0];
       const retryAfterSec = Math.ceil((oldest + this.rateLimitWindowMs - now) / 1000);
-      const error = new Error(`Companies House API rate limit reached (${this.rateLimitMax} requests per 5 minutes). Retry in ${retryAfterSec}s.`);
+      const error = new Error(`Companies House only allows so many checks every few minutes, and that limit has been reached. Please try again in ${retryAfterSec} seconds.`);
       error.code = 'RATE_LIMIT_EXCEEDED';
       error.status = 429;
       error.retryAfter = retryAfterSec;
@@ -200,7 +200,7 @@ export class CompaniesHouseService {
         }
 
         if (response.status === 401 || response.status === 403) {
-          const err = new Error('Companies House API authentication failed. Server credential invalid.');
+          const err = new Error('Sloane could not sign in to Companies House. Ask your Sloane administrator to check the Companies House key.');
           err.code = 'CH_AUTHENTICATION_FAILED';
           err.status = 502; // Bad Gateway since upstream credential failed
           throw err;
@@ -208,7 +208,7 @@ export class CompaniesHouseService {
 
         if (response.status === 429) {
           const retryAfter = parseInt(response.headers?.get?.('Retry-After') || '60', 10);
-          const err = new Error('Upstream Companies House API rate limit exceeded.');
+          const err = new Error('Companies House is asking us to slow down. Please try again in a few minutes.');
           err.code = 'UPSTREAM_RATE_LIMIT';
           err.status = 429;
           err.retryAfter = retryAfter;
@@ -223,7 +223,7 @@ export class CompaniesHouseService {
         }
 
         const errText = await response.text().catch(() => '');
-        const err = new Error(`Companies House API request failed with status ${response.status}: ${errText}`);
+        const err = new Error(`Companies House could not answer just now (error ${response.status}). Please try again later.`);
         err.code = 'CH_API_ERROR';
         err.status = response.status;
         throw err;
@@ -236,7 +236,7 @@ export class CompaniesHouseService {
             await new Promise(r => setTimeout(r, backoffMs));
             continue;
           }
-          const err = new Error(`Companies House request timed out after ${this.timeoutMs}ms.`);
+          const err = new Error('Companies House took too long to answer. Please try again.');
           err.code = 'UPSTREAM_TIMEOUT';
           err.status = 504;
           throw err;

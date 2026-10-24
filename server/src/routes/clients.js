@@ -6,6 +6,48 @@
 
 import { mockDb } from '../data/db.js';
 import { config } from '../config.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { documentStorage } from '../services/storageDriver.js';
+import { sendError } from './helpers.js';
+
+/**
+ * Removes everything Sloane stored for a client that is being deleted: its company, tasks,
+ * notes, documents (and the files), signing requests, conversations and history.
+ * Returns how many of each were removed, so the screen can say so.
+ */
+function removeClientAndRelatedData(client) {
+  const companyIds = new Set(client.companyIds || []);
+  const ids = new Set([client.id, ...companyIds]);
+  const counts = { tasks: 0, notes: 0, documents: 0, history: 0, signing: 0 };
+
+  const prune = (name, test) => {
+    const list = mockDb[name] || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (test(list[i])) { const [gone] = list.splice(i, 1); onRemoved(name, gone); }
+    }
+  };
+  const onRemoved = (name, row) => {
+    if (name === 'documents') { documentStorage.deleteDocument(row); counts.documents++; }
+    if (name === 'tasks') counts.tasks++;
+    if (name === 'notes') counts.notes++;
+    if (name === 'timeline_events') counts.history++;
+    if (name === 'signingRequests') counts.signing++;
+  };
+
+  prune('tasks', t => ids.has(t.companyId) || ids.has(t.clientId));
+  prune('notes', n => ids.has(n.companyId));
+  prune('documents', d => ids.has(d.companyId));
+  prune('signingRequests', r => ids.has(r.companyId));
+  prune('timeline_events', e => e.clientId === client.id || ids.has(e.companyId));
+  // VAT returns and own-date deadlines kept for this client go with it
+  prune('vatReturns', v => v.clientId === client.id);
+  prune('statutoryTracker', d => d.clientId === client.id);
+  const convIds = new Set((mockDb.conversations || []).filter(c => ids.has(c.companyId)).map(c => c.id));
+  prune('messages', m => convIds.has(m.conversationId));
+  prune('conversations', c => ids.has(c.companyId));
+  prune('companies', c => companyIds.has(c.id) || c.clientId === client.id);
+  return counts;
+}
 
 function serveMockClients(req, res) {
   let results = [...mockDb.clients];
@@ -66,6 +108,82 @@ function serveMockClients(req, res) {
   });
 }
 
+
+/**
+ * Clients added by hand inside Sloane (flagged addedInSloane) live in Sloane's own store.
+ * This flattens one of them into the same shape the TriNova portal returns, so the
+ * browser can show it in the list next to the live TriNova clients.
+ */
+function toPortalShape(client) {
+  const company = (mockDb.companies || []).find(comp => (client.companyIds || []).includes(comp.id)) || {};
+  const directors = (company.officers || []).map(o => o.name).filter(Boolean);
+  return {
+    id: client.id,
+    client_id: client.id,
+    name: client.name,
+    businessArea: client.businessArea,
+    company_number: company.companyNumber || '',
+    financial_year_end: company.accountingReferenceDate || null,
+    accounts_due: company.accountsDueDate || null,
+    confirmation_statement_due: company.confirmationDueDate || null,
+    vat_registered: Boolean(company.vatRegistered),
+    vat_number: company.vatNumber || '',
+    paye_reference: company.payeReference || '',
+    cis_registered: Boolean(company.cisStatus && company.cisStatus !== 'No'),
+    directors,
+    assignedManagerName: client.assignedManagerName,
+    risk_tier: company.riskLevel || 'Low',
+    notes: company.notes || '',
+    addedInSloane: true,
+    companies: company.id ? [{
+      id: company.id,
+      companyName: company.companyName,
+      companyNumber: company.companyNumber,
+      accountsDueDate: company.accountsDueDate,
+      confirmationDueDate: company.confirmationDueDate,
+      accountingReferenceDate: company.accountingReferenceDate,
+      riskLevel: company.riskLevel
+    }] : []
+  };
+}
+
+function sloaneAddedClients(req) {
+  let added = (mockDb.clients || []).filter(c => c.addedInSloane);
+  if (req.query.biz && req.query.biz !== 'All') {
+    added = added.filter(c => c.businessArea === req.query.biz);
+  }
+  if (req.query.search) {
+    const q = String(req.query.search).toLowerCase();
+    added = added.filter(c => {
+      const company = (mockDb.companies || []).find(comp => (c.companyIds || []).includes(comp.id)) || {};
+      return c.name.toLowerCase().includes(q) || (company.companyNumber || '').includes(q);
+    });
+  }
+  return added.map(toPortalShape);
+}
+
+/** The business the owner has put a TriNova client under, or null. */
+function businessFor(clientId) {
+  const row = (mockDb.clientBusiness || []).find(r => r.id === String(clientId));
+  return row ? row.businessArea : null;
+}
+
+function respondWithSloaneClientsOnly(req, res, trinovaStatus) {
+  const addedOnly = sloaneAddedClients(req);
+  return res.status(200).json({
+    status: 'success',
+    data: addedOnly,
+    meta: { trinovaStatus, total: addedOnly.length },
+    pagination: {
+      page: 1,
+      pageSize: 10,
+      total: addedOnly.length,
+      totalPages: addedOnly.length ? 1 : 0,
+      hasMore: false
+    }
+  });
+}
+
 export function registerClientRoutes(app, { authenticate, requireScope }) {
   /**
    * GET /api/v1/clients
@@ -80,45 +198,41 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       return serveMockClients(req, res);
     }
 
-    try {
-      const trinovaUrl = new URL(`${config.trinova.baseUrl}/clients`);
-      if (req.query.search) trinovaUrl.searchParams.set('q', req.query.search);
-      if (req.query.biz && req.query.biz !== 'All') trinovaUrl.searchParams.set('type', req.query.biz);
-      if (req.query.page) trinovaUrl.searchParams.set('page', req.query.page);
-      if (req.query.pageSize) trinovaUrl.searchParams.set('per_page', req.query.pageSize);
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), config.trinova.timeoutMs || 8000);
-
-      const upstreamRes = await fetch(trinovaUrl.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${config.trinova.apiKey}`,
-          'X-Requested-With': 'sloane'
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-
-      if (upstreamRes.ok) {
-        const json = await upstreamRes.json();
-        return res.status(200).json(json);
-      }
-    } catch (err) {
-      console.warn('[TriNova Proxy] Upstream clients fetch failed:', err.message);
+    // No TriNova key set: do not call TriNova at all, and say so plainly.
+    if (!clientDirectory.isConfigured()) {
+      return respondWithSloaneClientsOnly(req, res, 'not_configured');
     }
 
+    // Read every client from TriNova (remembered for a minute), then search, filter and
+    // page them here, so the Clients page and the pickers always see the whole list.
+    await clientDirectory.refresh();
+    const live = clientDirectory.trinovaClients();
+    if (live.length === 0 && clientDirectory.lastError) {
+      return respondWithSloaneClientsOnly(req, res, 'unreachable');
+    }
+
+    const biz = req.query.biz || req.query.type;
+    const query = String(req.query.search || req.query.q || '').trim().toLowerCase();
+    let liveRows = live.map(c => {
+      const assigned = businessFor(c.id);
+      return { ...c.raw, id: c.raw.id ?? c.id, businessArea: assigned || c.raw.businessArea || null, assignedBusiness: assigned };
+    });
+    if (biz && biz !== 'All') liveRows = liveRows.filter(r => r.assignedBusiness === biz);
+    if (query) {
+      liveRows = liveRows.filter(r => [r.name, r.company_name, r.company_number, r.notes,
+        Array.isArray(r.directors) ? r.directors.join(' ') : r.directors]
+        .some(v => String(v || '').toLowerCase().includes(query)));
+    }
+
+    const combined = [...sloaneAddedClients(req), ...liveRows];
+    const pageSize = Math.max(1, Math.min(500, parseInt(req.query.pageSize || req.query.per_page || '500', 10) || 500));
+    const page = Math.max(1, parseInt(req.query.page || '1', 10) || 1);
+    const totalPages = Math.max(1, Math.ceil(combined.length / pageSize));
     return res.status(200).json({
       status: 'success',
-      data: [],
-      pagination: {
-        page: 1,
-        pageSize: 10,
-        total: 0,
-        totalPages: 0,
-        hasMore: false
-      }
+      data: combined.slice((page - 1) * pageSize, page * pageSize),
+      meta: { trinovaStatus: clientDirectory.lastError ? 'unreachable' : 'ok', total: combined.length },
+      pagination: { page, pageSize, total: combined.length, totalPages, hasMore: page < totalPages }
     });
   });
 
@@ -133,13 +247,22 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
     req.resourceId = clientId;
 
     const idx = mockDb.clients.findIndex(c => c.id === clientId || c.clientId === clientId);
-    if (idx !== -1) {
-      mockDb.clients.splice(idx, 1);
+    if (idx === -1) {
+      // Live TriNova clients are not stored in Sloane, so Sloane cannot remove them.
+      return res.status(409).json({
+        error: {
+          code: 'MANAGED_IN_TRINOVA',
+          message: 'This client comes from TriNova, so it can only be removed there.'
+        }
+      });
     }
+    const [removed] = mockDb.clients.splice(idx, 1);
+    const counts = removeClientAndRelatedData(removed);
 
     return res.status(200).json({
       status: 'success',
-      message: `Client ${clientId} removed successfully.`
+      message: 'The client has been removed.',
+      data: { removed: counts }
     });
   });
 
@@ -159,7 +282,7 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'CLIENT_NOT_FOUND',
-          message: `Client with ID '${clientId}' does not exist.`
+          message: 'We could not find that client. Refresh the Clients page and try again.'
         }
       });
     }
@@ -193,7 +316,7 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' does not exist.`
+          message: 'We could not find that company. Refresh the Clients page and try again.'
         }
       });
     }
@@ -227,6 +350,111 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
         notes: company.notes
       }
     });
+  });
+
+
+  /**
+   * PATCH /api/v1/clients/:id
+   * Edits a client that was added by hand inside Sloane.
+   * Clients that come from the TriNova portal are managed in TriNova, so they are refused here.
+   */
+  app.patch('/api/v1/clients/:id', authenticate, requireScope('sloane:write'), (req, res) => {
+    const clientId = req.params?.id;
+    req.auditAction = 'update_client';
+    req.resourceType = 'client';
+    req.resourceId = clientId;
+
+    const client = (mockDb.clients || []).find(c => c.id === clientId);
+    if (!client) {
+      return res.status(404).json({
+        error: { code: 'CLIENT_NOT_FOUND', message: 'That client could not be found.' }
+      });
+    }
+    if (!client.addedInSloane) {
+      return res.status(409).json({
+        error: {
+          code: 'MANAGED_IN_TRINOVA',
+          message: 'This client comes from TriNova, so it can only be changed there.'
+        }
+      });
+    }
+
+    const b = req.body || {};
+    if (b.name !== undefined) {
+      if (!String(b.name).trim()) {
+        return res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Client name is required.' } });
+      }
+      client.name = String(b.name).trim();
+    }
+    if (b.biz !== undefined) {
+      client.businessArea = b.biz;
+      client.clientType = b.biz;
+    }
+    if (b.owner !== undefined) {
+      client.assignedManagerName = String(b.owner).trim() || client.assignedManagerName;
+    }
+
+    const company = (mockDb.companies || []).find(comp => (client.companyIds || []).includes(comp.id));
+    if (company) {
+      if (b.name !== undefined) company.companyName = client.name;
+      if (b.no !== undefined) company.companyNumber = String(b.no).trim();
+      if (b.year !== undefined) company.accountingReferenceDate = b.year || null;
+      if (b.accounts !== undefined) company.accountsDueDate = b.accounts || null;
+      if (b.confirm !== undefined) company.confirmationDueDate = b.confirm || null;
+      if (b.vat !== undefined) company.vatRegistered = b.vat === 'Yes';
+      if (b.vatNo !== undefined) company.vatNumber = b.vatNo || null;
+      if (b.paye !== undefined) { company.payeReference = b.paye || null; company.payeRegistered = Boolean(b.paye); }
+      if (b.cis !== undefined) company.cisStatus = b.cis;
+      if (b.risk !== undefined) company.riskLevel = b.risk;
+      if (b.notes !== undefined) company.notes = b.notes;
+      if (b.dirs !== undefined) {
+        company.officers = String(b.dirs).split(',').map(d => d.trim()).filter(Boolean).map((dName, idx) => ({
+          id: `off_${Date.now()}_${idx}`, name: dName, role: 'Director', isActive: true
+        }));
+      }
+    }
+
+    res.status(200).json({ status: 'success', data: toPortalShape(client) });
+  });
+
+  /**
+   * PUT /api/v1/clients/:id/business
+   * Puts a client under one of the owner's businesses (or takes it out). For a TriNova client
+   * this is the one thing Sloane can change, because everything else is managed in TriNova.
+   */
+  app.put('/api/v1/clients/:id/business', authenticate, requireScope('sloane:write'), (req, res) => {
+    const clientId = req.params.id;
+    req.auditAction = 'client_business_set';
+    req.resourceType = 'client';
+    req.resourceId = clientId;
+
+    const client = clientDirectory.find(clientId);
+    if (!client) return sendError(res, 404, 'CLIENT_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.');
+
+    const wanted = req.body && req.body.businessArea;
+    let businessArea = null;
+    if (wanted !== null && wanted !== undefined && String(wanted).trim() !== '') {
+      const biz = (mockDb.businesses || []).find(b => b.name === String(wanted).trim());
+      if (!biz) return sendError(res, 422, 'BUSINESS_NOT_FOUND', 'That business does not exist. Add it on the My Businesses page first.');
+      businessArea = biz.name;
+    }
+
+    if (client.source === 'trinova') {
+      const rows = mockDb.clientBusiness;
+      const idx = rows.findIndex(r => r.id === String(clientId));
+      if (businessArea === null) {
+        if (idx !== -1) rows.splice(idx, 1);
+      } else if (idx === -1) {
+        rows.push({ id: String(clientId), businessArea, updatedAt: new Date().toISOString() });
+      } else {
+        rows[idx] = { ...rows[idx], businessArea, updatedAt: new Date().toISOString() };
+      }
+    } else {
+      const own = mockDb.clients.find(c => c.id === clientId);
+      own.businessArea = businessArea || own.businessArea;
+      if (businessArea) own.clientType = businessArea;
+    }
+    res.status(200).json({ status: 'success', data: { id: String(clientId), businessArea } });
   });
 
   /**
@@ -266,9 +494,9 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       clientId,
       companyName: name.trim(),
       companyNumber: (no || '').trim(),
-      accountingReferenceDate: year || '2026-03-31',
-      accountsDueDate: accounts || '2026-12-31',
-      confirmationDueDate: confirm || '2026-11-30',
+      accountingReferenceDate: year || null,
+      accountsDueDate: accounts || null,
+      confirmationDueDate: confirm || null,
       vatRegistered: vat === 'Yes',
       vatNumber: vatNo || null,
       payeRegistered: Boolean(paye),
@@ -293,9 +521,10 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
       contacts: directorNames.length > 0 ? [{
         id: `cnt_${Date.now()}`,
         name: directorNames[0],
-        email: `${directorNames[0].toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        email: null,
         isPrimary: true
       }] : [],
+      addedInSloane: true,
       createdAt: new Date().toISOString()
     };
 

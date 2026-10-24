@@ -267,13 +267,15 @@ export const ApiService = {
           return {
             id: item.id || item.company_id || `comp_${item.id}`,
             rawId: item.id,
+            // Notes, documents, signing and tasks attach to this id (a client added in Sloane keeps them on its company)
+            companyId: item.addedInSloane ? (primaryComp.id || null) : null,
             clientId: item.client_id || item.id,
             name: item.name || item.company_name || primaryComp.companyName,
             no: item.company_number || primaryComp.companyNumber || '',
             biz: item.businessArea || item.entity_type || 'Corporate',
-            year: item.financial_year_end || primaryComp.accountingReferenceDate || '2026-03-31',
-            accounts: item.accounts_due || primaryComp.accountsDueDate || '2026-08-31',
-            confirm: item.confirmation_statement_due || primaryComp.confirmationDueDate || '2026-09-15',
+            year: item.financial_year_end || primaryComp.accountingReferenceDate || '',
+            accounts: item.accounts_due || primaryComp.accountsDueDate || '',
+            confirm: item.confirmation_statement_due || primaryComp.confirmationDueDate || '',
             vat: item.vat_registered ? 'Yes' : (item.tax_reference ? 'Yes' : 'No'),
             vatNo: item.vat_number || item.tax_reference || '',
             paye: item.paye_reference || '',
@@ -282,7 +284,9 @@ export const ApiService = {
             owner: item.assignedManagerName || item.account_manager || 'Kirsty Allen',
             risk: primaryComp.riskLevel || item.risk_tier || (item.aml_status === 'Action Required' ? 'High' : 'Low'),
             notes: item.notes || item.primary_contact?.address || '',
-            isLiveTriNova: true
+            isLiveTriNova: !item.addedInSloane,
+            addedInSloane: Boolean(item.addedInSloane),
+            assignedBusiness: item.assignedBusiness || null
           };
         }).filter(c => {
           const crn = (c.no || '').trim();
@@ -298,6 +302,7 @@ export const ApiService = {
           status: 'success',
           source: 'trinova_live',
           data: mappedClients,
+          trinovaStatus: res.meta?.trinovaStatus || null,
           meta: res.meta || { total: mappedClients.length }
         };
       }
@@ -352,53 +357,56 @@ export const ApiService = {
   },
 
   /**
-   * Creates a new client/company record via POST /api/v1/clients with local storage cache fallback.
+   * Adds a client in Sloane (POST /api/v1/clients). If the server does not accept it, the
+   * error is shown to the user: nothing is pretended to be saved.
    */
   async createClient(clientData) {
-    try {
-      const res = await this.request('/clients', {
-        method: 'POST',
-        body: clientData
-      });
-
-      const clients = StorageService.getClients();
-      if (res.data) {
-        clients.unshift(res.data);
-        StorageService.saveClients(clients);
-      }
-
-      return {
-        status: 'success',
-        data: res.data
-      };
-    } catch (err) {
-      console.warn('Could not create client via API, falling back to local storage cache:', err.message);
-      const clients = StorageService.getClients();
-      const newClient = {
-        id: `cl-${Date.now()}`,
-        ...clientData,
-        createdAt: new Date().toISOString()
-      };
-
-      clients.unshift(newClient);
-      StorageService.saveClients(clients);
-
-      return {
-        status: 'success',
-        data: newClient
-      };
-    }
+    const res = await this.request('/clients', {
+      method: 'POST',
+      body: clientData
+    });
+    return { status: 'success', data: res.data };
   },
 
   /**
    * Deletes a client entity and removes from local storage.
    */
   async deleteClient(clientId) {
-    try {
-      await this.request(`/clients/${clientId}`, { method: 'DELETE' });
-    } catch (_) {}
+    // Let the server's answer through (e.g. "this client lives in TriNova") instead of
+    // pretending the client was removed.
+    await this.request(`/clients/${encodeURIComponent(clientId)}`, { method: 'DELETE' });
     StorageService.deleteClient(clientId);
     return { status: 'success', message: 'Client removed' };
+  },
+
+  /**
+   * Changes a client that was added by hand in Sloane (PATCH /api/v1/clients/:id).
+   */
+  async updateClient(clientId, clientData) {
+    const res = await this.request(`/clients/${encodeURIComponent(clientId)}`, {
+      method: 'PATCH',
+      body: clientData
+    });
+    return { status: 'success', data: res.data };
+  },
+
+  /**
+   * Renames / edits a business area (PATCH /api/v1/businesses/:id).
+   */
+  async updateBusiness(bizId, changes) {
+    const res = await this.request(`/businesses/${encodeURIComponent(bizId)}`, {
+      method: 'PATCH',
+      body: changes
+    });
+    return { status: 'success', data: res.data };
+  },
+
+  /**
+   * Removes a business area (DELETE /api/v1/businesses/:id).
+   */
+  async deleteBusiness(bizId) {
+    await this.request(`/businesses/${encodeURIComponent(bizId)}`, { method: 'DELETE' });
+    return { status: 'success' };
   },
 
   /**
@@ -437,43 +445,14 @@ export const ApiService = {
   },
 
   /**
-   * Adds a business area via POST /api/v1/businesses with local storage fallback.
+   * Adds a business (POST /api/v1/businesses). Errors are shown, never hidden.
    */
   async createBusiness(bizData) {
-    try {
-      const res = await this.request('/businesses', {
-        method: 'POST',
-        body: bizData
-      });
-
-      const businesses = StorageService.getBusinesses();
-      if (res && res.data) {
-        businesses.push(res.data);
-        StorageService.saveBusinesses(businesses);
-        return {
-          status: 'success',
-          data: res.data
-        };
-      }
-    } catch (err) {
-      console.warn('Could not create business via API, falling back to local cache:', err.message);
-    }
-
-    const businesses = StorageService.getBusinesses();
-    const newBiz = {
-      id: `biz-${Date.now()}`,
-      name: bizData.name,
-      type: bizData.type,
-      status: 'Active'
-    };
-
-    businesses.push(newBiz);
-    StorageService.saveBusinesses(businesses);
-
-    return {
-      status: 'success',
-      data: newBiz
-    };
+    const res = await this.request('/businesses', {
+      method: 'POST',
+      body: bizData
+    });
+    return { status: 'success', data: res.data };
   },
 
   /**
@@ -485,15 +464,39 @@ export const ApiService = {
       const res = await this.request(`/tasks${query ? '?' + query : ''}`);
       return {
         status: 'success',
-        data: res.data || []
+        data: res.data || [],
+        meta: res.meta || {}
       };
     } catch (err) {
-      console.warn('Could not fetch tasks from TriNova:', err.message);
+      console.warn('Could not fetch tasks:', err.message);
       return {
-        status: 'fallback',
-        data: []
+        status: 'error',
+        data: [],
+        error: err.message
       };
     }
+  },
+
+  /**
+   * Changes a task (status, due date, ...) via PATCH /api/v1/tasks/:id.
+   */
+  async updateTask(taskId, changes = {}) {
+    const res = await this.request(`/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      body: changes
+    });
+    return { status: 'success', data: res.data };
+  },
+
+  /**
+   * Marks a task as done via POST /api/v1/tasks/:id/complete.
+   */
+  async completeTask(taskId, note = '') {
+    const res = await this.request(`/tasks/${encodeURIComponent(taskId)}/complete`, {
+      method: 'POST',
+      body: note ? { completionNotes: note, resolution: note } : {}
+    });
+    return { status: 'success', data: res.data };
   },
 
   /* ==========================================================================
@@ -509,115 +512,54 @@ export const ApiService = {
       const res = await this.request(`/statutory${query ? '?' + query : ''}`);
       return {
         status: 'success',
-        data: res.data
+        data: res.data,
+        meta: res.meta || {}
       };
     } catch (err) {
-      console.warn('Could not fetch statutory deadlines from TriNova:', err.message);
+      console.warn('Could not fetch deadlines:', err.message);
       return {
-        status: 'fallback',
-        data: []
+        status: 'error',
+        data: [],
+        error: err.message
       };
     }
   },
 
   /**
-   * Triggers Companies House reconciliation and syncs results to TriNova.
-   * Calls POST /api/v1/statutory/sync with reconciled company records.
+   * Asks the server to check companies against the real Companies House register.
+   * POST /api/v1/statutory/sync. With no company numbers, the server checks every
+   * company it knows about. The result is exactly what the server reports.
    */
   async syncCompaniesHouse(companyNumbers = []) {
-    const cache = StorageService.getCHCache();
-
-    // Simulated/verified live Companies House dataset
-    const simulatedLiveResponses = {
-      "12345678": {
-        name: "Corporate Client Entity 1",
-        companyStatus: "active",
-        detail: "active-proposal-to-strike-off",
-        accounts: "2026-08-31",
-        accountsOverdue: true,
-        confirm: "2026-09-15",
-        confirmOverdue: true,
-        checked: new Date().toISOString()
-      },
-      "08923412": {
-        name: "Corporate Client Entity 2",
-        companyStatus: "active",
-        detail: null,
-        accounts: "2026-07-31",
-        accountsOverdue: true,
-        confirm: "2026-11-12",
-        confirmOverdue: false,
-        checked: new Date().toISOString()
-      },
-      "11223344": {
-        name: "Corporate Client Entity 3",
-        companyStatus: "active",
-        detail: null,
-        accounts: "2026-09-30",
-        accountsOverdue: false,
-        confirm: "2026-10-15",
-        confirmOverdue: false,
-        checked: new Date().toISOString()
-      },
-      "02110099": {
-        name: "Corporate Client Entity 4",
-        companyStatus: "active",
-        detail: null,
-        accounts: "2026-07-31",
-        accountsOverdue: true,
-        confirm: "2026-10-01",
-        confirmOverdue: false,
-        checked: new Date().toISOString()
-      }
-    };
-
-    // Update local cache
-    Object.assign(cache, simulatedLiveResponses);
-    StorageService.saveCHCache(cache);
-
-    // Prepare payload matching POST /api/v1/statutory/sync contract
-    const targetNumbers = companyNumbers.length > 0 ? companyNumbers : Object.keys(simulatedLiveResponses);
-    const syncRecords = targetNumbers.map(cn => {
-      const row = simulatedLiveResponses[cn] || cache[cn];
-      return {
-        company_number: cn,
-        accounts_due_date: row?.accounts || '2026-08-31',
-        accounts_overdue: Boolean(row?.accountsOverdue),
-        confirmation_statement_due_date: row?.confirm || '2026-09-15',
-        cs_overdue: Boolean(row?.confirmOverdue),
-        active_proposal_to_strike_off: Boolean(row?.detail === 'active-proposal-to-strike-off'),
-        synced_at: new Date().toISOString()
-      };
-    });
-
-    let backendSynced = false;
-    let backendDetails = null;
-
     try {
       const res = await this.request('/statutory/sync', {
         method: 'POST',
-        body: {
-          companyNumbers: targetNumbers,
-          records: syncRecords
-        }
+        body: companyNumbers.length > 0 ? { companyNumbers } : {},
+        timeout: 60000
       });
-
-      if (res.ok) {
-        backendSynced = true;
-        backendDetails = res.data;
-      }
+      const d = res.data || {};
+      return {
+        status: 'success',
+        reachedServer: true,
+        totalRequested: d.totalRequested || 0,
+        syncedCount: d.syncedCount || 0,
+        failedCount: d.failedCount || 0,
+        syncedAt: d.syncedAt || new Date().toISOString(),
+        results: d.results || []
+      };
     } catch (err) {
-      console.warn('TriNova backend statutory sync unavailable, local cache updated:', err.message);
+      console.warn('Companies House check could not be completed:', err.message);
+      return {
+        status: 'error',
+        reachedServer: false,
+        error: err.message,
+        totalRequested: 0,
+        syncedCount: 0,
+        failedCount: 0,
+        syncedAt: new Date().toISOString(),
+        results: []
+      };
     }
-
-    return {
-      status: 'success',
-      backendSynced,
-      backendDetails,
-      syncedCount: targetNumbers.length,
-      syncedAt: new Date().toISOString(),
-      cache
-    };
   },
 
   /* ==========================================================================
@@ -625,62 +567,37 @@ export const ApiService = {
      ========================================================================== */
 
   /**
-   * Explicitly sends an internal note to TriNova with audit metadata.
-   * Enforces the privacy boundary: requires confirm_write_to_trinova = true.
-   * Calls POST /api/v1/companies/{id}/notes.
+   * Saves a note on a client's Notes tab (POST /api/v1/companies/:id/notes).
+   * The note is kept in Sloane. It is NOT sent to TriNova.
    */
   async sendNoteToTrinova(notePayload) {
     if (!notePayload.text) {
       throw new Error('Note text is required.');
     }
-
-    const companyId = notePayload.companyId || notePayload.rawId || 1;
-    const companyName = notePayload.companyName || 'Corporate Client';
-    const visibility = notePayload.visibility || 'staff_only';
-    const idempotencyKey = notePayload.idempotencyKey || this.generateIdempotencyKey();
-
-    try {
-      const res = await this.request(`/companies/${companyId}/notes`, {
-        method: 'POST',
-        headers: {
-          'Idempotency-Key': idempotencyKey
-        },
-        body: {
-          text: notePayload.text,
-          confirm_write_to_trinova: true,
-          visibility
-        }
-      });
-
-      return {
-        status: 'success',
-        source: 'trinova_live',
-        message: `Note successfully posted to TriNova (${visibility})`,
-        data: res.data
-      };
-    } catch (err) {
-      console.warn('TriNova notes API unavailable, saved to local audit trail:', err.message);
-
-      // Local fallback audit record
-      const auditRecord = {
-        id: `tnote-${Date.now()}`,
-        idempotencyKey,
-        actor: 'Kirsty Allen (CEO)',
-        action: 'create_internal_note',
-        company: companyName,
-        visibility,
-        content: notePayload.text,
-        timestamp: new Date().toISOString(),
-        offline: true
-      };
-
-      return {
-        status: 'success',
-        source: 'local_cache',
-        message: `Note recorded in local audit log (${visibility}) — will sync when online`,
-        data: auditRecord
-      };
+    const companyId = notePayload.companyId;
+    if (!companyId) {
+      throw new Error('Please choose which client the note is for.');
     }
+    const visibility = notePayload.visibility || 'staff_only';
+
+    const res = await this.request(`/companies/${encodeURIComponent(companyId)}/notes`, {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': notePayload.idempotencyKey || this.generateIdempotencyKey()
+      },
+      body: {
+        text: notePayload.text,
+        confirm_write_to_trinova: true,
+        visibility
+      }
+    });
+
+    return {
+      status: 'success',
+      source: 'sloane',
+      message: 'Saved on the client\'s Notes tab.',
+      data: res.data
+    };
   },
 
   /**
@@ -707,46 +624,50 @@ export const ApiService = {
      ========================================================================== */
 
   /**
-   * Retrieves documents list for a company.
+   * Retrieves documents list for a company. Errors are passed on so the screen can say so.
    */
   async getCompanyDocuments(companyId) {
-    try {
-      const res = await this.request(`/companies/${companyId}/documents`);
-      return {
-        status: 'success',
-        data: res.data || []
-      };
-    } catch (err) {
-      return {
-        status: 'fallback',
-        data: [
-          {
-            id: 1,
-            filename: 'Annual_Accounts_Draft_2026.pdf',
-            description: 'Draft statutory accounts awaiting final sign-off',
-            status: 'Ready',
-            created_at: '2026-09-18T10:00:00Z'
-          }
-        ]
-      };
-    }
+    const res = await this.request(`/companies/${encodeURIComponent(companyId)}/documents`);
+    return { status: 'success', data: res.data || [] };
   },
 
   /**
-   * Obtains a signed, temporary 15-minute download URL for a document.
+   * Uploads a file for a client. `file` is a browser File.
+   */
+  async uploadDocument(companyId, file, category = 'General') {
+    const contentBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        resolve(text.slice(text.indexOf(',') + 1));
+      };
+      reader.onerror = () => reject(new Error('That file could not be read.'));
+      reader.readAsDataURL(file);
+    });
+    const res = await this.request(`/companies/${encodeURIComponent(companyId)}/documents/upload`, {
+      method: 'POST',
+      timeout: 60000,
+      body: { filename: file.name, mimeType: file.type || undefined, category, contentBase64 }
+    });
+    return { status: 'success', data: res.data };
+  },
+
+  async updateDocument(documentId, changes) {
+    const res = await this.request(`/documents/${encodeURIComponent(documentId)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteDocument(documentId) {
+    await this.request(`/documents/${encodeURIComponent(documentId)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  /**
+   * Asks for a short-lived download link for a document.
    */
   async getDocumentAccessToken(documentId) {
-    try {
-      const res = await this.request(`/documents/${documentId}/access-token`, {
-        method: 'POST'
-      });
-      return {
-        status: 'success',
-        data: res.data
-      };
-    } catch (err) {
-      throw new Error(`Could not generate download token: ${err.message}`);
-    }
+    const res = await this.request(`/documents/${encodeURIComponent(documentId)}/download-token`);
+    return { status: 'success', data: res.data };
   },
 
   /* ==========================================================================
@@ -765,20 +686,27 @@ export const ApiService = {
       };
     } catch (err) {
       return {
-        status: 'fallback',
-        data: []
+        status: 'error',
+        data: [],
+        error: err.message
       };
     }
   },
 
   /**
-   * Creates a new digital signature request.
+   * Records a signing request for a client's document.
    */
   async createSigningRequest(companyId, payload) {
-    return this.request(`/companies/${companyId}/signing-requests`, {
+    const res = await this.request(`/companies/${encodeURIComponent(companyId)}/signing-requests`, {
       method: 'POST',
       body: payload
     });
+    return { status: 'success', data: res.data, delivery: res.meta?.delivery || res.raw?.meta?.delivery };
+  },
+
+  async cancelSigningRequest(requestId) {
+    const res = await this.request(`/signing-requests/${encodeURIComponent(requestId)}/cancel`, { method: 'POST', body: {} });
+    return { status: 'success', data: res.data };
   },
 
   /**
@@ -858,13 +786,13 @@ export const ApiService = {
           ok: true,
           source,
           message: isClaude
-            ? 'Connected successfully to Anthropic Claude 3.5 Sonnet via secure server backend!'
-            : 'Connected to Sloane backend (Operating under deterministic practice rules engine).'
+            ? 'The AI (Claude) is connected and answering.'
+            : 'No AI is connected, so Sloane answers from your saved records only.'
         };
       }
-      return { ok: false, message: 'Backend AI returned non-200 status.' };
+      return { ok: false, message: 'The AI did not answer.' };
     } catch (err) {
-      return { ok: false, message: `Could not reach backend AI endpoint: ${err.message}` };
+      return { ok: false, message: `Sloane could not reach the AI: ${err.message}` };
     }
   },
 
@@ -962,7 +890,7 @@ export const ApiService = {
     if (isGreeting) {
       responseData = {
         response_type: 'conversational',
-        answer: 'Hello. I am Sloane, your Executive Command Centre assistant. How can I assist you with practice intelligence, statutory obligations, or director instructions right now?',
+        answer: 'Hello. I am Sloane. Ask me about your clients, tasks or deadlines.',
         risk_level: null,
         key_reasons: [],
         recommended_actions: [],
@@ -996,7 +924,7 @@ export const ApiService = {
     else if (/^(who\s+are\s+you|what\s+can\s+you\s+help|what\s+do\s+you\s+do|explain\s+what\s+you\s+can)\b/i.test(mLower)) {
       responseData = {
         response_type: 'general_knowledge',
-        answer: 'I am Sloane, your executive assistant. I monitor statutory obligations and filing deadlines, cross-reference Companies House records, track client timelines with immutable provenance, manage Documenso digital signing workflows, and brief you on high-risk practice entities.',
+        answer: 'I am Sloane. I can answer questions about your clients, tasks and deadlines using the records saved in Sloane.',
         risk_level: null,
         key_reasons: [],
         recommended_actions: [],
@@ -1004,110 +932,15 @@ export const ApiService = {
       };
     }
 
-    // D. Red-Flagged Company Count
-    else if (/how\s+many.*(red|flagged)/i.test(mLower) || /count.*(red|high)/i.test(mLower)) {
-      const redList = clients.filter(c => c.risk === 'High');
-      const redCount = redList.length > 0 ? redList.length : 2;
-      const redNames = redList.length > 0 ? redList.map(c => c.name).slice(0, 4) : ['Critical Monitored Account 1', 'Critical Monitored Account 2'];
-
-      responseData = {
-        response_type: 'practice_assessment',
-        answer: `According to practice records, there are ${redCount} entities flagged RED at high statutory risk: ${redNames.join(', ')}.`,
-        risk_level: 'red',
-        key_reasons: [
-          `${redCount} practice entities require immediate intervention to prevent penalties or dissolution.`,
-          "Statutory accounts or confirmation statements overdue on registry records."
-        ],
-        recommended_actions: [
-          { action: "Submit statutory filing defense with Companies House", priority: "high", reason: "Dissolution defense" },
-          { action: "Chase client directors for missing accounting records", priority: "high", reason: "Filing penalty mitigation" }
-        ],
-        evidence: []
-      };
-    }
-
-    // E. Focused Client
-    else if (targetClient) {
-      const isDirector = /director|who|contact|email|call/i.test(mLower);
-      const isTimeline = /timeline|recent|happened|event|history/i.test(mLower);
-
-      if (isDirector) {
-        responseData = {
-          response_type: 'practice_assessment',
-          answer: `The registered director(s) for ${targetClient.name} are ${targetClient.dirs || 'on record'}.`,
-          risk_level: "neutral",
-          key_reasons: [
-            `Company: ${targetClient.name} (Co. No: ${targetClient.no || 'Active'}).`,
-            `Officers on file: ${targetClient.dirs || 'Primary Director'}.`
-          ],
-          recommended_actions: [
-            { action: `Contact ${targetClient.dirs || 'director'} to obtain signed documents`, priority: "high", reason: "Unblocks accounts submission" }
-          ],
-          evidence: []
-        };
-      } else if (isTimeline) {
-        responseData = {
-          response_type: 'practice_assessment',
-          answer: `${targetClient.name}'s chronological timeline records statutory filing tracking and accounts preparation activities.`,
-          risk_level: targetClient.risk === 'High' ? "red" : "amber",
-          key_reasons: [
-            `Statutory accounts and filing records for ${targetClient.name}.`,
-            "Practice task status monitored under client file."
-          ],
-          recommended_actions: [
-            { action: `Review upcoming statutory deliverables for ${targetClient.name}`, priority: "high", reason: "Compliance" }
-          ],
-          evidence: []
-        };
-      } else {
-        responseData = {
-          response_type: 'practice_assessment',
-          answer: `${targetClient.name} is currently managed with risk rating ${targetClient.risk || 'Normal'}.`,
-          risk_level: targetClient.risk === 'High' ? "red" : "neutral",
-          key_reasons: [
-            `Entity: ${targetClient.name} (Co. No: ${targetClient.no || 'Active'}).`,
-            `Assigned partner: ${targetClient.owner || 'Practice Partner'}.`
-          ],
-          recommended_actions: [
-            { action: `Review ${targetClient.name} statutory schedule`, priority: "normal", reason: "Periodic review" }
-          ],
-          evidence: []
-        };
-      }
-    }
-
-    // F. Practice Morning Priorities / Executive Review
-    else if (/deadline|focus|today|morning|priorit|urgent\s+statutory/i.test(mLower)) {
-      responseData = {
-        response_type: 'practice_assessment',
-        answer: "Practice morning priorities indicate critical statutory risks requiring immediate attention across flagged overdue accounts.",
-        risk_level: "red",
-        key_reasons: [
-          "Urgent statutory filings requiring immediate director submission.",
-          "Overdue confirmation statements and late penalty avoidance."
-        ],
-        recommended_actions: [
-          { action: "Halt active strike-off notices with Companies House", priority: "high", reason: "Immediate dissolution risk" },
-          { action: "Chase client directors for missing bank reconciliation records", priority: "high", reason: "Penalty mitigation" },
-          { action: "Review VAT submission queue for upcoming obligations", priority: "normal", reason: "Upcoming deadline" }
-        ],
-        evidence: []
-      };
-    }
-
-    // G. Default Practice Context
+    // Anything about the practice needs the server's records, and the server cannot be reached
+    // right now. Say so, and never make up an answer.
     else {
       responseData = {
-        response_type: 'practice_assessment',
-        answer: "Sloane has analyzed the active practice portfolio. Practice statutory monitors indicate action items requiring executive attention.",
-        risk_level: 'amber',
-        key_reasons: [
-          "Active portfolio monitoring across statutory deadlines.",
-          "Entities flagged for review in Statutory Radar."
-        ],
-        recommended_actions: [
-          { action: "Review statutory obligations in Client 360", priority: "normal", reason: "Portfolio review" }
-        ],
+        response_type: 'conversational',
+        answer: 'Sloane could not reach its server just now, so it cannot look at your records to answer that. Please try again in a minute.',
+        risk_level: null,
+        key_reasons: [],
+        recommended_actions: [],
         evidence: []
       };
     }
@@ -1129,29 +962,147 @@ export const ApiService = {
    * Adheres to Prompt Section 42.
    */
   async getExecutiveBriefing() {
+    // No made-up fallback: if the server cannot be reached the error is passed on.
+    return this.request('/ai/executive-briefing');
+  },
+
+  /* ==========================================================================
+     Tasks, team, deadlines, VAT, notes and history: create / change / delete
+     ========================================================================== */
+
+  async createTask(payload) {
+    const res = await this.request('/tasks', { method: 'POST', body: payload });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteTask(taskId) {
+    await this.request(`/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async getTeam() {
     try {
-      return await this.request('/ai/executive-briefing');
+      const res = await this.request('/team');
+      return { status: 'success', data: res.data || [] };
     } catch (err) {
-      console.warn('[ApiService] Remote executive briefing unavailable, generating local briefing:', err.message);
-      return {
-        ok: true,
-        source: 'grounded_rules_engine',
-        data: {
-          critical_risks: [
-            { client: 'Priority Client Record 1', reason: 'Active strike-off notice on Companies House', priority: 'high' },
-            { client: 'Priority Client Record 2', reason: 'Statutory accounts overdue', priority: 'high' }
-          ],
-          upcoming_deadlines: [
-            { client: 'Monitored Client Record A', due_date: '2026-09-30', type: 'Accounts' },
-            { client: 'Monitored Client Record B', due_date: '2026-09-30', type: 'Accounts' }
-          ],
-          priorities: [
-            'Halt active strike-off notices with Companies House',
-            'Follow up with client directors for outstanding records',
-            'Finalize periodic VAT returns queue'
-          ]
-        }
-      };
+      return { status: 'error', data: [], error: err.message };
+    }
+  },
+
+  async createTeamMember(payload) {
+    const res = await this.request('/team', { method: 'POST', body: payload });
+    return { status: 'success', data: res.data };
+  },
+
+  async updateTeamMember(id, changes) {
+    const res = await this.request(`/team/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteTeamMember(id) {
+    await this.request(`/team/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async createDeadline(payload) {
+    const res = await this.request('/statutory/deadlines', { method: 'POST', body: payload });
+    return { status: 'success', data: res.data };
+  },
+
+  async updateDeadline(id, changes) {
+    const res = await this.request(`/statutory/deadlines/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteDeadline(id) {
+    await this.request(`/statutory/deadlines/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async getVatReturns() {
+    try {
+      const res = await this.request('/vat-returns');
+      return { status: 'success', data: res.data || [] };
+    } catch (err) {
+      return { status: 'error', data: [], error: err.message };
+    }
+  },
+
+  async createVatReturn(payload) {
+    const res = await this.request('/vat-returns', { method: 'POST', body: payload });
+    return { status: 'success', data: res.data };
+  },
+
+  async updateVatReturn(id, changes) {
+    const res = await this.request(`/vat-returns/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteVatReturn(id) {
+    await this.request(`/vat-returns/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async updateCompanyNote(companyId, noteId, changes) {
+    const res = await this.request(`/companies/${encodeURIComponent(companyId)}/notes/${encodeURIComponent(noteId)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteCompanyNote(companyId, noteId) {
+    await this.request(`/companies/${encodeURIComponent(companyId)}/notes/${encodeURIComponent(noteId)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async updateTimelineEvent(clientId, eventId, changes) {
+    const res = await this.request(`/clients/${encodeURIComponent(clientId)}/timeline/${encodeURIComponent(eventId)}`, { method: 'PATCH', body: changes });
+    return { status: 'success', data: res.data };
+  },
+
+  async deleteTimelineEvent(clientId, eventId) {
+    await this.request(`/clients/${encodeURIComponent(clientId)}/timeline/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  /** Puts a client under one of the owner's businesses (null takes it out). */
+  async setClientBusiness(clientId, businessArea) {
+    const res = await this.request(`/clients/${encodeURIComponent(clientId)}/business`, { method: 'PUT', body: { businessArea } });
+    return { status: 'success', data: res.data };
+  },
+
+  /* ---- My Private Notes (saved on the server, signed-in owner only) ---- */
+
+  async getPrivateNotes() {
+    const res = await this.request('/ceo-notes');
+    return { status: 'success', data: res.data || [] };
+  },
+
+  async createPrivateNote(text) {
+    const res = await this.request('/ceo-notes', { method: 'POST', body: { text } });
+    return { status: 'success', data: res.data };
+  },
+
+  async updatePrivateNote(id, text) {
+    const res = await this.request(`/ceo-notes/${encodeURIComponent(id)}`, { method: 'PATCH', body: { text } });
+    return { status: 'success', data: res.data };
+  },
+
+  async deletePrivateNote(id) {
+    await this.request(`/ceo-notes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success' };
+  },
+
+  async importPrivateNotes(notes) {
+    const res = await this.request('/ceo-notes/import', { method: 'POST', body: { notes } });
+    return { status: 'success', data: res.data };
+  },
+
+  /** Plain facts about this install: where data is saved, whether TriNova is connected. */
+  async getSystemStatus() {
+    try {
+      const res = await this.request('/system/status');
+      return { status: 'success', data: res.data };
+    } catch (err) {
+      return { status: 'error', data: null, error: err.message };
     }
   },
 

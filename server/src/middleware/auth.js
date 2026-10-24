@@ -76,7 +76,7 @@ export function authenticate(req, res, next) {
     return res.status(401).json({
       error: {
         code: 'UNAUTHORIZED',
-        message: 'Missing credentials. Provide an active session cookie, Authorization: Bearer <token>, or X-Trinova-API-Key.'
+        message: 'Please sign in to Sloane to continue. Your sign-in may have timed out.'
       }
     });
   }
@@ -136,7 +136,7 @@ export function requireScope(requiredScope) {
       return res.status(401).json({
         error: {
           code: 'UNAUTHORIZED',
-          message: 'Authentication required prior to scope verification.'
+          message: 'Please sign in to Sloane to continue.'
         }
       });
     }

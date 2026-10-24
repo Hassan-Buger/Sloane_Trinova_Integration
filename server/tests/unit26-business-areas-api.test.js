@@ -244,7 +244,7 @@ describe('Task P7.4.2: Add Business Area Working Against API', () => {
       assert.match(appJsContent, /renderBusinesses\s*\(/,
         'scripts/app.js must define renderBusinesses'
       );
-      assert.match(appJsContent, /No active business areas configured/,
+      assert.match(appJsContent, /You have not added any businesses yet/,
         'scripts/app.js must provide honest empty state for business areas'
       );
       assert.match(appJsContent, /populateClientModalBizSelect\s*\(/,

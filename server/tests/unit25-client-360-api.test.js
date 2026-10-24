@@ -32,6 +32,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { frontendSource } from './support.js';
 
 import { createApp } from '../src/app.js';
 import { mockDb } from '../src/data/db.js';
@@ -310,7 +311,7 @@ describe('Task P7.4.1: Client 360 Interactive Features Against API', () => {
     const indexHtmlPath = path.join(rootDir, 'index.html');
 
     const apiJsContent = fs.readFileSync(apiJsPath, 'utf8');
-    const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+    const appJsContent = frontendSource();
     const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
 
     test('4.1 ApiService provides all required Client 360 interactive methods', () => {
@@ -332,7 +333,7 @@ describe('Task P7.4.1: Client 360 Interactive Features Against API', () => {
       assert.match(appJsContent, /renderClientDocumentsDetail/, 'app.js must implement renderClientDocumentsDetail');
       assert.match(appJsContent, /renderClientStatutoryDetail/, 'app.js must implement renderClientStatutoryDetail');
       assert.match(appJsContent, /No internal notes recorded for this client/, 'Must contain honest empty state for notes');
-      assert.match(appJsContent, /No corporate documents recorded for this client/, 'Must contain honest empty state for documents');
+      assert.match(appJsContent, /No documents yet/, 'Must contain honest empty state for documents');
     });
 
     test('4.4 index.html static shell has zero literal @ symbols and zero client leaks', () => {

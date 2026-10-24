@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { frontendSource } from './support.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +14,7 @@ describe('Task P7.3: Demo Arrays Removal from UI Path', () => {
   const apiJsPath = path.join(rootDir, 'scripts/services/api.js');
   const indexHtmlPath = path.join(rootDir, 'index.html');
 
-  const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+  const appJsContent = frontendSource();
   const apiJsContent = fs.readFileSync(apiJsPath, 'utf8');
   const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
 
@@ -102,16 +103,16 @@ describe('Task P7.3: Demo Arrays Removal from UI Path', () => {
     test('5. Waiting for sign-off renders honest empty state when no sign-off tasks exist', () => {
       assert.match(
         appJsContent,
-        /No items waiting for sign-off/,
-        'renderCommandCentre must define "No items waiting for sign-off" empty state'
+        /Nothing is waiting for your OK/,
+        'renderCommandCentre must define "Nothing is waiting for your OK" empty state'
       );
     });
 
     test('6. Top 3 ranked items renders honest empty state when no statutory items exist', () => {
       assert.match(
         appJsContent,
-        /No urgent priority items/,
-        'renderCommandCentre must define "No urgent priority items" empty state'
+        /Nothing urgent right now/,
+        'renderCommandCentre must define "Nothing urgent right now" empty state'
       );
     });
 
@@ -122,11 +123,11 @@ describe('Task P7.3: Demo Arrays Removal from UI Path', () => {
         /pulseSignoffs\.textContent\s*=\s*signoffCount/,
         'pulseSignoffs must be updated from signoffCount'
       );
-      // pulseOverdue must be updated from statutoryMeta.redCount
+      // pulseOverdue must be computed from the real filing records (late filings)
       assert.match(
         appJsContent,
-        /pulseOverdue\.textContent\s*=\s*statutoryMeta\.redCount/,
-        'pulseOverdue must be dynamically set from statutoryMeta.redCount'
+        /pulseOverdue\.textContent\s*=\s*lateCount/,
+        'pulseOverdue must be dynamically set from lateCount'
       );
       // pulseBlocked must be updated from blockedCount
       assert.match(
@@ -146,8 +147,8 @@ describe('Task P7.3: Demo Arrays Removal from UI Path', () => {
       );
       assert.match(
         appJsContent,
-        /No team work currently assigned/,
-        'renderPeopleWork must display "No team work currently assigned" when tasks array is empty'
+        /No tasks yet\. Click/,
+        'renderPeopleWork must display an empty state when tasks array is empty'
       );
       assert.match(
         appJsContent,
@@ -166,18 +167,18 @@ describe('Task P7.3: Demo Arrays Removal from UI Path', () => {
       );
       assert.match(
         appJsContent,
-        /No statutory records available/,
+        /No deadlines yet/,
         'renderStatutory must provide empty state for empty records'
       );
       assert.match(
         appJsContent,
-        /No immediate actions required/,
+        /Nothing needs doing right now/,
         'renderStatutory action tracker must provide empty state when no RED/AMBER items exist'
       );
       assert.match(
         appJsContent,
-        /No VAT filings currently scheduled/,
-        'renderStatutory VAT schedule must provide clean empty state'
+        /No VAT returns saved yet/,
+        'renderVatReturns must provide clean empty state (VAT returns are now kept in Sloane)'
       );
     });
   });

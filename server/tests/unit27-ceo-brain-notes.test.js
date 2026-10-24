@@ -24,6 +24,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { frontendSource } from './support.js';
 
 import { createApp } from '../src/app.js';
 import { ContextBuilder } from '../src/services/ai/contextBuilder.js';
@@ -153,27 +154,39 @@ describe('Task P7.4.3: CEO Brain Notes & Strict Privacy Boundary', () => {
     const apiJsPath = path.join(rootDir, 'scripts/services/api.js');
     const indexHtmlPath = path.join(rootDir, 'index.html');
 
-    const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+    const appJsContent = frontendSource();
     const apiJsContent = fs.readFileSync(apiJsPath, 'utf8');
     const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
 
-    test('3.1 handleSaveBrain validates non-empty input and stores isPrivate: true', () => {
+    test('3.1 handleSaveBrain validates non-empty input and saves the note on the server', () => {
       assert.match(appJsContent, /handleSaveBrain\s*\(/, 'Must implement handleSaveBrain');
-      assert.match(appJsContent, /isPrivate:\s*true/, 'Must tag saved brain entries with isPrivate: true');
-      assert.match(appJsContent, /Toast\.warning\(/, 'Must warn if user attempts to save an empty brain entry');
+      assert.match(appJsContent, /ApiService\.createPrivateNote\(/, 'Must save notes on the server, not only in the browser');
+      assert.match(appJsContent, /Please write something before saving/, 'Must warn if user attempts to save an empty note');
+      assert.doesNotMatch(appJsContent, /StorageService\.saveBrainEntries\(entries\)/, 'New notes must not be written to localStorage');
     });
 
     test('3.2 renderBrain renders honest empty state and escapeHtml', () => {
       assert.match(appJsContent, /renderBrain\s*\(/, 'Must implement renderBrain');
-      assert.match(appJsContent, /No private notes in CEO Brain yet/, 'Must contain honest empty state');
+      assert.match(appJsContent, /No private notes yet/, 'Must contain honest empty state');
       assert.match(appJsContent, /escapeHtml\s*\(\s*entry\.text\s*\)/, 'Must sanitize entry text with escapeHtml');
-      assert.match(appJsContent, /escapeHtml\s*\(\s*entry\.at\s*\)/, 'Must sanitize entry timestamp with escapeHtml');
+      assert.match(appJsContent, /escapeHtml\s*\(\s*stamp\(entry\.createdAt\)\s*\)/, 'Must sanitize entry timestamp with escapeHtml');
     });
 
-    test('3.3 openTrinovaNoteModal requires explicit checkbox and fetches live clients', () => {
+    test('3.2b Notes saved only in this browser are moved to the server once', () => {
+      assert.match(appJsContent, /migrateBrowserNotes\s*\(/);
+      assert.match(appJsContent, /ApiService\.importPrivateNotes\(/);
+      assert.match(appJsContent, /StorageService\.saveBrainEntries\(\[\]\)/, 'Browser copy is cleared only after a successful move');
+    });
+
+    test('3.3 openTrinovaNoteModal requires explicit checkbox and offers the live client list', () => {
       assert.match(appJsContent, /openTrinovaNoteModal\s*\(/, 'Must implement openTrinovaNoteModal');
       assert.match(appJsContent, /confirmBox\.checked\s*=\s*false/, 'Must explicitly uncheck confirmation box on modal open');
-      assert.match(appJsContent, /ApiService\.getClients\(\)/, 'Must resolve clients for modal dropdown from ApiService');
+      assert.match(appJsContent, /getClientChoices\(\)/, 'Must offer the clients from the Clients page');
+    });
+
+    test('3.3b The copy dialog says truthfully that the note is not sent to TriNova', () => {
+      assert.match(indexHtmlContent, /Nothing is sent to TriNova or to the client/);
+      assert.doesNotMatch(indexHtmlContent, /TriNova staff will be able to read it/);
     });
 
     test('3.4 handleSendNoteToTrinova verifies checkbox before calling ApiService.sendNoteToTrinova', () => {

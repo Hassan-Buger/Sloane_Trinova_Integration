@@ -41,3 +41,10 @@ data-private/
 server/data-private/
 *.tmp
 
+# Sloane's saved data (SQLite database and its journal files)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+

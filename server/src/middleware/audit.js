@@ -6,6 +6,8 @@
 
 import { logger } from './sanitizer.js';
 
+const MAX_AUDIT_ENTRIES = 2000;
+
 class AuditStore {
   constructor() {
     this.logs = [];
@@ -18,6 +20,8 @@ class AuditStore {
       ...entry
     };
     this.logs.unshift(record);
+    // Keep the most recent entries only, so the log cannot grow without limit.
+    if (this.logs.length > MAX_AUDIT_ENTRIES) this.logs.length = MAX_AUDIT_ENTRIES;
     // Log with sanitized metadata
     logger.info(`Audit Log: [${record.action}] by ${record.actorId} on ${record.resourceType || 'API'}:${record.resourceId || 'root'} (${record.statusCode})`);
     return record;

@@ -105,13 +105,13 @@ describe('Task P7.2: Command Centre Integration & Dynamic Radar Pills', () => {
     });
 
     test('9. Context scan in renderIntelligence dynamically uses cachedDiaryEvents', () => {
-      const intelMatch = appJs.match(/renderIntelligence\s*\(\)\s*\{([\s\S]*?)renderBrain/);
+      const intelMatch = appJs.match(/renderIntelligence\s*\(\)\s*\{([\s\S]*?)renderMissedScan/);
       assert.ok(intelMatch, 'renderIntelligence method found');
       const intelBody = intelMatch[1];
 
       assert.ok(intelBody.includes('this.cachedDiaryEvents'), 'Inspects cachedDiaryEvents for clashes');
-      assert.ok(intelBody.includes('Schedule Conflict:'), 'Renders Schedule Conflict title when clashes exist');
-      assert.ok(intelBody.includes('Calendar Schedule Clear'), 'Renders Calendar Schedule Clear when no clashes exist');
+      assert.ok(intelBody.includes('Two meetings at once:'), 'Renders a plain-English clash title when clashes exist');
+      assert.ok(intelBody.includes('None of today'), 'Says plainly that no meetings overlap when there are no clashes');
     });
 
     test('10. Pulse metric pulseEmails is updated from attentionEmails.length', () => {

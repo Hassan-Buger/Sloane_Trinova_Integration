@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { outlookVaultFilePath } from '../data/paths.js';
+
 const DEFAULT_VAULT_PATH = path.resolve(__dirname, '../../data-private/outlook-vault.json');
 
 /**
@@ -196,8 +198,7 @@ export function decrypt(blob, keyOverride) {
  */
 export function getVaultPath(pathOverride) {
   if (pathOverride) return path.resolve(pathOverride);
-  if (process.env.OUTLOOK_VAULT_PATH) return path.resolve(process.env.OUTLOOK_VAULT_PATH);
-  return DEFAULT_VAULT_PATH;
+  return outlookVaultFilePath() || DEFAULT_VAULT_PATH;
 }
 
 /**

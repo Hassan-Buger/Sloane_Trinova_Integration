@@ -1,22 +1,102 @@
 /**
- * Trinova Tasks & Workflow API Routes
- * Implements task reads, idempotent creation, updates, completion, and workflow transitions.
+ * Tasks: create, read, change, tick off, reassign and delete.
  *
- * Adheres strictly to:
+ * Tasks are Sloane's own. They can be attached to any client (one added in Sloane or a live
+ * TriNova client) or be general ("Ring the accountant") with no client at all.
+ *
+ * Adheres to:
  * - context/04_backend_integration_context.md §4–5, §7
  * - context/05_data_security_context.md §3, §6
  * - context/specs/04-tasks-workflow-read-write.md
  */
 
-import { mockDb } from '../data/db.js';
+import { mockDb, sampleDataEnabled } from '../data/db.js';
 import { requireIdempotency } from '../middleware/idempotency.js';
 import { WorkflowEngine } from '../services/workflow.js';
 import { TimelineService } from '../services/timelineService.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { sendError, newId, isIsoDate, cleanText } from './helpers.js';
+
+export const TASK_PRIORITIES = ['Low', 'Normal', 'Medium', 'High', 'Urgent'];
+const MAX_TITLE = 255;
+const MAX_DESCRIPTION = 4000;
+
+const TASK_NOT_FOUND = 'We could not find that task. It may already have been deleted.';
+
+/** Work out which client (if any) a new task belongs to. */
+function resolveTarget(companyIdFromPath, body) {
+  const wanted = companyIdFromPath || body.companyId || null;
+  if (wanted) {
+    const ref = clientDirectory.findCompany(wanted);
+    if (!ref) {
+      return { error: ['COMPANY_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.'] };
+    }
+    return { ref: { companyId: ref.id, clientId: ref.clientId, clientName: ref.companyName } };
+  }
+  if (body.clientId) {
+    const client = clientDirectory.find(body.clientId);
+    if (!client) {
+      return { error: ['CLIENT_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.'] };
+    }
+    return { ref: { companyId: client.companyId || client.id, clientId: client.id, clientName: client.name } };
+  }
+  if (body.general === true) return { ref: null };
+  return { error: ['VALIDATION_ERROR', 'Choose which client this task is for, or mark it as a general task.'] };
+}
+
+/** Work out the assignee from an id and/or a name. */
+function resolveAssignee(body) {
+  const hasId = Object.prototype.hasOwnProperty.call(body, 'assigneeId');
+  const hasName = Object.prototype.hasOwnProperty.call(body, 'assigneeName');
+  if (!hasId && !hasName) return { unchanged: true };
+
+  const id = body.assigneeId;
+  if (hasId && (id === null || id === '')) return { assigneeId: null, assigneeName: null };
+
+  if (id) {
+    const member = (mockDb.teamMembers || []).find(m => m.id === id);
+    if (member) return { assigneeId: member.id, assigneeName: member.name };
+    const name = cleanText(body.assigneeName);
+    if (name) return { assigneeId: String(id), assigneeName: name };
+    return { error: ['ASSIGNEE_NOT_FOUND', 'We could not find that team member. Add them on the Team & Tasks page first.'] };
+  }
+
+  const name = cleanText(body.assigneeName);
+  return { assigneeId: null, assigneeName: name || null };
+}
+
+function validateDueDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return isIsoDate(value) ? null : 'Please enter the due date as a real date (day, month and year).';
+}
+
+function recordTimeline(task, eventType, title, description, actor, extra = {}) {
+  if (!task.clientId) return;
+  try {
+    TimelineService.createEvent({
+      clientId: task.clientId,
+      companyId: task.companyId || null,
+      eventType,
+      title,
+      description,
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: actor?.actorId || 'actor_staff',
+      source: 'task',
+      severity: task.priority === 'Urgent' ? 'urgent' : 'normal',
+      visibility: 'shared',
+      externalId: extra.externalId || `${eventType.toLowerCase()}_${task.id}_${task.version}`,
+      metadata: { taskId: task.id, ...(extra.metadata || {}) }
+    });
+  } catch (e) {
+    // The history entry is a nice-to-have and must never block the task change.
+  }
+}
 
 export function registerTaskRoutes(app, { authenticate, requireScope }) {
   /**
    * GET /api/v1/tasks
-   * Reads outstanding tasks with filtering across companies, assignees, and statuses.
+   * Reads tasks with filtering by client, assignee and status.
    */
   app.get('/api/v1/tasks', authenticate, requireScope('sloane:read'), (req, res) => {
     req.auditAction = 'read_tasks_list';
@@ -27,20 +107,19 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     if (req.query.companyId) {
       tasks = tasks.filter(t => t.companyId === req.query.companyId);
     }
-
+    if (req.query.clientId) {
+      tasks = tasks.filter(t => t.clientId === req.query.clientId || t.companyId === req.query.clientId);
+    }
     if (req.query.status) {
       tasks = tasks.filter(t => t.status.toLowerCase() === req.query.status.toLowerCase());
     }
-
     if (req.query.assigneeId) {
       tasks = tasks.filter(t => t.assigneeId === req.query.assigneeId);
     }
-
     if (req.query.isBlocked !== undefined) {
       const isBlockedBool = req.query.isBlocked === 'true';
       tasks = tasks.filter(t => Boolean(t.isBlocked) === isBlockedBool);
     }
-
     if (req.query.search) {
       const q = req.query.search.toLowerCase();
       tasks = tasks.filter(t => {
@@ -50,8 +129,9 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
       });
     }
 
-    // Sort by due date ascending (urgent first)
+    // Sort by due date ascending (soonest first, no date last)
     tasks.sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
@@ -62,14 +142,16 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
       data: tasks,
       meta: {
         total: tasks.length,
-        unfilteredTotal: (mockDb.tasks || []).length
+        unfilteredTotal: (mockDb.tasks || []).length,
+        // 'sample' only while the built-in example records are switched on
+        dataSource: sampleDataEnabled() ? 'sample' : 'sloane'
       }
     });
   });
 
   /**
    * GET /api/v1/companies/:companyId/tasks
-   * Reads tasks linked specifically to a company ID.
+   * Reads tasks linked specifically to a client / company id.
    */
   app.get('/api/v1/companies/:companyId/tasks', authenticate, requireScope('sloane:read'), (req, res) => {
     const { companyId } = req.params;
@@ -77,32 +159,22 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     req.resourceType = 'task';
     req.resourceId = companyId;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
-      return res.status(404).json({
-        error: {
-          code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' not found.`
-        }
-      });
+      return sendError(res, 404, 'COMPANY_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.');
     }
 
-    const tasks = (mockDb.tasks || []).filter(t => t.companyId === companyId);
+    const tasks = (mockDb.tasks || []).filter(t => t.companyId === companyId || t.clientId === company.clientId);
 
     res.status(200).json({
       status: 'success',
       data: tasks,
-      meta: {
-        companyId,
-        companyName: company.companyName,
-        total: tasks.length
-      }
+      meta: { companyId, companyName: company.companyName, total: tasks.length }
     });
   });
 
   /**
    * GET /api/v1/tasks/:id
-   * Reads details of a single task.
    */
   app.get('/api/v1/tasks/:id', authenticate, requireScope('sloane:read'), (req, res) => {
     const { id } = req.params;
@@ -111,151 +183,98 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     req.resourceId = id;
 
     const task = (mockDb.tasks || []).find(t => t.id === id);
-    if (!task) {
-      return res.status(404).json({
-        error: {
-          code: 'TASK_NOT_FOUND',
-          message: `Task with ID '${id}' not found.`
-        }
-      });
-    }
+    if (!task) return sendError(res, 404, 'TASK_NOT_FOUND', TASK_NOT_FOUND);
 
-    res.status(200).json({
-      status: 'success',
-      data: task
-    });
+    res.status(200).json({ status: 'success', data: task });
   });
 
   /**
-   * Helper to handle task creation logic (shared by POST /tasks and POST /companies/:id/tasks)
+   * Shared by POST /tasks and POST /companies/:id/tasks
    */
-  function handleCreateTask(req, res, targetCompanyId) {
-    const companyId = targetCompanyId || req.body?.companyId;
+  function handleCreateTask(req, res, companyIdFromPath) {
+    const body = req.body || {};
 
-    if (!companyId) {
-      return res.status(422).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Target companyId is required.'
-        }
-      });
+    const target = resolveTarget(companyIdFromPath, body);
+    if (target.error) {
+      const [code, message] = target.error;
+      return sendError(res, 422, code, message);
     }
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
-    if (!company) {
-      return res.status(422).json({
-        error: {
-          code: 'COMPANY_NOT_FOUND',
-          message: `Cannot create task: Company with ID '${companyId}' does not exist.`
-        }
-      });
+    const title = cleanText(body.title);
+    if (!title) return sendError(res, 422, 'VALIDATION_ERROR', 'Please give the task a title.');
+    if (title.length > MAX_TITLE) {
+      return sendError(res, 422, 'VALIDATION_ERROR', `The task title can be up to ${MAX_TITLE} characters.`);
     }
 
-    const title = (req.body?.title || '').trim();
-    if (!title) {
-      return res.status(422).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Task title is required.'
-        }
-      });
+    const dueProblem = validateDueDate(body.dueDate);
+    if (dueProblem) return sendError(res, 422, 'VALIDATION_ERROR', dueProblem);
+
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+    if (description.length > MAX_DESCRIPTION) {
+      return sendError(res, 422, 'VALIDATION_ERROR', `The description can be up to ${MAX_DESCRIPTION} characters.`);
     }
 
-    if (title.length > 255) {
-      return res.status(422).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Task title cannot exceed 255 characters.'
-        }
-      });
+    const status = body.status || 'Pending';
+    if (!WorkflowEngine.PERMITTED_TASK_STATUSES.includes(status)) {
+      return sendError(res, 422, 'INVALID_TASK_STATUS', 'That is not a status a task can have.');
+    }
+    const priority = body.priority || 'Normal';
+    if (!TASK_PRIORITIES.includes(priority)) {
+      return sendError(res, 422, 'VALIDATION_ERROR', `Priority must be one of: ${TASK_PRIORITIES.join(', ')}.`);
     }
 
-    if (req.body.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.dueDate)) {
-      return res.status(422).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'dueDate must be a valid ISO date string (YYYY-MM-DD).'
-        }
-      });
-    }
+    const assignee = resolveAssignee(body);
+    if (assignee.error) return sendError(res, 422, assignee.error[0], assignee.error[1]);
 
+    const now = new Date().toISOString();
+    const ref = target.ref;
     const newTask = {
-      id: `tsk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      companyId: company.id,
-      companyName: company.companyName,
+      id: newId('tsk'),
+      companyId: ref ? ref.companyId : null,
+      clientId: ref ? ref.clientId : null,
+      companyName: ref ? ref.clientName : null,
       title,
-      description: req.body.description || '',
-      status: req.body.status || 'Pending',
-      priority: req.body.priority || 'Normal',
-      dueDate: req.body.dueDate || null,
-      isBlocked: Boolean(req.body.isBlocked),
-      blocker: req.body.blocker || null,
-      assigneeId: req.body.assigneeId || null,
-      assigneeName: req.body.assigneeName || null,
+      description,
+      status,
+      priority,
+      dueDate: body.dueDate || null,
+      isBlocked: Boolean(body.isBlocked),
+      blocker: body.isBlocked ? (cleanText(body.blocker) || 'Blocked') : null,
+      assigneeId: assignee.unchanged ? null : assignee.assigneeId,
+      assigneeName: assignee.unchanged ? null : assignee.assigneeName,
       creatorId: req.actor?.actorId || 'unknown_actor',
       creatorName: req.actor?.actorName || 'Authorized Staff',
       idempotencyKey: req.idempotencyKey,
       version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now
     };
 
-    if (!mockDb.tasks) mockDb.tasks = [];
     mockDb.tasks.unshift(newTask);
 
     req.auditAction = 'task_created';
     req.resourceType = 'task';
     req.resourceId = newTask.id;
 
-    // Generate real timeline event (Section 15: Timeline Data Generation)
-    if (company && company.clientId) {
-      try {
-        TimelineService.createEvent({
-          clientId: company.clientId,
-          companyId: company.id,
-          eventType: 'TASK_CREATED',
-          title: `Task Created: ${newTask.title}`,
-          description: newTask.description || `Task created for ${company.companyName}`,
-          occurredAt: newTask.createdAt,
-          actorType: 'user',
-          actorId: newTask.creatorId,
-          source: 'task',
-          severity: newTask.priority === 'Urgent' ? 'urgent' : 'normal',
-          visibility: 'shared',
-          externalId: newTask.id,
-          metadata: { taskId: newTask.id, dueDate: newTask.dueDate, assignee: newTask.assigneeName }
-        });
-      } catch (e) {
-        // Non-blocking timeline record
-      }
-    }
+    recordTimeline(newTask, 'TASK_CREATED', `Task Created: ${newTask.title}`,
+      newTask.description || `Task created${newTask.companyName ? ` for ${newTask.companyName}` : ''}`,
+      req.actor, { externalId: newTask.id, metadata: { dueDate: newTask.dueDate, assignee: newTask.assigneeName } });
 
-    res.status(201).json({
-      status: 'success',
-      message: 'Task created successfully.',
-      data: newTask
-    });
+    res.status(201).json({ status: 'success', message: 'Task created successfully.', data: newTask });
   }
 
-  /**
-   * POST /api/v1/companies/:companyId/tasks
-   * Creates a task linked to a specific company with mandatory Idempotency-Key.
-   */
   app.post('/api/v1/companies/:companyId/tasks', authenticate, requireScope('sloane:write'), requireIdempotency, (req, res) => {
     handleCreateTask(req, res, req.params.companyId);
   });
 
-  /**
-   * POST /api/v1/tasks
-   * Creates a task with mandatory Idempotency-Key and companyId in body.
-   */
   app.post('/api/v1/tasks', authenticate, requireScope('sloane:write'), requireIdempotency, (req, res) => {
     handleCreateTask(req, res, req.body?.companyId);
   });
 
   /**
    * PATCH /api/v1/tasks/:id
-   * Updates task details with optimistic concurrency conflict detection.
+   * Change the title, description, due date, priority, status, assignee or "stuck" flag.
+   * Optimistic concurrency: send the task's `version` to be told if someone else changed it.
    */
   app.patch('/api/v1/tasks/:id', authenticate, requireScope('sloane:write'), (req, res) => {
     const { id } = req.params;
@@ -264,97 +283,110 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     req.resourceId = id;
 
     const task = (mockDb.tasks || []).find(t => t.id === id);
-    if (!task) {
-      return res.status(404).json({
-        error: {
-          code: 'TASK_NOT_FOUND',
-          message: `Task with ID '${id}' not found.`
-        }
-      });
-    }
+    if (!task) return sendError(res, 404, 'TASK_NOT_FOUND', TASK_NOT_FOUND);
 
-    // Optimistic Concurrency Control
-    if (req.body.version !== undefined) {
-      const versionCheck = WorkflowEngine.validateVersion(task.version, req.body.version);
+    const body = req.body || {};
+
+    if (body.version !== undefined) {
+      const versionCheck = WorkflowEngine.validateVersion(task.version, body.version);
       if (!versionCheck.valid) {
-        return res.status(409).json({
-          error: {
-            code: versionCheck.code,
-            message: versionCheck.message
-          }
-        });
+        return sendError(res, 409, versionCheck.code, 'This task was changed somewhere else a moment ago. Refresh the page and try again.');
       }
     }
 
-    // Validations
-    if (req.body.title !== undefined) {
-      const title = String(req.body.title).trim();
-      if (!title) {
-        return res.status(422).json({
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Task title cannot be empty.'
-          }
-        });
+    // Validate everything first so a bad field never leaves the task half-changed.
+    let title;
+    if (body.title !== undefined) {
+      title = cleanText(body.title);
+      if (!title) return sendError(res, 422, 'VALIDATION_ERROR', 'The task title cannot be empty.');
+      if (title.length > MAX_TITLE) {
+        return sendError(res, 422, 'VALIDATION_ERROR', `The task title can be up to ${MAX_TITLE} characters.`);
       }
-      task.title = title;
     }
-
-    if (req.body.description !== undefined) {
-      task.description = String(req.body.description);
+    if (body.dueDate !== undefined) {
+      const problem = validateDueDate(body.dueDate);
+      if (problem) return sendError(res, 422, 'VALIDATION_ERROR', problem);
     }
+    if (body.description !== undefined && String(body.description).length > MAX_DESCRIPTION) {
+      return sendError(res, 422, 'VALIDATION_ERROR', `The description can be up to ${MAX_DESCRIPTION} characters.`);
+    }
+    if (body.status !== undefined && !WorkflowEngine.PERMITTED_TASK_STATUSES.includes(body.status)) {
+      return sendError(res, 422, 'INVALID_TASK_STATUS',
+        `Task status '${body.status}' is not permitted. Permitted statuses: [${WorkflowEngine.PERMITTED_TASK_STATUSES.join(', ')}].`);
+    }
+    if (body.priority !== undefined && !TASK_PRIORITIES.includes(body.priority)) {
+      return sendError(res, 422, 'VALIDATION_ERROR', `Priority must be one of: ${TASK_PRIORITIES.join(', ')}.`);
+    }
+    const assignee = resolveAssignee(body);
+    if (assignee.error) return sendError(res, 422, assignee.error[0], assignee.error[1]);
 
-    if (req.body.dueDate !== undefined) {
-      if (req.body.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.dueDate)) {
-        return res.status(422).json({
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'dueDate must be a valid ISO date string (YYYY-MM-DD).'
-          }
-        });
+    // Moving the task to a different client
+    let newTarget = null;
+    if (body.clientId !== undefined || body.general === true) {
+      if (body.general === true || body.clientId === null || body.clientId === '') {
+        newTarget = { ref: null };
+      } else {
+        newTarget = resolveTarget(null, { clientId: body.clientId });
+        if (newTarget.error) return sendError(res, 422, newTarget.error[0], newTarget.error[1]);
       }
-      task.dueDate = req.body.dueDate;
     }
 
-    if (req.body.status !== undefined) {
-      if (!WorkflowEngine.PERMITTED_TASK_STATUSES.includes(req.body.status)) {
-        return res.status(422).json({
-          error: {
-            code: 'INVALID_TASK_STATUS',
-            message: `Task status '${req.body.status}' is not permitted. Permitted statuses: [${WorkflowEngine.PERMITTED_TASK_STATUSES.join(', ')}].`
-          }
-        });
-      }
-      task.status = req.body.status;
-    }
+    const previousAssignee = task.assigneeName;
 
-    if (req.body.priority !== undefined) {
-      task.priority = req.body.priority;
+    if (title !== undefined) task.title = title;
+    if (body.description !== undefined) task.description = String(body.description);
+    if (body.dueDate !== undefined) task.dueDate = body.dueDate || null;
+    if (body.status !== undefined) {
+      task.status = body.status;
+      if (body.status === 'Completed' && !task.completedAt) task.completedAt = new Date().toISOString();
     }
-
-    if (req.body.assigneeId !== undefined) {
-      task.assigneeId = req.body.assigneeId;
-      task.assigneeName = req.body.assigneeName || task.assigneeName;
+    if (body.priority !== undefined) task.priority = body.priority;
+    if (!assignee.unchanged) {
+      task.assigneeId = assignee.assigneeId;
+      task.assigneeName = assignee.assigneeName;
     }
-
-    if (req.body.isBlocked !== undefined) {
-      task.isBlocked = Boolean(req.body.isBlocked);
-      task.blocker = task.isBlocked ? (req.body.blocker || 'Blocked') : null;
+    if (body.isBlocked !== undefined) {
+      task.isBlocked = Boolean(body.isBlocked);
+      task.blocker = task.isBlocked ? (cleanText(body.blocker) || 'Blocked') : null;
+    }
+    if (newTarget) {
+      const ref = newTarget.ref;
+      task.companyId = ref ? ref.companyId : null;
+      task.clientId = ref ? ref.clientId : null;
+      task.companyName = ref ? ref.clientName : null;
     }
 
     task.version = (task.version || 1) + 1;
     task.updatedAt = new Date().toISOString();
 
-    res.status(200).json({
-      status: 'success',
-      message: 'Task updated successfully.',
-      data: task
-    });
+    if (!assignee.unchanged && previousAssignee !== task.assigneeName) {
+      recordTimeline(task, 'TASK_REASSIGNED', `Task Reassigned: ${task.title}`,
+        task.assigneeName ? `Now with ${task.assigneeName}.` : 'Now unassigned.', req.actor,
+        { metadata: { from: previousAssignee || null, to: task.assigneeName || null } });
+    }
+
+    res.status(200).json({ status: 'success', message: 'Task updated successfully.', data: task });
+  });
+
+  /**
+   * DELETE /api/v1/tasks/:id
+   * Removes a task for good. (To keep a record of it instead, set its status to Cancelled.)
+   */
+  app.delete('/api/v1/tasks/:id', authenticate, requireScope('sloane:write'), (req, res) => {
+    const { id } = req.params;
+    req.auditAction = 'task_deleted';
+    req.resourceType = 'task';
+    req.resourceId = id;
+
+    const idx = (mockDb.tasks || []).findIndex(t => t.id === id);
+    if (idx === -1) return sendError(res, 404, 'TASK_NOT_FOUND', TASK_NOT_FOUND);
+
+    const [removed] = mockDb.tasks.splice(idx, 1);
+    res.status(200).json({ status: 'success', message: 'Task deleted.', data: { id: removed.id } });
   });
 
   /**
    * POST /api/v1/tasks/:id/complete
-   * Enforces Trinova completion rules and marks task as Completed.
    */
   app.post('/api/v1/tasks/:id/complete', authenticate, requireScope('sloane:write'), (req, res) => {
     const { id } = req.params;
@@ -363,24 +395,11 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     req.resourceId = id;
 
     const task = (mockDb.tasks || []).find(t => t.id === id);
-    if (!task) {
-      return res.status(404).json({
-        error: {
-          code: 'TASK_NOT_FOUND',
-          message: `Task with ID '${id}' not found.`
-        }
-      });
-    }
+    if (!task) return sendError(res, 404, 'TASK_NOT_FOUND', TASK_NOT_FOUND);
 
-    // Validate completion rules
     const completionCheck = WorkflowEngine.validateTaskCompletion(task, req.body || {});
     if (!completionCheck.valid) {
-      return res.status(422).json({
-        error: {
-          code: completionCheck.code,
-          message: completionCheck.message
-        }
-      });
+      return sendError(res, 422, completionCheck.code, completionCheck.message);
     }
 
     task.status = 'Completed';
@@ -392,35 +411,11 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     task.version = (task.version || 1) + 1;
     task.updatedAt = new Date().toISOString();
 
-    // Generate real timeline event for completion (Section 15)
-    const taskCompany = (mockDb.companies || []).find(c => c.id === task.companyId);
-    if (taskCompany && taskCompany.clientId) {
-      try {
-        TimelineService.createEvent({
-          clientId: taskCompany.clientId,
-          companyId: taskCompany.id,
-          eventType: 'TASK_COMPLETED',
-          title: `Task Completed: ${task.title}`,
-          description: `Resolved by ${task.completedBy}: ${task.completionNotes}`,
-          occurredAt: task.completedAt,
-          actorType: 'user',
-          actorId: req.actor?.actorId || 'actor_staff',
-          source: 'task',
-          severity: 'normal',
-          visibility: 'shared',
-          externalId: `comp_${task.id}_${task.version}`,
-          metadata: { taskId: task.id, completedBy: task.completedBy }
-        });
-      } catch (e) {
-        // Non-blocking timeline record
-      }
-    }
+    recordTimeline(task, 'TASK_COMPLETED', `Task Completed: ${task.title}`,
+      `Resolved by ${task.completedBy}: ${task.completionNotes}`, req.actor,
+      { externalId: `comp_${task.id}_${task.version}`, metadata: { completedBy: task.completedBy } });
 
-    res.status(200).json({
-      status: 'success',
-      message: 'Task successfully completed.',
-      data: task
-    });
+    res.status(200).json({ status: 'success', message: 'Task successfully completed.', data: task });
   });
 
   /**
@@ -435,12 +430,7 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
 
     const company = (mockDb.companies || []).find(c => c.id === companyId);
     if (!company) {
-      return res.status(404).json({
-        error: {
-          code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' not found.`
-        }
-      });
+      return sendError(res, 404, 'COMPANY_NOT_FOUND', 'We could not find that company.');
     }
 
     const currentStage = company.workflowStage || 'Onboarding';
@@ -448,12 +438,7 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
 
     const transitionResult = WorkflowEngine.validateWorkflowTransition(currentStage, targetStage);
     if (!transitionResult.valid) {
-      return res.status(422).json({
-        error: {
-          code: 'INVALID_WORKFLOW_TRANSITION',
-          message: transitionResult.message
-        }
-      });
+      return sendError(res, 422, 'INVALID_WORKFLOW_TRANSITION', transitionResult.message);
     }
 
     const previousStage = currentStage;

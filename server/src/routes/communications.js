@@ -13,6 +13,35 @@ import { mockDb } from '../data/db.js';
 import { requireIdempotency } from '../middleware/idempotency.js';
 import { documentStorage } from '../services/storageDriver.js';
 import { TimelineService } from '../services/timelineService.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { sendError, cleanText } from './helpers.js';
+
+const MIME_BY_EXTENSION = {
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.txt': 'text/plain',
+  '.csv': 'text/csv'
+};
+
+const NOTE_NOT_FOUND = 'We could not find that note. It may already have been deleted.';
+const DOC_NOT_FOUND = 'We could not find that document. It may already have been deleted.';
+const CLIENT_NOT_FOUND = 'We could not find that client. Refresh the Clients page and try again.';
+
+/** Keeps the history entry that mirrors a note in step with the note. */
+function mirrorNoteInHistory(note, change) {
+  const events = mockDb.timeline_events || [];
+  const idx = events.findIndex(e => e.source === 'trinova' && e.externalId === note.id);
+  if (idx === -1) return;
+  if (change === 'delete') {
+    events.splice(idx, 1);
+  } else {
+    events[idx].description = note.text.substring(0, 160) + (note.text.length > 160 ? '...' : '');
+  }
+}
 
 /**
  * Strips sensitive internal server storage paths and disk IDs from API responses per Section 1.5.
@@ -38,12 +67,12 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     req.resourceType = 'conversation';
     req.resourceId = companyId;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
       return res.status(404).json({
         error: {
           code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' not found.`
+          message: CLIENT_NOT_FOUND
         }
       });
     }
@@ -76,7 +105,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(404).json({
         error: {
           code: 'CONVERSATION_NOT_FOUND',
-          message: `Conversation with ID '${id}' not found.`
+          message: 'We could not find that conversation.'
         }
       });
     }
@@ -108,7 +137,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(404).json({
         error: {
           code: 'CONVERSATION_NOT_FOUND',
-          message: `Cannot send message: Conversation '${id}' not found.`
+          message: 'We could not find that conversation, so the message was not sent.'
         }
       });
     }
@@ -118,7 +147,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Message body cannot be empty.'
+          message: 'Please type a message before sending.'
         }
       });
     }
@@ -127,7 +156,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Message body exceeds 4,000 characters limit.'
+          message: 'A message can be up to 4,000 characters.'
         }
       });
     }
@@ -156,7 +185,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
     res.status(201).json({
       status: 'success',
-      message: 'Portal message sent successfully.',
+      message: 'Message sent.',
       data: newMessage
     });
   });
@@ -200,12 +229,12 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
   app.post('/api/v1/companies/:companyId/notes', authenticate, requireScope('sloane:write'), (req, res) => {
     const { companyId } = req.params;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
       return res.status(404).json({
         error: {
           code: 'COMPANY_NOT_FOUND',
-          message: `Company with ID '${companyId}' not found.`
+          message: CLIENT_NOT_FOUND
         }
       });
     }
@@ -216,7 +245,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'PRIVACY_BOUNDARY_CONFIRMATION_REQUIRED',
-          message: 'Writing internal notes to Trinova requires explicit user opt-in confirmation (confirm_write_to_trinova: true). Background or automatic sync of private notes is forbidden.'
+          message: 'Please confirm that you want to save this note (confirm_write_to_trinova: true). Notes are never saved automatically.'
         }
       });
     }
@@ -226,7 +255,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Note text cannot be empty.'
+          message: 'Please write something in the note.'
         }
       });
     }
@@ -238,7 +267,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'INVALID_VISIBILITY',
-          message: `Visibility '${visibility}' is invalid. Permitted values: [${allowedVisibilities.join(', ')}].`
+          message: 'Choose who can see this note: only the team, or the client too.'
         }
       });
     }
@@ -287,7 +316,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
     res.status(201).json({
       status: 'success',
-      message: `Internal note created with '${visibility}' visibility.`,
+      message: 'Note saved.',
       data: newNote
     });
   });
@@ -325,18 +354,19 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
   app.post('/api/v1/companies/:companyId/documents/upload', authenticate, requireScope('sloane:write'), requireIdempotency, (req, res) => {
     const { companyId } = req.params;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
       return res.status(404).json({
         error: {
           code: 'COMPANY_NOT_FOUND',
-          message: `Cannot upload document: Company '${companyId}' not found.`
+          message: CLIENT_NOT_FOUND
         }
       });
     }
 
-    const filename = req.body?.filename;
-    const mimeType = req.body?.mimeType || 'application/pdf';
+    const filename = typeof req.body?.filename === 'string' ? req.body.filename.trim() : req.body?.filename;
+    const extension = typeof filename === 'string' && filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
+    const mimeType = req.body?.mimeType || MIME_BY_EXTENSION[extension] || 'application/pdf';
     const category = req.body?.category || 'General';
 
     // Decode file content (handles base64 string or plain text)
@@ -350,7 +380,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
         return res.status(422).json({
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'File content is required (provide contentBase64 or content).'
+            message: 'Please choose a file to add.'
           }
         });
       }
@@ -358,7 +388,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(422).json({
         error: {
           code: 'INVALID_FILE_ENCODING',
-          message: 'Failed to decode file payload.'
+          message: 'That file could not be read. Please try another one.'
         }
       });
     }
@@ -427,7 +457,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
     res.status(201).json({
       status: 'success',
-      message: 'Document uploaded and validated successfully.',
+      message: 'Document added.',
       data: sanitizeDocument(newDoc)
     });
   });
@@ -444,7 +474,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(404).json({
         error: {
           code: 'DOCUMENT_NOT_FOUND',
-          message: `Document with ID '${id}' not found.`
+          message: DOC_NOT_FOUND
         }
       });
     }
@@ -478,7 +508,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(401).json({
         error: {
           code: 'TOKEN_REQUIRED',
-          message: 'Download requires a valid pre-signed token query parameter (?token=...).'
+          message: 'This download link is not valid. Please go back and click Download again.'
         }
       });
     }
@@ -498,13 +528,13 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(404).json({
         error: {
           code: 'DOCUMENT_NOT_FOUND',
-          message: 'Associated document was not found.'
+          message: DOC_NOT_FOUND
         }
       });
     }
 
     try {
-      const fileBuffer = documentStorage.readDocument(doc.storagePath);
+      const fileBuffer = documentStorage.readDocument(documentStorage.pathFor(doc));
       res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.filename)}"`);
       res.setHeader('Content-Length', fileBuffer.length);
@@ -535,7 +565,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       return res.status(404).json({
         error: {
           code: 'DOCUMENT_NOT_FOUND',
-          message: `Document with ID '${id}' not found.`
+          message: DOC_NOT_FOUND
         }
       });
     }
@@ -544,5 +574,116 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
       status: 'success',
       data: sanitizeDocument(doc)
     });
+  });
+
+  // =========================================================================
+  // 4. Change or remove notes and documents
+  // =========================================================================
+
+  /**
+   * PATCH /api/v1/companies/:companyId/notes/:noteId
+   * Changes the text (and who may see it) of a client note.
+   */
+  app.patch('/api/v1/companies/:companyId/notes/:noteId', authenticate, requireScope('sloane:write'), (req, res) => {
+    req.auditAction = 'internal_note_updated';
+    req.resourceType = 'company_note';
+    req.resourceId = req.params.noteId;
+
+    const note = (mockDb.notes || []).find(n => n.id === req.params.noteId && n.companyId === req.params.companyId);
+    if (!note) return sendError(res, 404, 'NOTE_NOT_FOUND', NOTE_NOT_FOUND);
+
+    const body = req.body || {};
+    if (body.text !== undefined) {
+      const text = cleanText(body.text);
+      if (!text) return sendError(res, 422, 'VALIDATION_ERROR', 'A note cannot be empty. Use Delete to remove it.');
+      if (text.length > 4000) return sendError(res, 422, 'VALIDATION_ERROR', 'A note can be up to 4,000 characters.');
+      note.text = text;
+    }
+    if (body.visibility !== undefined) {
+      if (!['staff_only', 'client_visible'].includes(body.visibility)) {
+        return sendError(res, 422, 'INVALID_VISIBILITY', 'Choose who can see this note: only the team, or the client too.');
+      }
+      note.visibility = body.visibility;
+    }
+    note.editedAt = new Date().toISOString();
+    mirrorNoteInHistory(note, 'update');
+
+    res.status(200).json({ status: 'success', message: 'Note updated.', data: note });
+  });
+
+  /**
+   * DELETE /api/v1/companies/:companyId/notes/:noteId
+   */
+  app.delete('/api/v1/companies/:companyId/notes/:noteId', authenticate, requireScope('sloane:write'), (req, res) => {
+    req.auditAction = 'internal_note_deleted';
+    req.resourceType = 'company_note';
+    req.resourceId = req.params.noteId;
+
+    const idx = (mockDb.notes || []).findIndex(n => n.id === req.params.noteId && n.companyId === req.params.companyId);
+    if (idx === -1) return sendError(res, 404, 'NOTE_NOT_FOUND', NOTE_NOT_FOUND);
+
+    const [note] = mockDb.notes.splice(idx, 1);
+    mirrorNoteInHistory(note, 'delete');
+    res.status(200).json({ status: 'success', message: 'Note deleted.', data: { id: note.id } });
+  });
+
+  /**
+   * PATCH /api/v1/documents/:id
+   * Renames a document or changes its category. The file itself is not touched.
+   */
+  app.patch('/api/v1/documents/:id', authenticate, requireScope('sloane:write'), (req, res) => {
+    req.auditAction = 'document_updated';
+    req.resourceType = 'document';
+    req.resourceId = req.params.id;
+
+    const doc = (mockDb.documents || []).find(d => d.id === req.params.id);
+    if (!doc) return sendError(res, 404, 'DOCUMENT_NOT_FOUND', DOC_NOT_FOUND);
+
+    const body = req.body || {};
+    if (body.filename !== undefined) {
+      const filename = cleanText(body.filename);
+      if (!filename) return sendError(res, 422, 'VALIDATION_ERROR', 'Please type a name for the document.');
+      if (filename.length > 200 || /[\\/:*?"<>|]/.test(filename)) {
+        return sendError(res, 422, 'VALIDATION_ERROR', 'The document name can be up to 200 characters and cannot contain \\ / : * ? " < > |');
+      }
+      // Keep the original file type: renaming must not turn a PDF into something else.
+      const oldExt = doc.filename.includes('.') ? doc.filename.slice(doc.filename.lastIndexOf('.')).toLowerCase() : '';
+      const newExt = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
+      doc.filename = oldExt && newExt !== oldExt ? `${filename}${oldExt}` : filename;
+    }
+    if (body.category !== undefined) {
+      const category = cleanText(body.category);
+      if (!category || category.length > 60) return sendError(res, 422, 'VALIDATION_ERROR', 'Please choose a category (up to 60 characters).');
+      doc.category = category;
+    }
+    doc.updatedAt = new Date().toISOString();
+
+    res.status(200).json({ status: 'success', message: 'Document updated.', data: sanitizeDocument(doc) });
+  });
+
+  /**
+   * DELETE /api/v1/documents/:id
+   * Deletes the document and its stored file.
+   */
+  app.delete('/api/v1/documents/:id', authenticate, requireScope('sloane:write'), (req, res) => {
+    req.auditAction = 'document_deleted';
+    req.resourceType = 'document';
+    req.resourceId = req.params.id;
+
+    const idx = (mockDb.documents || []).findIndex(d => d.id === req.params.id);
+    if (idx === -1) return sendError(res, 404, 'DOCUMENT_NOT_FOUND', DOC_NOT_FOUND);
+
+    const doc = mockDb.documents[idx];
+    // A document that has been sent for signing is part of that record: keep it.
+    const inUse = (mockDb.signingRequests || []).find(r =>
+      r.documentId === doc.id || r.signedDocumentId === doc.id || r.auditCertificateId === doc.id);
+    if (inUse) {
+      return sendError(res, 409, 'DOCUMENT_IN_USE',
+        'This document is part of a signing request, so it cannot be deleted.');
+    }
+
+    mockDb.documents.splice(idx, 1);
+    documentStorage.deleteDocument(doc);
+    res.status(200).json({ status: 'success', message: 'Document deleted.', data: { id: doc.id } });
   });
 }

@@ -1,10 +1,10 @@
 # ==============================================================================
 # Production Dockerfile for Trinova Integration & Signing Service
-# Lean, multi-stage, hardened Node.js 20 runtime image
+# Lean, multi-stage, hardened Node.js 22 runtime image
 # ==============================================================================
 
 # Build & Dependency Stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /usr/src/app
 
@@ -18,7 +18,7 @@ RUN npm ci --omit=dev
 COPY src/ ./src/
 
 # Production Runtime Stage
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /usr/src/app
 
@@ -42,7 +42,7 @@ USER node
 EXPOSE 4000
 
 # Volume mount for separate document storage
-VOLUME ["/var/data/trinova/documents"]
+VOLUME ["/var/data/trinova"]
 
 # Container healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

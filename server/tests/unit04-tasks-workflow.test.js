@@ -340,7 +340,7 @@ describe('Unit 04: Tasks & Workflow Read/Write API with Idempotency', () => {
 
     assert.strictEqual(res.status, 422);
     assert.strictEqual(res.body.error.code, 'INVALID_WORKFLOW_TRANSITION');
-    assert.ok(res.body.error.message.includes('not permitted by Trinova workflow rules'));
+    assert.ok(res.body.error.message.includes('cannot move from'));
   });
 
   // --- 6. Scoped Authorization & Audit ---

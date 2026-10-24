@@ -11,38 +11,40 @@ import { AuthService } from './services/auth.js';
 import { ModalManager } from './components/modal.js';
 import { Toast } from './components/toast.js';
 import { OutlookSettings } from './components/outlookSettings.js';
+import { FormModal, ConfirmDialog } from './components/formModal.js';
+import { escapeHtml, sanitizeId } from './utils/html.js';
+import { teamTaskMethods, TEAM_TASK_ACTIONS } from './features/teamTasks.js';
+import { deadlineMethods, DEADLINE_ACTIONS } from './features/deadlines.js';
+import { clientDetailMethods, CLIENT_DETAIL_ACTIONS } from './features/clientDetail.js';
+import { privateNoteMethods, PRIVATE_NOTE_ACTIONS } from './features/privateNotes.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
 // All data is dynamically queried from authenticated /api/v1 endpoints.
 
-/**
- * HTML Output Escaping Utility (Section 1.4)
- * Escapes dynamic values before DOM interpolation to prevent Stored & Reflected XSS.
- */
-export function escapeHtml(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * Strict ID Sanitizer (Section 1.4)
- * Enforces alphanumeric, hyphen, underscore, and dot pattern for entity identifiers.
- */
-export function sanitizeId(id) {
-  if (typeof id !== 'string') return '';
-  return id.replace(/[^a-zA-Z0-9_\-\.]/g, '');
-}
+// escapeHtml and sanitizeId live in ./utils/html.js (they are re-exported here for older callers).
+export { escapeHtml, sanitizeId };
 
 if (typeof window !== 'undefined') {
   window.escapeHtml = escapeHtml;
   window.sanitizeId = sanitizeId;
 }
+
+/** Everyday words for the labels on a client's history. */
+const HISTORY_KIND = {
+  CLIENT_CREATED: 'Client added', CLIENT_UPDATED: 'Client changed', TASK_CREATED: 'Task added',
+  TASK_COMPLETED: 'Task finished', TASK_REASSIGNED: 'Task given to someone else', NOTE_CREATED: 'Note',
+  NOTE_UPDATED: 'Note changed', DOCUMENT_UPLOADED: 'Document added', DOCUMENT_SIGNED: 'Document signed',
+  EMAIL_RECEIVED: 'Email received', EMAIL_SENT: 'Email sent', STATUTORY_DEADLINE: 'Official deadline',
+  STATUTORY_STATUS_CHANGED: 'Filing status changed', VAT_DEADLINE: 'VAT date', VAT_RETURN_FILED: 'VAT return filed',
+  COMPANIES_HOUSE_SYNC: 'Checked with Companies House', COMPANIES_HOUSE_STATUS_CHANGED: 'Companies House change',
+  RISK_CHANGED: 'Risk level changed', CEO_NOTE_CREATED: 'My private note', AI_INSIGHT_GENERATED: 'Sloane\'s suggestion'
+};
+const HISTORY_SOURCE = {
+  user: 'Written by you', system: 'Added by Sloane', companies_house: 'From Companies House', trinova: 'Note',
+  outlook: 'From Outlook', document: 'Documents', task: 'Tasks', ai: 'Sloane\'s AI'
+};
+const HISTORY_IMPORTANCE = { critical: 'Very important', urgent: 'Urgent', warning: 'Worth watching', info: 'For information', normal: 'Normal' };
 
 class SloaneApp {
   constructor() {
@@ -59,6 +61,17 @@ class SloaneApp {
     this.cachedDiaryEvents = [];
     this.authEventsBound = false;
     this.appEventsBound = false;
+    this.teamMembers = null;
+    this.allTasks = [];
+    this.lastClients = [];
+    this.showFinishedTasks = false;
+    this.actionNames = new Set([
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS,
+      'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
+    ]);
+    this.changeNames = new Set([
+      'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
+    ]);
   }
 
   async refreshOutlookData() {
@@ -181,7 +194,7 @@ class SloaneApp {
     const forgotLink = document.getElementById('authForgotLink');
     if (forgotLink) {
       forgotLink.addEventListener('click', () => {
-        Toast.info('Please contact your system administrator to reset executive credentials.', 6000);
+        Toast.info('Please ask your Sloane administrator to reset your password.', 6000);
       });
     }
 
@@ -215,7 +228,7 @@ class SloaneApp {
     try {
       const session = await AuthService.login({ email, password, remember });
       
-      Toast.success(`Welcome back, ${session.user.name}. Executive session verified.`);
+      Toast.success(`Welcome back, ${session.user.name}.`);
       
       this.showAppView();
       
@@ -253,49 +266,59 @@ class SloaneApp {
 
   handleLogout() {
     AuthService.logout();
-    Toast.info('Executive session locked. Access restricted.');
+    Toast.info('You have been signed out.');
     this.showLoginView();
   }
 
-  async checkTrinovaBackend() {
+  /**
+   * The pill at the top says whether Sloane can really read TriNova (not just whether Sloane's own
+   * server is awake). status: 'ok' | 'not_configured' | 'unreachable' | 'checking' | 'server_down'
+   */
+  applyTrinovaPill(status) {
     const statusBtn = document.getElementById('trinovaStatusBtn');
     const statusDot = document.getElementById('trinovaStatusDot');
     const statusText = document.getElementById('trinovaStatusText');
+    const look = {
+      ok: ['green', 'var(--green)', '⚡ TriNova: Connected', 'Sloane is reading your clients from TriNova. Click for details.'],
+      not_configured: ['neutral', 'var(--muted)', 'TriNova: Not set up', 'Sloane has not been given TriNova\'s access key yet, so it cannot show your TriNova clients. Click for details.'],
+      unreachable: ['neutral', 'var(--amber)', 'TriNova: Cannot reach', 'Sloane could not reach TriNova just now. Click for details.'],
+      checking: ['neutral', 'var(--amber)', 'TriNova: Checking...', 'Sloane is checking the connection to TriNova.'],
+      server_down: ['neutral', 'var(--red)', 'Sloane: Not responding', 'Sloane\'s own server is not answering. Please try again in a minute.']
+    }[status] || ['neutral', 'var(--muted)', 'TriNova: Unknown', ''];
+    if (statusBtn) { statusBtn.className = `pill ${look[0]}`; statusBtn.title = look[3]; }
+    if (statusDot) statusDot.style.background = look[1];
+    if (statusText) statusText.textContent = look[2];
+    this.trinovaPillStatus = status;
+  }
 
-    if (statusDot) statusDot.style.background = 'var(--amber)';
-    if (statusText) statusText.textContent = 'Trinova: Connecting...';
+  async checkTrinovaBackend() {
+    if (!this.trinovaStatus) this.applyTrinovaPill('checking');
 
+    let health = { ok: false };
     try {
-      const health = await ApiService.checkHealth();
-      if (health.ok) {
-        const auth = await ApiService.verifyAuth();
-        const duration = health.durationMs || 0;
-
-        if (statusBtn) {
-          statusBtn.className = 'pill green';
-          statusBtn.title = `Connected to TriNova API (${duration}ms) • Click to open settings`;
-        }
-        if (statusDot) statusDot.style.background = 'var(--green)';
-        if (statusText) statusText.textContent = `⚡ Trinova: Live (${duration}ms)`;
-
-        this.updateConfigModalTelemetry(health, auth);
-        this.logToTrinovaConsole(`[Connection] Successfully connected to TriNova API at ${ApiService.config.baseUrl} (${duration}ms). DB: ${health.database}`);
-        return true;
-      }
+      health = await ApiService.checkHealth();
     } catch (e) {
-      console.log('Trinova connection check failed:', e);
+      console.log('Sloane server check failed:', e);
+    }
+    if (!health.ok) {
+      this.applyTrinovaPill('server_down');
+      this.updateConfigModalTelemetry({ ok: false, error: 'Cannot connect' }, { ok: false });
+      this.logToTrinovaConsole('[Connection] Sloane\'s server is not answering.');
+      return false;
     }
 
-    if (statusBtn) {
-      statusBtn.className = 'pill neutral';
-      statusBtn.title = 'TriNova API is offline or waking up • Running in standalone cached mode';
-    }
-    if (statusDot) statusDot.style.background = 'var(--muted)';
-    if (statusText) statusText.textContent = 'Trinova: Standalone Mode';
+    const auth = await ApiService.verifyAuth();
+    this.updateConfigModalTelemetry(health, auth);
 
-    this.updateConfigModalTelemetry({ ok: false, error: 'Cannot connect to target API' }, { ok: false });
-    this.logToTrinovaConsole(`[Connection] TriNova API at ${ApiService.config.baseUrl} is unreachable. Operating in local cache fallback mode.`);
-    return false;
+    // What the Clients page last heard from TriNova is the truth; otherwise ask the server.
+    let status = this.trinovaStatus;
+    if (!status) {
+      const sys = await ApiService.getSystemStatus();
+      status = sys.data ? (sys.data.trinova.configured ? 'checking' : 'not_configured') : 'checking';
+    }
+    this.applyTrinovaPill(status);
+    this.logToTrinovaConsole(`[Connection] Sloane's server answered in ${health.durationMs || 0} ms. TriNova: ${status}.`);
+    return true;
   }
 
   updateConfigModalTelemetry(health, auth) {
@@ -309,7 +332,7 @@ class SloaneApp {
     if (health && health.ok) {
       if (dot) dot.style.background = 'var(--green)';
       if (title) {
-        title.textContent = 'Connected · TriNova /api/v1 Live';
+        title.textContent = 'Sloane\'s server is working';
         title.style.color = 'var(--green)';
       }
       if (latency) latency.textContent = `${health.durationMs || 0} ms`;
@@ -324,7 +347,7 @@ class SloaneApp {
     } else {
       if (dot) dot.style.background = 'var(--amber)';
       if (title) {
-        title.textContent = 'Disconnected / Standalone Mode';
+        title.textContent = 'Sloane\'s server is not answering';
         title.style.color = 'var(--amber)';
       }
       if (latency) latency.textContent = 'Offline';
@@ -337,7 +360,7 @@ class SloaneApp {
 
     if (env) {
       const url = ApiService.config.baseUrl;
-      env.textContent = url.includes('railway') ? 'Railway Live' : (url.includes('localhost') ? 'Localhost' : 'Custom');
+      env.textContent = 'This Sloane server';
     }
   }
 
@@ -519,11 +542,48 @@ class SloaneApp {
       });
     }
 
+    // Buttons and drop-downs drawn by the pages use data-action / data-change instead of inline code.
+    // The click handler runs first (capture) so a button inside a clickable table row only does its own job.
+    document.addEventListener('click', (e) => {
+      const el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+      if (!el) return;
+      const name = el.getAttribute('data-action');
+      if (!this.actionNames.has(name) || typeof this[name] !== 'function') return;
+      e.preventDefault();
+      e.stopPropagation();
+      Promise.resolve(this[name](el.dataset.id, el, el.dataset)).catch(err => {
+        console.error(`[${name}]`, err);
+        Toast.error((err && err.message) || 'Something went wrong. Please try again.');
+      });
+    }, true);
+
+    document.addEventListener('change', (e) => {
+      const el = e.target && e.target.closest ? e.target.closest('[data-change]') : null;
+      if (!el) return;
+      const name = el.getAttribute('data-change');
+      if (!this.changeNames.has(name) || typeof this[name] !== 'function') return;
+      Promise.resolve(this[name](el.dataset.id, el.value, el)).catch(err => {
+        console.error(`[${name}]`, err);
+        Toast.error((err && err.message) || 'Something went wrong. Please try again.');
+      });
+    });
+
+    // Any "Choose what Sloane reads" link jumps to Settings
+    document.addEventListener('click', (e) => {
+      const link = e.target && e.target.closest ? e.target.closest('[data-goto-settings]') : null;
+      if (link) {
+        e.preventDefault();
+        this.switchView('settings');
+      }
+    });
+
     // Add Client modal open & save
     const addClientBtn = document.getElementById('openAddClientBtn');
     if (addClientBtn) {
       addClientBtn.addEventListener('click', async () => {
+        this.editingClientId = null;
         document.getElementById('clientForm').reset();
+        this.setClientModalMode(false);
         await this.populateClientModalBizSelect();
         ModalManager.open('clientModal', addClientBtn);
       });
@@ -541,7 +601,9 @@ class SloaneApp {
     const addBizBtn = document.getElementById('openAddBizBtn');
     if (addBizBtn) {
       addBizBtn.addEventListener('click', () => {
+        this.editingBizId = null;
         document.getElementById('bizForm').reset();
+        this.setBizModalMode(false);
         ModalManager.open('bizModal', addBizBtn);
       });
     }
@@ -554,7 +616,7 @@ class SloaneApp {
       });
     }
 
-    // CEO Brain capture
+    // My Private Notes: write a new note
     const brainForm = document.getElementById('brainForm');
     if (brainForm) {
       brainForm.addEventListener('submit', (e) => {
@@ -617,11 +679,11 @@ class SloaneApp {
           this.syncProviderDropdowns(chosenProvider);
         }
         ApiService.configure({ baseUrl });
-        Toast.info('Connecting to updated TriNova endpoint...');
+        Toast.info('Connecting to TriNova...');
         this.logToTrinovaConsole(`Configuration saved. Re-testing endpoint ${baseUrl}...`);
         await this.checkTrinovaBackend();
         await this.renderClients();
-        Toast.success('TriNova & AI configuration saved.');
+        Toast.success('Settings saved.');
       });
     }
 
@@ -634,8 +696,8 @@ class SloaneApp {
       const selected = e.target.value;
       ApiService.setAiProvider(selected);
       this.syncProviderDropdowns(selected);
-      const name = selected === 'gemini' ? 'Google Gemini' : selected === 'anthropic' ? 'Anthropic Claude 3.5' : 'Auto Failover';
-      Toast.info(`AI Engine switched to: ${name}`);
+      const name = selected === 'gemini' ? 'Google Gemini' : selected === 'anthropic' ? 'Anthropic Claude 3.5' : 'Automatic';
+      Toast.info(`Sloane will now use: ${name}`);
     };
 
     if (topAiSelect) topAiSelect.addEventListener('change', handleProviderChange);
@@ -647,36 +709,26 @@ class SloaneApp {
     const claudeStatusEl = document.getElementById('claudeKeyTestStatus');
     if (btnTestClaudeKey) {
       btnTestClaudeKey.addEventListener('click', async () => {
-        const keyInput = document.getElementById('configAnthropicKey');
-        const keyVal = keyInput?.value?.trim() || ApiService.config.anthropicApiKey || '';
-        if (!keyVal) {
-          if (claudeStatusEl) {
-            claudeStatusEl.style.display = 'block';
-            claudeStatusEl.style.color = '#ef4444';
-            claudeStatusEl.textContent = '❌ Please enter an Anthropic API key first (starts with sk-ant-).';
-          }
-          return;
-        }
         btnTestClaudeKey.disabled = true;
         btnTestClaudeKey.textContent = 'Testing...';
         if (claudeStatusEl) {
           claudeStatusEl.style.display = 'block';
           claudeStatusEl.style.color = 'var(--accent)';
-          claudeStatusEl.textContent = 'Testing connection to Claude 3.5 Sonnet...';
+          claudeStatusEl.textContent = 'Asking the AI a test question...';
         }
-        const result = await ApiService.testAnthropicKey(keyVal);
+        const result = await ApiService.testAnthropicKey();
         btnTestClaudeKey.disabled = false;
-        btnTestClaudeKey.textContent = '⚡ Test Key';
+        btnTestClaudeKey.textContent = '⚡ Test the AI';
         if (claudeStatusEl) {
           claudeStatusEl.style.display = 'block';
           if (result.ok) {
             claudeStatusEl.style.color = '#10b981';
-            claudeStatusEl.textContent = '✅ Connected! Claude 3.5 Sonnet is verified and active.';
-            Toast.success('Claude API Key verified successfully!');
+            claudeStatusEl.textContent = `✅ ${result.message}`;
+            Toast.success('The AI is working.');
           } else {
             claudeStatusEl.style.color = '#ef4444';
-            claudeStatusEl.textContent = `❌ Anthropic Error: ${result.message}`;
-            Toast.error(`Claude Key Error: ${result.message}`);
+            claudeStatusEl.textContent = `❌ ${result.message}`;
+            Toast.error('The AI is not working right now.');
           }
         }
       });
@@ -693,7 +745,7 @@ class SloaneApp {
         if (baseUrlInput) baseUrlInput.value = ApiService.config.baseUrl;
         if (tokenInput) tokenInput.value = 'HttpOnly Session Cookie (slon_session)';
         if (anthropicInput) anthropicInput.value = '';
-        Toast.info('Reset to default Railway endpoints.');
+        Toast.info('Put back the usual settings.');
         this.logToTrinovaConsole('Reset configuration to Railway defaults.');
         await this.checkTrinovaBackend();
       });
@@ -708,7 +760,7 @@ class SloaneApp {
         const auth = await ApiService.verifyAuth();
         this.updateConfigModalTelemetry(health, auth);
         this.logToTrinovaConsole(`Result: Health=${health.ok ? 'OK' : 'FAIL'}, Database=${health.database || 'n/a'}, Actor=${auth.actor || 'none'}, Scopes=${(auth.scopes || []).join(',')}`);
-        Toast.info(health.ok ? `TriNova is Live (${health.durationMs}ms)` : 'TriNova API is offline.');
+        Toast.info(health.ok ? 'TriNova is connected.' : 'Sloane cannot reach TriNova right now.');
       });
     }
 
@@ -716,7 +768,7 @@ class SloaneApp {
     const syncClientsBtn = document.getElementById('btnForceSyncClients');
     const syncTrinovaToolbarBtn = document.getElementById('clientSyncTrinovaBtn');
     const handleSyncClientsClick = async () => {
-      Toast.info('Connecting to live TriNova portal and syncing fresh records...');
+      Toast.info('Fetching the latest clients from TriNova...');
       this.logToTrinovaConsole('Executing GET /api/v1/clients against live TriNova...');
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('sloane_clients_v2');
@@ -724,7 +776,7 @@ class SloaneApp {
       const res = await ApiService.getClients({ search: this.searchQuery, biz: this.selectedBizFilter });
       await this.renderClients();
       this.logToTrinovaConsole(`Client sync complete. Loaded ${res.data.length} records (Source: ${res.source}).`);
-      Toast.success(`Synced ${res.data.length} client entities (${res.source === 'trinova_live' ? 'Live TriNova' : 'Cached Local'}).`);
+      Toast.success(`Loaded ${res.data.length} client${res.data.length === 1 ? '' : 's'} (${res.source === 'trinova_live' ? 'from TriNova' : 'saved on this device'}).`);
     };
 
     if (syncClientsBtn) syncClientsBtn.addEventListener('click', handleSyncClientsClick);
@@ -780,6 +832,7 @@ class SloaneApp {
 
     if (viewId === 'settings') {
       OutlookSettings.loadStatus();
+      this.renderSystemStatus();
     }
 
     // Close mobile/tablet navigation drawer if open
@@ -795,8 +848,8 @@ class SloaneApp {
     await this.renderClients();
     await this.renderPeopleWork();
     await this.renderStatutory();
-    this.renderIntelligence();
-    this.renderBrain();
+    await this.renderIntelligence();
+    await this.renderBrain();
     await OutlookSettings.loadStatus();
   }
 
@@ -835,23 +888,29 @@ class SloaneApp {
       tasksRes = tRes;
       statutoryRes = sRes;
 
-      // Render Red Alerts dynamically from statutory filings
+      // Remember what we loaded, for the Warnings page and the "Anything I've missed?" box
+      this.cachedStatutory = statutoryRes?.data || [];
+      this.cachedTasks = tasksRes?.data || [];
+      this.setSampleBanners(Boolean(statutoryRes?.meta?.dataSource === 'sample' || tasksRes?.meta?.dataSource === 'sample'));
+
+      // Render "Needs action now" from filings that are late or due very soon (RED)
       if (redAlertsContainer) {
-        const urgentItems = (statutoryRes?.data || []).filter(s => s.status === 'Overdue' || s.risk === 'Critical');
+        const urgentItems = this.cachedStatutory.filter(s => s.urgency === 'RED' || s.status === 'Overdue' || s.risk === 'Critical');
         if (urgentItems.length > 0) {
-          redAlertsContainer.innerHTML = urgentItems.slice(0, 2).map(item => `
+          const more = urgentItems.length - 3;
+          redAlertsContainer.innerHTML = urgentItems.slice(0, 3).map(item => `
             <div class="alert-item">
               <span class="dot red" style="margin-top: 4px;"></span>
               <div class="alert-item-content">
-                <div class="alert-title">${escapeHtml(item.type || 'Statutory Filing')}: ${escapeHtml(item.clientName || item.name || 'Client')}</div>
-                <div class="alert-desc">${escapeHtml(item.reason || item.description || 'Statutory deadline overdue. Immediate filing required.')}</div>
+                <div class="alert-title">${escapeHtml(item.name || item.companyName || item.clientName || 'Client')}</div>
+                <div class="alert-desc">${escapeHtml(item.note || item.notes || item.urgencyReason || 'A filing is late or due very soon.')}</div>
               </div>
             </div>
-          `).join('');
+          `).join('') + (more > 0 ? `<div style="font-size: 11.5px; color: var(--muted); padding: 6px 0;">…and ${more} more. See the Deadlines page.</div>` : '');
         } else {
           redAlertsContainer.innerHTML = `
             <div style="font-size: 11.5px; color: var(--muted); padding: 8px 0;">
-              No active critical red alerts on file.
+              Nothing needs action right now.
             </div>
           `;
         }
@@ -867,15 +926,15 @@ class SloaneApp {
         if (status === 'connected') {
           eyebrowDot.className = 'dot green';
           eyebrowDot.style.background = '';
-          eyebrowText.textContent = 'Private CEO Command Centre · Outlook Connected';
+          eyebrowText.textContent = 'Your private dashboard · Outlook connected';
         } else if (status === 'reconnect_required') {
           eyebrowDot.className = 'dot red';
           eyebrowDot.style.background = '';
-          eyebrowText.textContent = 'Private CEO Command Centre · Outlook Reconnect Required';
+          eyebrowText.textContent = 'Your private dashboard · Outlook needs reconnecting';
         } else {
           eyebrowDot.className = 'dot';
           eyebrowDot.style.background = 'var(--muted)';
-          eyebrowText.textContent = 'Private CEO Command Centre';
+          eyebrowText.textContent = 'Your private dashboard';
         }
       }
 
@@ -934,8 +993,8 @@ class SloaneApp {
 
         const top3Items = sorted.slice(0, 3).map((r, idx) => ({
           rank: idx + 1,
-          title: `${r.name || r.companyName} — ${r.urgency === 'RED' ? (r.hasStrikeOff ? 'Active Strike-Off Defense' : 'Overdue Accounts') : 'Statutory Filing Due'}`,
-          desc: r.note || r.notes || (r.hasStrikeOff ? 'Active proposal to strike-off registered on Companies House.' : `Accounts due: ${r.accountsDueDate || 'Pending'}`),
+          title: `${r.name || r.companyName} — ${r.urgency === 'RED' ? (r.hasStrikeOff ? 'Risk of being removed from the register' : 'Accounts are late') : 'Filing due soon'}`,
+          desc: r.note || r.notes || (r.hasStrikeOff ? 'Companies House has said it plans to remove this company from the register.' : `Accounts due: ${r.accountsDueDate || 'date not known'}`),
           isRed: r.urgency === 'RED'
         }));
 
@@ -950,39 +1009,51 @@ class SloaneApp {
             </div>
           `).join('');
         } else {
-          top3Container.innerHTML = `<div class="table-empty" style="padding: 24px;">No urgent priority items</div>`;
+          top3Container.innerHTML = `<div class="table-empty" style="padding: 24px;">Nothing urgent right now.</div>`;
         }
       }
 
       // Process Diary data
       const diaryData = diaryRes?.data !== undefined ? diaryRes.data : diaryRes;
-      if (diaryData && diaryData.connected && diaryData.enabled && Array.isArray(diaryData.events)) {
-        diaryEvents = diaryData.events;
-      } else if (diaryData?.code === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
+      // The server sends the list as `items` (older builds used `events`); accept both.
+      const diaryList = Array.isArray(diaryData?.items) ? diaryData.items : diaryData?.events;
+      const diaryErrCode = diaryData?.code || diaryRes?.error?.code;
+      if (diaryData && diaryData.connected && diaryData.enabled && Array.isArray(diaryList)) {
+        diaryEvents = diaryList;
+        if (diaryList.length === 0) diaryEmptyReason = 'No meetings in your calendar today.';
+      } else if (diaryErrCode === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
         diaryEmptyReason = 'Reconnect your Outlook';
       } else if (diaryData?.code === 'CALENDAR_SYNC_DISABLED') {
         diaryEmptyReason = 'Calendar sync is off';
       } else if (diaryData?.code === 'OUTLOOK_NOT_CONNECTED') {
         diaryEmptyReason = 'Connect your Outlook to see this here';
+      } else if (diaryRes?.error && isOutlookConnected) {
+        diaryEmptyReason = 'Sloane could not reach Outlook just now. Try again in a minute.';
       } else if (diaryData?.message) {
         diaryEmptyReason = diaryData.message;
       }
 
       // Process Flagged Emails data
       const emailsData = emailsRes?.data !== undefined ? emailsRes.data : emailsRes;
-      if (emailsData && emailsData.connected && emailsData.enabled && Array.isArray(emailsData.emails)) {
-        attentionEmails = emailsData.emails;
-      } else if (emailsData?.code === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
+      const emailList = Array.isArray(emailsData?.items) ? emailsData.items : emailsData?.emails;
+      const emailErrCode = emailsData?.code || emailsRes?.error?.code;
+      if (emailsData && emailsData.connected && emailsData.enabled && Array.isArray(emailList)) {
+        attentionEmails = emailList;
+        if (emailList.length === 0) emailEmptyReason = 'No flagged emails. You are up to date.';
+      } else if (emailErrCode === 'OUTLOOK_RECONNECT_REQUIRED' || status === 'reconnect_required') {
         emailEmptyReason = 'Reconnect your Outlook';
       } else if (emailsData?.code === 'EMAIL_SYNC_DISABLED') {
         emailEmptyReason = 'Email sync is off';
       } else if (emailsData?.code === 'OUTLOOK_NOT_CONNECTED') {
         emailEmptyReason = 'Connect your Outlook to see this here';
+      } else if (emailsRes?.error && isOutlookConnected) {
+        emailEmptyReason = 'Sloane could not reach Outlook just now. Try again in a minute.';
       } else if (emailsData?.message) {
         emailEmptyReason = emailsData.message;
       }
 
       this.cachedDiaryEvents = diaryEvents;
+      this.cachedEmailCount = attentionEmails.length;
     } catch (err) {
       console.warn('[renderCommandCentre] Live Outlook fetch error:', err.message);
     }
@@ -1024,7 +1095,7 @@ class SloaneApp {
         <div class="card" style="padding: 14px; cursor: pointer;" onclick="app.switchView('businesses')">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span class="pill green" style="font-size: 10px;">${escapeHtml(b.status)}</span>
-            <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${escapeHtml(b.clientCount)} clients</span>
+            <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${escapeHtml(b.clientCount)} ${Number(b.clientCount) === 1 ? 'client' : 'clients'}</span>
           </div>
           <div style="font-size: 13px; font-weight: 800; color: var(--text);">${escapeHtml(b.name)}</div>
           <div style="font-size: 10px; color: var(--muted);">${escapeHtml(b.type)}</div>
@@ -1035,15 +1106,18 @@ class SloaneApp {
     // 4. Render Waiting Sign-off from API (Task P7.3: dynamic sign-off tasks)
     const signoffContainer = document.getElementById('waitingSignoffContainer');
     const allTasks = tasksRes?.data || [];
-    const signoffItems = allTasks.filter(t => 
-      t.status === 'Pending' || 
-      t.status === 'In_Review' || 
-      t.status === 'Under_Review' ||
-      /sign|review|approval/i.test(t.title || '')
+    const signoffItems = allTasks.filter(t =>
+      !['Completed', 'Cancelled'].includes(t.status) && (
+        t.status === 'Pending' ||
+        t.status === 'In_Review' ||
+        t.status === 'Under_Review' ||
+        /sign|review|approval/i.test(t.title || '')
+      )
     ).map(t => ({
+      id: t.id,
       title: `${t.companyName || 'Client'} — ${t.title}`,
       sub: t.description || `Assigned to ${t.assigneeName || 'Staff'}`,
-      date: t.dueDate ? `Due ${t.dueDate}` : 'Pending'
+      date: t.dueDate ? `Due ${t.dueDate}` : 'No due date'
     }));
 
     if (signoffContainer) {
@@ -1054,11 +1128,16 @@ class SloaneApp {
               <div class="item-title">${escapeHtml(item.title)}</div>
               <div class="item-sub">${escapeHtml(item.sub)}</div>
             </div>
-            <span class="pill amber">${escapeHtml(item.date)}</span>
+            <div style="text-align: right;">
+              <span class="pill amber">${escapeHtml(item.date)}</span>
+              <div class="task-controls">
+                <button type="button" class="btn-done" onclick="app.markTaskDone('${sanitizeId(item.id)}', this)" title="Tick this off as finished">✓ Mark done</button>
+              </div>
+            </div>
           </div>
         `).join('');
       } else {
-        signoffContainer.innerHTML = `<div class="table-empty" style="padding: 24px;">No items waiting for sign-off</div>`;
+        signoffContainer.innerHTML = `<div class="table-empty" style="padding: 24px;">Nothing is waiting for your OK.</div>`;
       }
     }
 
@@ -1081,7 +1160,10 @@ class SloaneApp {
               <div class="item-title">${escapeHtml(item.title)}</div>
               <div class="item-sub">${escapeHtml(item.sub)}</div>
             </div>
-            <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${escapeHtml(item.priority)}</span>
+            <div style="text-align: right;">
+              <span class="pill ${item.priority === 'High' ? 'red' : 'blue'}">${escapeHtml(item.priority)}</span>
+              ${/^https:\/\//.test(item.webLink || '') ? `<div class="task-controls"><a class="card-action-btn" href="${escapeHtml(item.webLink)}" target="_blank" rel="noopener noreferrer">Open in Outlook ↗</a></div>` : ''}
+            </div>
           </div>
         `).join('');
       } else {
@@ -1089,12 +1171,21 @@ class SloaneApp {
       }
     }
 
+    // Outlook panel footers: tell the user plainly what Sloane can and cannot do
+    const readOnlyNote = 'Sloane only reads. It never sends, deletes or changes anything.';
+    const diaryNote = document.getElementById('diaryManageNote');
+    const emailNote = document.getElementById('emailManageNote');
+    if (diaryNote) diaryNote.textContent = isOutlookConnected ? readOnlyNote : 'Not connected yet. Sloane cannot see your calendar.';
+    if (emailNote) emailNote.textContent = isOutlookConnected ? readOnlyNote : 'Not connected yet. Sloane cannot see your emails.';
+
     // 6. Update Pulse Metrics
     const signoffCount = signoffItems.length;
     const emailCount = attentionEmails.length;
     const bizCount = Array.isArray(businesses) ? businesses.length : 0;
-    const statutoryMeta = statutoryRes?.meta || {};
-    const blockedCount = allTasks.filter(t => Boolean(t.isBlocked)).length;
+    const filingRecords = Array.isArray(statutoryRes?.data) ? statutoryRes.data : [];
+    const lateCount = filingRecords.filter(r => r.accountsOverdue || (typeof r.daysRemaining === 'number' && r.daysRemaining < 0)).length;
+    const dueSoonCount = filingRecords.filter(r => typeof r.daysRemaining === 'number' && r.daysRemaining >= 0 && r.daysRemaining <= 14).length;
+    const blockedCount = allTasks.filter(t => Boolean(t.isBlocked) && !['Completed', 'Cancelled'].includes(t.status)).length;
 
     const pulseSignoffs = document.getElementById('pulseSignoffs');
     const pulseEmails = document.getElementById('pulseEmails');
@@ -1105,10 +1196,11 @@ class SloaneApp {
 
     if (pulseSignoffs) pulseSignoffs.textContent = signoffCount;
     if (pulseEmails) pulseEmails.textContent = emailCount;
-    if (pulseOverdue) pulseOverdue.textContent = statutoryMeta.redCount !== undefined ? statutoryMeta.redCount : '0';
-    if (pulseDue7d) pulseDue7d.textContent = statutoryMeta.amberCount !== undefined ? statutoryMeta.amberCount : '0';
+    if (pulseOverdue) pulseOverdue.textContent = lateCount;
+    if (pulseDue7d) pulseDue7d.textContent = dueSoonCount;
     if (pulseBlocked) pulseBlocked.textContent = blockedCount;
     if (pulseBizAreas) pulseBizAreas.textContent = bizCount;
+    this.updateNavBadges({ bizCount });
   }
 
   async renderBusinesses() {
@@ -1117,17 +1209,17 @@ class SloaneApp {
     if (!container) return;
 
     if (!businesses || businesses.length === 0) {
-      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 32px;">No active business areas configured. Click "+ Add Business Area" above to create one.</div>`;
+      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 32px;">You have not added any businesses yet. Click "+ Add a business" above to add one.</div>`;
       this.populateClientBizFilterOptions([]);
       return;
     }
 
+    this.lastBusinesses = businesses;
     container.innerHTML = businesses.map(b => `
       <div class="card biz-card">
         <div>
           <div class="biz-card-header">
-            <span class="pill green">${escapeHtml(b.status || 'Active')}</span>
-            <span class="source-badge">Active Area</span>
+            <span class="pill ${b.status === 'Paused' ? 'amber' : 'green'}">${escapeHtml(b.status === 'Paused' ? 'Paused' : 'Active')}</span>
           </div>
           <div class="biz-name">${escapeHtml(b.name)}</div>
           <div class="biz-type">${escapeHtml(b.type)}</div>
@@ -1135,16 +1227,12 @@ class SloaneApp {
         <div class="biz-stats">
           <div class="biz-stat-item">
             <span class="biz-stat-n">${escapeHtml(b.clientCount !== undefined ? b.clientCount : 0)}</span>
-            <span class="biz-stat-lbl">Clients</span>
+            <span class="biz-stat-lbl">${b.clientCount === 1 ? 'Client' : 'Clients'}</span>
           </div>
-          <div class="biz-stat-item">
-            <span class="biz-stat-n">0</span>
-            <span class="biz-stat-lbl">Sign-offs</span>
-          </div>
-          <div class="biz-stat-item">
-            <span class="biz-stat-n" style="color: var(--amber);">0</span>
-            <span class="biz-stat-lbl">Alerts</span>
-          </div>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="btn btn-secondary" onclick="app.openEditBiz('${sanitizeId(b.id)}')">✎ Edit</button>
+          <button type="button" class="btn btn-secondary" style="color: var(--red); border-color: rgba(239, 68, 68, 0.3);" onclick="app.deleteBiz('${sanitizeId(b.id)}')">Remove</button>
         </div>
       </div>
     `).join('');
@@ -1157,7 +1245,7 @@ class SloaneApp {
     const filter = document.getElementById('clientBizFilter');
     if (!filter) return;
     const currentVal = filter.value;
-    filter.innerHTML = `<option value="All">All Business Areas</option>` +
+    filter.innerHTML = `<option value="All">All businesses</option>` +
       businesses.map(b => `<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}</option>`).join('');
     filter.value = currentVal || 'All';
   }
@@ -1181,16 +1269,38 @@ class SloaneApp {
       biz: this.selectedBizFilter
     });
     const clients = res.data || [];
+    this.lastClients = clients;
+
+    if (res.trinovaStatus) {
+      this.trinovaStatus = res.trinovaStatus;
+      this.applyTrinovaPill(res.trinovaStatus);
+    }
+
+    // Say plainly when TriNova's clients cannot be shown.
+    const banner = document.getElementById('clientTrinovaBanner');
+    if (banner) {
+      const msgs = {
+        not_configured: 'Sloane has not been given TriNova\'s access key, so it cannot show your TriNova clients yet. Ask your Sloane administrator to set it up. You can still add clients here yourself.',
+        unreachable: 'Sloane could not reach TriNova just now, so only the clients you added here are shown. Try "Refresh from TriNova" in a minute.'
+      };
+      const msg = msgs[res.trinovaStatus];
+      banner.style.display = msg ? 'flex' : 'none';
+      const span = banner.querySelector('span:last-child');
+      if (span && msg) span.textContent = msg;
+    }
 
     // Update Client 360 data source badge
     const badge = document.getElementById('clientDataSourceBadge');
     if (badge) {
-      if (res.source === 'trinova_live') {
+      if (res.source === 'trinova_live' && res.trinovaStatus === 'ok') {
         badge.className = 'source-badge ch-live';
-        badge.textContent = `⚡ Live TriNova (${res.meta?.total || clients.length})`;
+        badge.textContent = `TriNova and Sloane (${res.meta?.total || clients.length})`;
+      } else if (res.source === 'trinova_live') {
+        badge.className = 'source-badge';
+        badge.textContent = `Added in Sloane (${clients.length})`;
       } else {
         badge.className = 'source-badge';
-        badge.textContent = `Cached Local (${clients.length})`;
+        badge.textContent = `Saved on this device (${clients.length})`;
       }
     }
 
@@ -1198,7 +1308,7 @@ class SloaneApp {
     if (!tbody) return;
 
     if (clients.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">No client records found matching your filters.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">No clients found. Try a different search, or click "+ Add a client".</td></tr>`;
       return;
     }
 
@@ -1214,9 +1324,10 @@ class SloaneApp {
       const safeVat = escapeHtml(c.vat || 'No');
       const safeVatNo = escapeHtml(c.vatNo);
       const safeRisk = escapeHtml(c.risk || 'Low');
+      const canEdit = Boolean(c.addedInSloane);
 
       return `
-        <tr class="client-row" style="cursor: pointer;" title="Click to view full 360 timeline" onclick="app.selectClient360('${clientId}')">
+        <tr class="client-row" style="cursor: pointer;" title="Click to see this client's history" onclick="app.selectClient360('${clientId}')">
           <td>
             <div style="font-weight: 700; color: var(--text);">${safeName}</div>
             <div style="font-size: 11px; color: var(--muted);">${safeBiz}</div>
@@ -1237,8 +1348,13 @@ class SloaneApp {
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span>${safeNotes}</span>
               <div style="display: flex; gap: 4px;">
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="View Timeline" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px; color: var(--red); border-color: rgba(239, 68, 68, 0.3);" title="Remove Client" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">✕</button>
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="See history" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+                ${canEdit ? `
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Edit this client" onclick="event.stopPropagation(); app.openEditClient('${clientId}');">✎</button>
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px; color: var(--red); border-color: rgba(239, 68, 68, 0.3);" title="Remove this client" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">✕</button>
+                ` : `
+                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Choose which of your businesses this client belongs to" data-action="openClientBusinessForm" data-id="${clientId}">🏢</button>
+                <span class="source-badge" title="This client comes from TriNova, so its details are changed there.">TriNova</span>`}
               </div>
             </div>
           </td>
@@ -1261,357 +1377,133 @@ class SloaneApp {
     }
   }
 
-  async deleteClient(clientId, clientName = 'this client') {
-    if (!confirm(`Are you sure you want to remove "${clientName}" from Sloane?`)) {
-      return;
+  async deleteClient(clientId, clientName) {
+    if (typeof clientName !== 'string') {
+      const found = (this.lastClients || []).find(c => String(c.id || c.clientId) === String(clientId));
+      clientName = found ? found.name : 'this client';
     }
+    const ok = await ConfirmDialog.ask({
+      title: `Remove ${clientName}?`,
+      message: 'The client is removed from Sloane, together with its tasks, notes, documents and history. This cannot be undone.',
+      confirmLabel: 'Remove client'
+    });
+    if (!ok) return;
     try {
       await ApiService.deleteClient(clientId);
       Toast.success(`Client "${clientName}" removed.`);
+      if (String(this.activeClient360Id) === String(clientId)) this.activeClient360Id = null;
       await this.renderClients();
+      await this.renderBusinesses();
+      await this.renderPeopleWork();
+      await this.renderStatutory();
+      await this.renderCommandCentre();
+      if (this.activeClientTab !== 'overview') await this.switchClientTab(this.activeClientTab);
     } catch (err) {
-      Toast.error(`Failed to remove client: ${err.message}`);
+      Toast.error(err.message || 'Could not remove that client.');
     }
   }
 
-  async renderPeopleWork() {
-    const container = document.getElementById('peopleGridContainer');
-    if (!container) return;
-
-    let tasks = [];
-    try {
-      const res = await ApiService.getTasks();
-      tasks = res.data || [];
-    } catch (err) {
-      console.warn('Could not load tasks for People & Work:', err);
-    }
-
-    if (!tasks || tasks.length === 0) {
-      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; padding: 32px; text-align: center;"><div class="table-empty">No team work currently assigned</div></div>`;
-      return;
-    }
-
-    // Group tasks by assignee from live API (Task P7.3: dynamic assignee grouping)
-    const peopleMap = new Map();
-    for (const t of tasks) {
-      const key = t.assigneeId || t.assigneeName || 'unassigned';
-      if (!peopleMap.has(key)) {
-        const name = t.assigneeName || 'Unassigned';
-        const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'TM';
-        peopleMap.set(key, {
-          id: key,
-          name,
-          role: key.includes('hamza') ? 'Senior Client Manager / Partner' : (key.includes('jessica') ? 'Tax & Compliance Senior' : 'Team Member'),
-          avatar: initials,
-          tasks: [],
-          ceoNote: key.includes('hamza') ? 'Agreed to follow up personally on R GB Elevations today.' : (key.includes('jessica') ? 'Jessica is handling the technical CH objection paperwork.' : null)
-        });
-      }
-      peopleMap.get(key).tasks.push({
-        client: t.companyName || 'Client',
-        task: t.title || t.description || 'Task',
-        stage: t.status || 'In Progress',
-        deadline: t.dueDate ? `Due ${t.dueDate}` : 'Pending',
-        isBlocked: Boolean(t.isBlocked),
-        blocker: t.blocker
-      });
-    }
-
-    const peopleList = Array.from(peopleMap.values());
-    container.innerHTML = peopleList.map(p => `
-      <div class="card person-card">
-        <div class="person-header">
-          <div class="person-info">
-            <div class="person-avatar">${escapeHtml(p.avatar)}</div>
-            <div>
-              <div class="person-name">${escapeHtml(p.name)}</div>
-              <div class="person-role">${escapeHtml(p.role)}</div>
-            </div>
-          </div>
-          <span class="pill blue">${p.tasks.length} tasks</span>
-        </div>
-        <div class="work-list">
-          ${p.tasks.map(t => `
-            <div class="work-item">
-              <div>
-                <div style="font-weight: 600; color: var(--text);">${escapeHtml(t.client)}</div>
-                <div style="font-size: 11px; color: var(--muted);">${escapeHtml(t.task)}${t.blocker ? ` — <span style="color: var(--red);">${escapeHtml(t.blocker)}</span>` : ''}</div>
-              </div>
-              <div style="text-align: right;">
-                <span class="pill ${t.isBlocked ? 'red' : 'amber'}">${t.isBlocked ? 'BLOCKED' : escapeHtml(t.stage)}</span>
-                <div style="font-size: 10px; color: var(--muted); margin-top: 2px;">${escapeHtml(t.deadline)}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        ${p.ceoNote ? `
-          <div style="padding: 10px 12px; background: rgba(201, 166, 107, 0.08); border-left: 2px solid var(--accent); border-radius: 4px; font-size: 11px; color: var(--accent); margin-top: 12px;">
-            <strong>Private CEO Note:</strong> ${escapeHtml(p.ceoNote)}
-          </div>
-        ` : ''}
-      </div>
-    `).join('');
-  }
-
-  async renderStatutory() {
-    let records = [];
-    let redCount = 0;
-    let amberCount = 0;
-    let clearCount = 0;
-
-    try {
-      const res = await ApiService.getStatutory();
-      records = res.data || [];
-      if (res.meta) {
-        redCount = res.meta.redCount || 0;
-        amberCount = res.meta.amberCount || 0;
-        clearCount = res.meta.clearCount || 0;
-      }
-    } catch (err) {
-      console.warn('Could not load statutory deadlines from API:', err);
-    }
-
-    const tbody = document.getElementById('statutoryTableBody');
-    if (tbody) {
-      if (records.length > 0) {
-        tbody.innerHTML = records.map(r => {
-          const chUrl = r.companyNumber ? `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.companyNumber)}` : '#';
-          const urgencyClass = r.urgency === 'RED' ? 'status-red' : (r.urgency === 'AMBER' ? 'status-amber' : 'status-green');
-          const urgencyLabel = r.urgency === 'RED' ? 'RED · ACTION' : (r.urgency === 'AMBER' ? 'AMBER · UPCOMING' : 'CLEAR · ON TRACK');
-
-          return `
-            <tr>
-              <td>
-                <div style="font-weight: 700; color: var(--text);">${escapeHtml(r.name || r.companyName)}</div>
-                <div class="source">
-                  <span class="source-badge ${r.source === 'companies_house_live' ? 'ch-live' : ''}">${r.source === 'companies_house_live' ? 'CH Live' : 'Tracker'}</span>
-                  ${escapeHtml(r.source || 'statutory_api')}
-                </div>
-              </td>
-              <td>
-                <a href="${chUrl}" target="_blank" rel="noopener" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">${escapeHtml(r.companyNumber || '—')} ↗</a>
-              </td>
-              <td>${escapeHtml(ReconciliationEngine.formatDate(r.yearEnd || r.accountingReferenceDate || '—'))}</td>
-              <td>${escapeHtml(ReconciliationEngine.formatDate(r.accountsDueDate || '—'))}</td>
-              <td>
-                ${r.confirmationDueDate ? `<strong>CS Due:</strong> ${escapeHtml(ReconciliationEngine.formatDate(r.confirmationDueDate))}` : '—'}
-              </td>
-              <td>
-                <span class="${urgencyClass}">${escapeHtml(urgencyLabel)}</span>
-              </td>
-              <td style="max-width: 220px; font-size: 11px; color: ${r.urgency === 'RED' ? 'var(--red)' : 'var(--muted)'};">
-                ${escapeHtml(r.note || r.notes || '—')}
-              </td>
-            </tr>
-          `;
-        }).join('');
-      } else {
-        tbody.innerHTML = `<tr><td colspan="7" class="table-empty" style="text-align: center; padding: 24px;">No statutory records available</td></tr>`;
-      }
-    }
-
-    // Update Statutory Nav Badge with dynamic RED count
-    const navBadge = document.getElementById('statNavBadge');
-    if (navBadge) {
-      navBadge.textContent = redCount;
-      navBadge.className = `nav-badge ${redCount > 0 ? 'badge-red' : ''}`;
-    }
-
-    // Update Radar Metric Cards
-    const statTracked = document.getElementById('statRadarTracked');
-    const statVat = document.getElementById('statRadarVat');
-    const statRed = document.getElementById('statRadarRed');
-    const statClear = document.getElementById('statRadarClear');
-
-    if (statTracked) statTracked.textContent = records.length;
-    if (statVat) statVat.textContent = '0';
-    if (statRed) statRed.textContent = redCount;
-    if (statClear) statClear.textContent = clearCount;
-
-    // Render Action Tracker table from API records with urgency RED or AMBER
-    const actionTbody = document.getElementById('actionTableBody');
-    if (actionTbody) {
-      const actionItems = records.filter(r => r.urgency === 'RED' || r.urgency === 'AMBER');
-      if (actionItems.length > 0) {
-        actionTbody.innerHTML = actionItems.map(a => `
-          <tr>
-            <td style="font-weight: 700; color: var(--text);">${escapeHtml(a.name || a.companyName)}</td>
-            <td style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(a.companyNumber || '—')}</td>
-            <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${escapeHtml(a.hasStrikeOff ? 'Active strike-off notice registered at Companies House' : (a.accountsOverdue ? 'Accounts overdue — penalty tier active' : 'Upcoming statutory accounts deadline'))}</td>
-            <td style="font-size: 11px; color: var(--muted);">${escapeHtml(a.note || a.notes || 'Immediate action required')}</td>
-            <td><span class="pill ${a.urgency === 'RED' ? 'red' : 'amber'}">${escapeHtml(a.urgency)}</span></td>
-          </tr>
-        `).join('');
-      } else {
-        actionTbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="text-align: center; padding: 24px;">No immediate actions required</td></tr>`;
-      }
-    }
-
-    // Render VAT schedule
-    const vatTbody = document.getElementById('vatTableBody');
-    if (vatTbody) {
-      vatTbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="text-align: center; padding: 24px;">No VAT filings currently scheduled</td></tr>`;
-    }
-  }
-
-  renderIntelligence() {
+  async renderIntelligence() {
     const grid = document.getElementById('intelGridContainer');
     if (!grid) return;
 
+    let filings = this.cachedStatutory;
+    let tasks = this.cachedTasks;
+    try {
+      if (!filings) {
+        const sRes = await ApiService.getStatutory();
+        filings = sRes.data || [];
+        this.setSampleBanners(sRes.meta?.dataSource === 'sample');
+      }
+      if (!tasks) {
+        const tRes = await ApiService.getTasks();
+        tasks = tRes.data || [];
+      }
+    } catch (_) {
+      filings = filings || [];
+      tasks = tasks || [];
+    }
+    this.cachedStatutory = filings;
+    this.cachedTasks = tasks;
+
     const clashes = (this.cachedDiaryEvents || []).filter(e => e.isClash);
-    let clashCardHtml = '';
-    if (clashes.length > 0) {
-      clashCardHtml = `
-        <div class="card intel-card">
-          <div class="card-header">
-            <h2><span class="dot red"></span> Context Scan (Meetings & Calendar Conflicts)</h2>
-            <span class="pill red">${clashes.length} Clash${clashes.length > 1 ? 'es' : ''}</span>
-          </div>
-          <div class="intel-list">
-            ${clashes.map(c => `
-              <div class="intel-item">
-                <div class="intel-item-content">
-                  <div class="intel-title">Schedule Conflict: ${escapeHtml(c.title)}</div>
-                  <div class="intel-desc">Event at ${escapeHtml(c.time)} overlaps with another scheduled meeting today.</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+    const redFilings = filings.filter(f => f.urgency === 'RED');
+    const stuckTasks = tasks.filter(t => t.isBlocked && !['Completed', 'Cancelled'].includes(t.status));
+
+    const card = (dot, title, pill, pillClass, items, emptyText) => `
+      <div class="card intel-card">
+        <div class="card-header">
+          <h2><span class="dot ${dot}"></span> ${title}</h2>
+          <span class="pill ${pillClass}">${pill}</span>
         </div>
-      `;
-    } else {
-      clashCardHtml = `
-        <div class="card intel-card">
-          <div class="card-header">
-            <h2><span class="dot green"></span> Context Scan (Meetings & Calendar Conflicts)</h2>
-            <span class="pill green">Clear</span>
-          </div>
-          <div class="intel-list">
+        <div class="intel-list">
+          ${items.length > 0 ? items.join('') : `
             <div class="intel-item">
               <div class="intel-item-content">
-                <div class="intel-title">Calendar Schedule Clear</div>
-                <div class="intel-desc">No meeting collisions or conflicting times detected for today.</div>
+                <div class="intel-desc">${emptyText}</div>
               </div>
-            </div>
-          </div>
+            </div>`}
         </div>
-      `;
-    }
+      </div>`;
+    const item = (cls, title, desc) => `
+      <div class="intel-item ${cls}">
+        <div class="intel-item-content">
+          <div class="intel-title">${escapeHtml(title)}</div>
+          <div class="intel-desc">${escapeHtml(desc)}</div>
+        </div>
+      </div>`;
 
-    grid.innerHTML = `
-      <div class="card intel-card">
-        <div class="card-header">
-          <h2><span class="dot red"></span> Critical Scan (Compliance & HMRC)</h2>
-          <span class="pill red">Active</span>
-        </div>
-        <div class="intel-list">
-          <div class="intel-item intel-critical">
-            <div class="intel-item-content">
-              <div class="intel-title">Corporate Statutory Filings & Compliance</div>
-              <div class="intel-desc">Statutory filings, late filing penalty tiers, and registry notices monitored across client portfolios.</div>
-            </div>
-          </div>
-          <div class="intel-item intel-critical">
-            <div class="intel-item-content">
-              <div class="intel-title">Registry Verification Tracker</div>
-              <div class="intel-desc">Cross-referencing live Companies House submission status with practice management records.</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    const filingItems = redFilings.slice(0, 6).map(f => item('intel-critical', f.name || f.companyName || 'Client', f.note || f.notes || 'A filing is late or due very soon.'));
+    if (redFilings.length > 6) filingItems.push(item('', `…and ${redFilings.length - 6} more`, 'See the Deadlines page for the full list.'));
 
-      <div class="card intel-card">
-        <div class="card-header">
-          <h2><span class="dot amber"></span> Chase Scan (Delegated Work & Promises)</h2>
-          <span class="pill amber">Active</span>
-        </div>
-        <div class="intel-list">
-          <div class="intel-item intel-chase">
-            <div class="intel-item-content">
-              <div class="intel-title">Delegated Action Items & Follow-ups</div>
-              <div class="intel-desc">Partner instructions and statutory balance sheet sign-offs tracked to completion.</div>
-            </div>
-          </div>
-          <div class="intel-item intel-chase">
-            <div class="intel-item-content">
-              <div class="intel-title">Pending Information Requests</div>
-              <div class="intel-desc">Awaiting client banking records and electronic approvals for scheduled submissions.</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    const stuckItems = stuckTasks.slice(0, 6).map(t => item('intel-chase', `${t.companyName || 'Client'}: ${t.title || 'Task'}`, t.blocker ? `Stuck because: ${t.blocker}` : `Given to ${t.assigneeName || 'a team member'} and currently stuck.`));
 
-      ${clashCardHtml}
+    const clashItems = clashes.map(c => item('', `Two meetings at once: ${c.title}`, `The meeting at ${c.time} overlaps with another meeting today.`));
+    const calendarConnected = Array.isArray(this.cachedDiaryEvents) && this.cachedDiaryEvents.length > 0;
 
-      <div class="card intel-card">
-        <div class="card-header">
-          <h2><span class="dot green"></span> Relationship Silence Radar</h2>
-          <span class="pill green">Healthy</span>
-        </div>
-        <div class="intel-list">
-          <div class="intel-item">
-            <div class="intel-item-content">
-              <div class="intel-title">All Key Practice Clients Monitored</div>
-              <div class="intel-desc">Communication cadence across practice business areas is in full compliance with SLA targets.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
+    grid.innerHTML = [
+      card('red', 'Late or urgent filings', redFilings.length === 0 ? 'None' : `${redFilings.length}`, redFilings.length === 0 ? 'green' : 'red', filingItems, 'No filings are late or due in the next 14 days.'),
+      card('amber', 'Work that is stuck', stuckTasks.length === 0 ? 'None' : `${stuckTasks.length}`, stuckTasks.length === 0 ? 'green' : 'amber', stuckItems, 'No tasks are marked as stuck.'),
+      card(clashes.length > 0 ? 'red' : 'green', 'Meetings that clash', clashes.length === 0 ? 'None' : `${clashes.length}`, clashes.length === 0 ? 'green' : 'red', clashItems, calendarConnected ? 'None of today\'s meetings overlap.' : 'Connect your Outlook calendar (in Settings) and Sloane will warn you about clashing meetings.')
+    ].join('');
 
-  renderBrain() {
-    const entries = StorageService.getBrainEntries();
-    const container = document.getElementById('brainFeedContainer');
-    if (!container) return;
-
-    if (entries.length === 0) {
-      container.innerHTML = `<div class="card" style="text-align: center; color: var(--muted); padding: 30px;">No private notes in CEO Brain yet. Jot down anything above.</div>`;
-      return;
-    }
-
-    container.innerHTML = entries.map((entry, idx) => `
-      <div class="brain-entry">
-        <div class="brain-entry-header">
-          <span class="source-badge" style="color: var(--accent); border-color: rgba(201, 166, 107, 0.4);">
-            🔒 Private Workspace · CEO View
-          </span>
-          <span>${escapeHtml(entry.at)}</span>
-        </div>
-        <div class="brain-entry-text">${escapeHtml(entry.text)}</div>
-        <div class="brain-entry-footer">
-          <span style="font-size: 10px; color: var(--muted);">Awaiting live AI classification</span>
-          <button class="card-action-btn" onclick="app.openTrinovaNoteModal(${idx})">
-            Send to Trinova ↗
-          </button>
-        </div>
-      </div>
-    `).join('');
+    this.updateNavBadges({ intelCount: redFilings.length + stuckTasks.length + clashes.length });
   }
 
   renderMissedScan() {
     const container = document.getElementById('missedModalContent');
     if (!container) return;
 
+    const filings = this.cachedStatutory || [];
+    const tasks = (this.cachedTasks || []).filter(t => !['Completed', 'Cancelled'].includes(t.status));
+    const lateFilings = filings.filter(f => f.accountsOverdue || (typeof f.daysRemaining === 'number' && f.daysRemaining < 0));
+    const soonFilings = filings.filter(f => typeof f.daysRemaining === 'number' && f.daysRemaining >= 0 && f.daysRemaining <= 14);
+    const stuck = tasks.filter(t => t.isBlocked);
+    const waiting = tasks.filter(t => t.status === 'Pending' || t.status === 'Under_Review');
+    const emailCount = this.cachedEmailCount || 0;
+
+    const rows = [];
+    const row = (dot, text, chip) => rows.push(`
+      <div class="diary-item">
+        <div class="diary-item-left">
+          <span class="dot ${dot}"></span>
+          <span class="diary-title">${escapeHtml(text)}</span>
+        </div>
+        <span class="timechip">${escapeHtml(chip)}</span>
+      </div>`);
+
+    if (lateFilings.length) row('red', `${lateFilings.length} filing${lateFilings.length === 1 ? ' is' : 's are'} late`, 'Deadlines');
+    if (soonFilings.length) row('amber', `${soonFilings.length} filing${soonFilings.length === 1 ? ' is' : 's are'} due in the next 14 days`, 'Deadlines');
+    if (stuck.length) row('red', `${stuck.length} task${stuck.length === 1 ? ' is' : 's are'} stuck`, 'Team & Tasks');
+    if (waiting.length) row('amber', `${waiting.length} task${waiting.length === 1 ? ' is' : 's are'} waiting for a decision`, 'Today');
+    if (emailCount) row('amber', `${emailCount} flagged email${emailCount === 1 ? '' : 's'} may need a reply`, 'Outlook');
+
     container.innerHTML = `
       <div class="sourcebanner">
-        Safety-net engine scanned practice filing tracker, calendar, and email queues.
+        Sloane has just looked at your deadlines, tasks and flagged emails. This is what it found.
       </div>
       <div style="display: flex; flex-direction: column; gap: 12px;">
-        <div class="alert-item">
-          <span class="dot red" style="margin-top: 4px;"></span>
-          <div class="alert-item-content">
-            <div class="alert-title">Compliance Scan Active</div>
-            <div class="alert-desc">Safety-net engine monitoring statutory filings, pending accounts, and overdue tasks.</div>
-          </div>
-        </div>
-        <div class="diary-item">
-          <div class="diary-item-left">
-            <span class="dot amber"></span>
-            <span class="diary-title">Follow-up: Pending client document signatures</span>
-          </div>
-          <span class="timechip">Today</span>
-        </div>
+        ${rows.length ? rows.join('') : '<div class="table-empty" style="padding: 18px;">Nothing has been missed. You are up to date.</div>'}
       </div>
     `;
   }
@@ -1623,7 +1515,7 @@ class SloaneApp {
   async handleSaveClient() {
     const name = document.getElementById('clientName').value.trim();
     if (!name) {
-      Toast.error('Please specify the company / client name.');
+      Toast.error('Please type the client or company name.');
       return;
     }
 
@@ -1644,9 +1536,20 @@ class SloaneApp {
       notes: document.getElementById('clientNotes').value.trim()
     };
 
-    await ApiService.createClient(clientData);
+    try {
+      if (this.editingClientId) {
+        await ApiService.updateClient(this.editingClientId, clientData);
+        Toast.success(`"${name}" has been updated.`);
+      } else {
+        await ApiService.createClient(clientData);
+        Toast.success(`"${name}" has been added.`);
+      }
+    } catch (err) {
+      Toast.error(err.message || 'Could not save this client.');
+      return;
+    }
     ModalManager.close('clientModal');
-    Toast.success(`Client "${name}" created successfully.`);
+    this.editingClientId = null;
 
     // Re-render affected views
     await this.renderClients();
@@ -1655,55 +1558,174 @@ class SloaneApp {
     await this.renderCommandCentre();
   }
 
+  setClientModalMode(isEdit) {
+    const title = document.getElementById('clientModalTitle');
+    const btn = document.getElementById('clientFormSubmitBtn');
+    if (title) title.textContent = isEdit ? 'Edit client' : 'Add a client';
+    if (btn) btn.textContent = isEdit ? 'Save changes' : 'Save client';
+  }
+
+  async openEditClient(clientId) {
+    const c = (this.lastClients || []).find(x => (x.id || x.clientId) === clientId);
+    if (!c) { Toast.error('Could not find that client. Please refresh the page.'); return; }
+    this.editingClientId = clientId;
+    document.getElementById('clientForm').reset();
+    this.setClientModalMode(true);
+    await this.populateClientModalBizSelect();
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+    set('clientName', c.name);
+    set('modalClientBiz', c.biz);
+    set('clientNo', c.no);
+    set('clientYear', c.year);
+    set('clientAccounts', c.accounts);
+    set('clientConfirm', c.confirm);
+    set('clientVat', c.vat === 'Yes' ? 'Yes' : 'No');
+    set('clientVatNo', c.vatNo);
+    set('clientPaye', c.paye);
+    set('clientCis', ['Contractor', 'Subcontractor', 'Both'].includes(c.cis) ? c.cis : 'No');
+    set('clientRisk', c.risk || 'Low');
+    set('clientDirs', c.dirs === '—' ? '' : c.dirs);
+    set('clientOwner', c.owner);
+    set('clientNotes', c.notes);
+    ModalManager.open('clientModal');
+  }
+
+  /* ---- Business areas: edit / remove ---- */
+  setBizModalMode(isEdit) {
+    const title = document.getElementById('bizModalTitle');
+    const btn = document.getElementById('bizFormSubmitBtn');
+    if (title) title.textContent = isEdit ? 'Edit business' : 'Add a business';
+    if (btn) btn.textContent = isEdit ? 'Save changes' : 'Save';
+  }
+
+  openEditBiz(bizId) {
+    const b = (this.lastBusinesses || []).find(x => x.id === bizId);
+    if (!b) { Toast.error('Could not find that business. Please refresh the page.'); return; }
+    this.editingBizId = bizId;
+    document.getElementById('bizForm').reset();
+    this.setBizModalMode(true);
+    document.getElementById('bizName').value = b.name;
+    document.getElementById('bizType').value = b.type;
+    ModalManager.open('bizModal');
+  }
+
+  async deleteBiz(bizId) {
+    const b = (this.lastBusinesses || []).find(x => x.id === bizId);
+    const name = b ? b.name : 'this business';
+    const ok = await ConfirmDialog.ask({
+      title: `Remove ${name}?`,
+      message: 'The business is taken off your list. A business that still has clients cannot be removed.',
+      confirmLabel: 'Remove business'
+    });
+    if (!ok) return;
+    try {
+      await ApiService.deleteBusiness(bizId);
+      Toast.success(`"${name}" has been removed.`);
+      await this.renderBusinesses();
+      await this.renderCommandCentre();
+      await this.populateClientModalBizSelect();
+    } catch (err) {
+      Toast.error(err.message || 'Could not remove that business.');
+    }
+  }
+
+  /* ---- Tasks: tick off / change status ---- */
+  async markTaskDone(taskId, btn) {
+    const task = [...(this.allTasks || []), ...(this.cachedTasks || [])].find(t => t.id === taskId);
+
+    // A task marked as stuck needs a few words on how it was sorted out.
+    if (task && task.isBlocked) {
+      FormModal.open({
+        title: 'How was it sorted out?',
+        intro: `"${task.title}" was marked as stuck${task.blocker ? ` (${task.blocker})` : ''}. Write a few words on how it was sorted out, then it can be ticked off.`,
+        submitLabel: 'Mark as done',
+        fields: [{ name: 'note', label: 'What happened?', type: 'textarea', required: true, maxlength: 1000 }],
+        onSubmit: async v => {
+          await ApiService.completeTask(taskId, v.note);
+          Toast.success('Marked as done.');
+          await this.refreshTaskViews();
+        }
+      });
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+      await ApiService.completeTask(taskId);
+      Toast.success('Marked as done.');
+      await this.refreshTaskViews();
+    } catch (err) {
+      if (btn) btn.disabled = false;
+      Toast.error(err.message || 'Could not mark that as done.');
+    }
+  }
+
+  async changeTaskStatus(taskId, status, selectEl) {
+    if (selectEl) selectEl.disabled = true;
+    try {
+      await ApiService.updateTask(taskId, { status });
+      Toast.success('Status updated.');
+      this.cachedTasks = null;
+      await this.renderPeopleWork();
+      await this.renderCommandCentre();
+      await this.renderIntelligence();
+    } catch (err) {
+      if (selectEl) selectEl.disabled = false;
+      Toast.error(err.message || 'Could not change the status.');
+      await this.renderPeopleWork();
+    }
+  }
+
+  /* ---- Page-wide helpers ---- */
+  setSampleBanners(isSample) {
+    document.querySelectorAll('[data-sample-banner]').forEach(el => {
+      el.style.display = isSample ? 'flex' : 'none';
+    });
+  }
+
+  updateNavBadges({ bizCount, redCount, intelCount } = {}) {
+    const set = (id, n, redStyle) => {
+      const el = document.getElementById(id);
+      if (!el || n === undefined) return;
+      el.textContent = n;
+      el.style.display = n > 0 ? '' : 'none';
+      if (redStyle) el.className = `nav-badge ${n > 0 ? 'badge-red' : ''}`;
+    };
+    set('bizNavBadge', bizCount, false);
+    set('statNavBadge', redCount, true);
+    set('intelNavBadge', intelCount, true);
+  }
+
   async handleSaveBiz() {
     const name = document.getElementById('bizName').value.trim();
     const type = document.getElementById('bizType').value.trim();
 
     if (!name || !type) {
-      Toast.error('Please specify both business name and business type.');
+      Toast.error('Please fill in both the business name and what kind of business it is.');
       return;
     }
 
     try {
-      await ApiService.createBusiness({ name, type });
+      if (this.editingBizId) {
+        await ApiService.updateBusiness(this.editingBizId, { name, type });
+        Toast.success(`"${name}" has been updated.`);
+      } else {
+        await ApiService.createBusiness({ name, type });
+        Toast.success(`"${name}" has been added.`);
+      }
       ModalManager.close('bizModal');
-      Toast.success(`Business area "${name}" added.`);
+      this.editingBizId = null;
 
       await this.renderBusinesses();
       await this.renderCommandCentre();
       await this.populateClientModalBizSelect();
     } catch (err) {
-      Toast.error(`Could not add business area: ${err.message}`);
+      Toast.error(err.message || 'Could not save that business.');
     }
-  }
-
-  handleSaveBrain() {
-    const textarea = document.getElementById('brainInput');
-    if (!textarea) return;
-    const text = textarea.value.trim();
-    if (!text) {
-      Toast.warning('Please enter a note before saving to CEO Brain.');
-      return;
-    }
-
-    const entries = StorageService.getBrainEntries();
-    entries.unshift({
-      id: `b-${Date.now()}`,
-      text,
-      at: new Date().toLocaleString('en-GB'),
-      isPrivate: true
-    });
-
-    StorageService.saveBrainEntries(entries);
-    textarea.value = '';
-    Toast.success('Saved to private CEO Brain.');
-
-    this.renderBrain();
   }
 
   async openTrinovaNoteModal(entryIndex) {
-    const entries = StorageService.getBrainEntries();
-    const entry = entries[entryIndex];
+    const entry = (this.privateNotes || [])[entryIndex];
     if (!entry) return;
 
     this.selectedBrainEntryForTrinova = entry;
@@ -1713,19 +1735,12 @@ class SloaneApp {
 
     // Explicitly uncheck confirmation box per privacy boundary
     const confirmBox = document.getElementById('trinovaNoteConfirm');
-    if (confirmBox) confirmBox.checked = false;
-    
-    // Populate company select from live API / cached clients
-    let clients = [];
-    try {
-      const res = await ApiService.getClients();
-      clients = res.data || [];
-    } catch (_) {
-      clients = StorageService.getClients();
-    }
+    confirmBox.checked = false;
+
+    const clients = await this.getClientChoices();
     const companySelect = document.getElementById('trinovaNoteCompany');
     if (companySelect) {
-      companySelect.innerHTML = clients.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+      companySelect.innerHTML = clients.map(c => `<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`).join('');
     }
 
     ModalManager.open('trinovaNoteModal');
@@ -1733,12 +1748,11 @@ class SloaneApp {
 
   async handleSendNoteToTrinova() {
     const text = document.getElementById('trinovaNoteContent').value.trim();
-    const companyName = document.getElementById('trinovaNoteCompany').value;
-    const visibility = document.getElementById('trinovaNoteVisibility').value;
+    const clientId = document.getElementById('trinovaNoteCompany').value;
     const confirmBox = document.getElementById('trinovaNoteConfirm');
 
     if (!confirmBox || !confirmBox.checked) {
-      Toast.error('You must check the confirmation box to authorize sharing private content with Trinova.');
+      Toast.error('Please tick the box to confirm you want to copy this note.');
       return;
     }
 
@@ -1747,63 +1761,62 @@ class SloaneApp {
       return;
     }
 
-    // Resolve matching company ID from live / cached clients
-    let clients = [];
-    try {
-      const res = await ApiService.getClients();
-      clients = res.data || [];
-    } catch (_) {
-      clients = StorageService.getClients();
+    const client = (this.lastClients || []).find(c => String(c.id || c.clientId) === clientId);
+    if (!client) {
+      Toast.error('Please choose which client the note is for.');
+      return;
     }
-    const match = clients.find(c => c.name === companyName);
-    const companyId = match ? (match.rawId || match.id) : (clients[0]?.id || 'comp_default_01');
 
     try {
-      this.logToTrinovaConsole(`Posting internal note to TriNova for company ${companyName} (${visibility})...`);
       const res = await ApiService.sendNoteToTrinova({
-        companyId,
-        companyName,
+        companyId: this.companyRef(client),
         text,
-        visibility
+        visibility: 'staff_only'
       });
 
       ModalManager.close('trinovaNoteModal');
-      Toast.success(res.message);
-      this.logToTrinovaConsole(`Note posted successfully: ${res.message}`);
-      if (this.activeClient360Id) {
-        await this.renderClientNotesDetail(this.activeClient360Id);
+      Toast.success(`Copied to ${client.name}'s notes.`);
+      this.logToTrinovaConsole(`Note copied to ${client.name} (${res.message})`);
+      if (String(this.activeClient360Id) === clientId) {
+        await this.renderClientNotesDetail();
         await this.renderTimeline(this.activeClient360Id);
       }
     } catch (err) {
-      Toast.error(err.message || 'Failed to send note to Trinova.');
-      this.logToTrinovaConsole(`Note post failed: ${err.message}`);
+      Toast.error(err.message || 'The note could not be copied.');
     }
   }
 
   async handleSyncCompaniesHouse() {
     const statusText = document.getElementById('chSyncStatusText');
-    if (statusText) statusText.textContent = 'Syncing live data from Companies House & TriNova...';
+    if (statusText) statusText.textContent = 'Checking Companies House... this can take a minute.';
 
     const result = await ApiService.syncCompaniesHouse();
-    const syncMsg = result.backendSynced 
-      ? `Live sync complete: reconciled ${result.syncedCount} companies with TriNova backend.`
-      : `Reconciliation complete: verified ${result.syncedCount} companies locally.`;
-
-    Toast.success(syncMsg);
-    this.logToTrinovaConsole(`Statutory sync: ${syncMsg}`);
-
-    if (statusText) {
-      const liveTag = result.backendSynced ? ' [TriNova Synced]' : ' [Local Cache]';
-      statusText.textContent = `Live verified: ${result.syncedCount} companies checked at ${new Date(result.syncedAt).toLocaleTimeString('en-GB')}${liveTag}`;
+    let msg;
+    let ok = true;
+    if (!result.reachedServer) {
+      ok = false;
+      msg = 'The Companies House check could not be run. Please try again in a minute.';
+    } else if (result.totalRequested === 0) {
+      msg = 'There are no companies to check yet.';
+    } else if (result.syncedCount === 0) {
+      ok = false;
+      msg = `Companies House could not be reached for any of the ${result.totalRequested} companies. Ask your Sloane administrator to check the Companies House setting.`;
+    } else if (result.failedCount > 0) {
+      msg = `Checked ${result.syncedCount} of ${result.totalRequested} companies with Companies House. ${result.failedCount} could not be checked.`;
+    } else {
+      msg = `Checked all ${result.syncedCount} companies with Companies House.`;
     }
 
-    this.renderStatutory();
+    if (ok) Toast.success(msg); else Toast.error(msg);
+    this.logToTrinovaConsole(`Companies House check: ${msg}`);
+
+    if (statusText) {
+      statusText.textContent = `${msg} (${new Date(result.syncedAt).toLocaleTimeString('en-GB')})`;
+    }
+
+    await this.renderStatutory();
     await this.renderCommandCentre();
   }
-
-  // =========================================================================
-  // Client 360 Tab Navigation & Subview Controllers (Section 13)
-  // =========================================================================
 
   switchClientTab(tabName) {
     this.activeClientTab = tabName;
@@ -1829,20 +1842,22 @@ class SloaneApp {
       this.renderClientDocumentsDetail(this.activeClient360Id);
     } else if (tabName === 'notes') {
       this.renderClientNotesDetail(this.activeClient360Id);
+    } else if (tabName === 'tasks') {
+      this.renderClientTasksDetail(this.activeClient360Id);
     }
   }
 
   selectClient360(clientId) {
     if (!clientId) return;
-    const sanitized = sanitizeId(clientId);
-    if (!sanitized) return;
+    const sanitized = String(clientId);
     this.activeClient360Id = sanitized;
     this.switchView('clients');
     this.switchClientTab('timeline');
   }
 
   async renderTimeline(clientId = this.activeClient360Id, forceToast = false) {
-    clientId = sanitizeId(clientId) || 'client_default';
+    if (!this.lastClients || this.lastClients.length === 0) await this.ensureClients();
+    clientId = clientId ? String(clientId) : (this.lastClients[0] ? String(this.lastClients[0].id || this.lastClients[0].clientId) : '');
     this.activeClient360Id = clientId;
 
     const container = document.getElementById('timelineEventsContainer');
@@ -1857,26 +1872,30 @@ class SloaneApp {
     `;
 
     // Retrieve client metadata to populate header
-    const clientRes = await ApiService.getClients();
-    const clients = clientRes.data || [];
-    const activeClient = clients.find(c => (c.id || c.clientId) === clientId) || clients[0] || {
-      name: 'Client Account',
-      biz: 'General Practice',
-      clientType: 'Corporate Group',
-      status: 'Active'
-    };
+    const clients = this.lastClients || [];
+    const activeClient = clients.find(c => String(c.id || c.clientId) === clientId);
+
+    if (!activeClient) {
+      const nameEl0 = document.getElementById('timelineActiveClientName');
+      if (nameEl0) nameEl0.textContent = 'No client chosen';
+      container.innerHTML = `<div class="timeline-empty"><strong style="color: var(--text);">No clients yet</strong><p style="margin: 4px 0 0 0;">Add a client first (the "+ Add a client" button), then its history shows here.</p></div>`;
+      return;
+    }
 
     const nameEl = document.getElementById('timelineActiveClientName');
     if (nameEl) nameEl.textContent = activeClient.name;
 
     const typeEl = document.getElementById('timelineActiveClientType');
-    if (typeEl) typeEl.textContent = activeClient.clientType || 'Corporate Group';
+    if (typeEl) typeEl.textContent = activeClient.no ? `Company number ${activeClient.no}` : '';
 
     const bizEl = document.getElementById('timelineActiveClientBiz');
-    if (bizEl) bizEl.textContent = activeClient.biz || activeClient.businessArea || 'Trinova Accounting';
+    if (bizEl) bizEl.textContent = activeClient.assignedBusiness || activeClient.biz || '';
 
     const statusEl = document.getElementById('timelineActiveClientStatus');
-    if (statusEl) statusEl.textContent = activeClient.status || 'Active';
+    if (statusEl) statusEl.style.display = 'none';
+
+    const barEl = document.getElementById('timelineClientBar');
+    if (barEl) barEl.innerHTML = this.clientBarHtml(activeClient, false);
 
     const selectEl = document.getElementById('timelineClientSelect');
     if (selectEl && selectEl.value !== clientId) {
@@ -1900,13 +1919,13 @@ class SloaneApp {
       const connBadge = document.getElementById('timelineConnectionBadge');
       if (connBadge) {
         if (res.source === 'trinova_live') {
-          connBadge.textContent = '⚡ Connected';
+          connBadge.textContent = 'Up to date';
           connBadge.className = 'pill green';
-          connBadge.title = 'Serving from active backend endpoint';
+          connBadge.title = 'Loaded from your Sloane server just now';
         } else {
-          connBadge.textContent = '⚠️ Blocked (TriNova /timeline unmapped)';
+          connBadge.textContent = 'Could not reach Sloane';
           connBadge.className = 'pill amber';
-          connBadge.title = 'TriNova upstream has no /clients/{id}/timeline route; using local store';
+          connBadge.title = 'Showing what was last saved on this device';
         }
       }
 
@@ -1971,13 +1990,12 @@ class SloaneApp {
               const sevPillClass = evt.severity === 'critical' ? 'red' : evt.severity === 'urgent' ? 'amber' : evt.severity === 'info' ? 'blue' : 'neutral';
               const safeEvtId = sanitizeId(evt.id);
               const safeTitle = escapeHtml(evt.title);
-              const safeSeverity = escapeHtml(evt.severity);
-              const safeEventType = escapeHtml((evt.eventType || '').replace(/_/g, ' '));
-              const safeDescription = escapeHtml(evt.description || 'No additional narrative recorded.');
-              const safeActor = escapeHtml(evt.actorId || evt.actorType || 'system');
-              const safeSource = escapeHtml(evt.source);
-              const safeExtId = evt.externalId ? escapeHtml(String(evt.externalId).substring(0, 16)) : '';
-
+              const safeSeverity = escapeHtml(HISTORY_IMPORTANCE[evt.severity] || evt.severity);
+              const safeEventType = escapeHtml(HISTORY_KIND[evt.eventType] || (evt.eventType || '').replace(/_/g, ' ').toLowerCase());
+              const safeDescription = escapeHtml(evt.description || 'No more details were written down.');
+              const safeActor = escapeHtml(this.describeActor(evt));
+              const safeSource = escapeHtml(HISTORY_SOURCE[evt.source] || evt.source);
+              
               return `
                 <div class="timeline-item" id="timeline-event-${safeEvtId}">
                   <div class="timeline-node ${nodeClass}"></div>
@@ -1988,7 +2006,7 @@ class SloaneApp {
                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
                           <span class="pill ${sevPillClass}" style="font-size: 9.5px; padding: 1px 6px;">${safeSeverity}</span>
                           <span class="source-badge" style="font-size: 9.5px;">${safeEventType}</span>
-                          ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒 Private CEO</span>' : ''}
+                          ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒 Only you</span>' : ''}
                         </div>
                       </div>
                       <div class="timeline-card-time">${dateStr} · ${timeStr}</div>
@@ -1997,6 +2015,10 @@ class SloaneApp {
                       ${safeDescription}
                     </div>
                     <div class="timeline-card-footer">
+                      <div class="row-actions" style="margin: 0 0 8px 0;">
+                        ${evt.source === 'user' ? `<button type="button" class="card-action-btn" data-action="openHistoryForm" data-id="${escapeHtml(evt.id)}">✎ Edit</button>` : ''}
+                        <button type="button" class="card-action-btn text-red" data-action="deleteHistoryEntry" data-id="${escapeHtml(evt.id)}">🗑 Delete</button>
+                      </div>
                       <div class="timeline-card-tags">
                         <span class="timeline-actor-tag">
                           <span>👤</span>
@@ -2006,7 +2028,6 @@ class SloaneApp {
                           <span>🔌</span>
                           <span>${safeSource}</span>
                         </span>
-                        ${safeExtId ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--muted);">ref:${safeExtId}</span>` : ''}
                       </div>
                     </div>
                   </div>
@@ -2043,12 +2064,12 @@ class SloaneApp {
     const visibility = document.getElementById('modalTimelineVisibility')?.value || 'shared';
 
     if (!clientId) {
-      Toast.error('Please select a target client.');
+      Toast.error('Please choose a client.');
       return;
     }
 
     if (!title) {
-      Toast.error('Event title cannot be empty.');
+      Toast.error('Please give the entry a short title.');
       return;
     }
 
@@ -2068,7 +2089,7 @@ class SloaneApp {
         source: 'user'
       });
 
-      Toast.success('Timeline event logged successfully.');
+      Toast.success('Added to the client history.');
       ModalManager.closeAll();
       const form = document.getElementById('logTimelineEventForm');
       if (form) form.reset();
@@ -2078,7 +2099,7 @@ class SloaneApp {
         await this.renderClientNotesDetail(clientId);
       }
     } catch (err) {
-      Toast.error(`Could not log timeline event: ${err.message}`);
+      Toast.error(`Could not save that entry: ${err.message}`);
     } finally {
       this._isSubmittingTimelineEvent = false;
       if (submitBtn) {
@@ -2087,146 +2108,6 @@ class SloaneApp {
       }
     }
   }
-
-  async renderClientStatutoryDetail(clientId) {
-    const card = document.getElementById('clientStatutoryDetailCard');
-    if (!card) return;
-
-    let company = null;
-    try {
-      const clientRes = await ApiService.getClients();
-      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
-      if (match) {
-        const detailsRes = await ApiService.getCompanyDetails(match.rawId || match.id);
-        company = detailsRes?.data || match;
-      }
-    } catch (_) {}
-
-    const accountsDueDate = company?.accountsDueDate || company?.accounts || '2026-12-31';
-    const confirmDueDate = company?.confirmationDueDate || company?.confirm || '2026-11-30';
-    const vatStatus = company?.vatRegistered || company?.vat === 'Yes' ? 'Active' : 'Not Registered';
-
-    card.innerHTML = `
-      <div class="card-header">
-        <h3>Statutory Filings & Obligations</h3>
-        <span class="pill ${company?.riskLevel === 'High' ? 'red' : 'green'}">${company?.riskLevel === 'High' ? 'Action Required' : 'Active Filings'}</span>
-      </div>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
-        Synchronized Companies House registers, annual accounts schedules, and confirmation statements.
-      </p>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-          <span style="font-size: 11px; color: var(--muted); display: block;">Accounts Due Date</span>
-          <strong style="color: var(--text);">${escapeHtml(ReconciliationEngine.formatDate(accountsDueDate))}</strong>
-        </div>
-        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-          <span style="font-size: 11px; color: var(--muted); display: block;">Confirmation Statement</span>
-          <strong style="color: var(--text);">${escapeHtml(ReconciliationEngine.formatDate(confirmDueDate))}</strong>
-        </div>
-        <div style="background: var(--panel2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-          <span style="font-size: 11px; color: var(--muted); display: block;">VAT Registration</span>
-          <strong style="color: var(--text);">${escapeHtml(vatStatus)}${company?.vatNumber ? ` (${escapeHtml(company.vatNumber)})` : ''}</strong>
-        </div>
-      </div>
-    `;
-  }
-
-  async renderClientDocumentsDetail(clientId) {
-    const card = document.getElementById('clientDocumentsDetailCard');
-    if (!card) return;
-
-    let companyId = clientId;
-    try {
-      const clientRes = await ApiService.getClients();
-      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
-      if (match && (match.rawId || match.id)) {
-        companyId = match.rawId || match.id;
-      }
-    } catch (_) {}
-
-    let docs = [];
-    try {
-      const res = await ApiService.getCompanyDocuments(companyId);
-      docs = res.data || [];
-    } catch (err) {
-      console.warn('Could not load company documents:', err);
-    }
-
-    const docsHtml = docs.length > 0
-      ? docs.map(d => `
-          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--panel2); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
-            <div>
-              <div style="font-weight: 700; font-size: 13px; color: var(--text);">${escapeHtml(d.filename || d.name || 'Document.pdf')}</div>
-              <div style="font-size: 11px; color: var(--muted);">${d.uploadedBy ? `Uploaded by ${escapeHtml(d.uploadedBy)} · ` : ''}Category: ${escapeHtml(d.category || 'General')}</div>
-            </div>
-            <span class="pill ${d.status === 'Ready' || d.status === 'Signed' ? 'green' : 'amber'}">${escapeHtml(d.status || 'Active')}</span>
-          </div>
-        `).join('')
-      : `<div class="table-empty" style="padding: 24px;">No corporate documents recorded for this client.</div>`;
-
-    card.innerHTML = `
-      <div class="card-header">
-        <h3>Corporate Documents & Certificates</h3>
-        <button class="btn btn-secondary" style="font-size: 11px;">+ Upload Document</button>
-      </div>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
-        Archived statutory balance sheets, minutes, and tamper-evident Documenso certificates.
-      </p>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        ${docsHtml}
-      </div>
-    `;
-  }
-
-  async renderClientNotesDetail(clientId) {
-    const card = document.getElementById('clientNotesDetailCard');
-    if (!card) return;
-
-    let companyId = clientId;
-    try {
-      const clientRes = await ApiService.getClients();
-      const match = (clientRes.data || []).find(c => c.id === clientId || c.clientId === clientId);
-      if (match && (match.rawId || match.id)) {
-        companyId = match.rawId || match.id;
-      }
-    } catch (_) {}
-
-    let notes = [];
-    try {
-      const res = await ApiService.getCompanyNotes(companyId);
-      notes = res.data || [];
-    } catch (err) {
-      console.warn('Could not load company notes:', err);
-    }
-
-    const notesListHtml = notes.length > 0
-      ? notes.map(n => `
-          <div style="background: var(--panel2); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <strong style="font-size: 12.5px; color: var(--text);">${escapeHtml(n.authorName || n.author || 'Staff')}</strong>
-              <span style="font-size: 11px; color: var(--muted);">${n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
-            </div>
-            <p style="font-size: 12px; color: #c5d1de; margin: 0; line-height: 1.5;">
-              ${escapeHtml(n.text || n.content || '')}
-            </p>
-          </div>
-        `).join('')
-      : `<div class="table-empty" style="padding: 24px;">No internal notes recorded for this client.</div>`;
-
-    card.innerHTML = `
-      <div class="card-header">
-        <h3>Internal Operational & Strategic Notes</h3>
-        <button class="btn btn-secondary" style="font-size: 11px;" onclick="document.getElementById('modalTimelineEventType').value='NOTE_CREATED'; ModalManager.open('logTimelineEventModal');">+ New Note</button>
-      </div>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
-        Client-specific practitioner communications protected by Sloane's strict staff privacy boundary.
-      </p>
-      <div id="clientNotesListContainer">
-        ${notesListHtml}
-      </div>
-    `;
-  }
-
 
   // =========================================================================
   // Feature 2: Secure Claude AI Assistant ("Ask Sloane") (Section 18-41)
@@ -2265,10 +2146,10 @@ class SloaneApp {
           <div class="ai-loading-container">
             <div class="ai-pulse-bar"></div>
             <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px;">
-              Sloane is analyzing your query...
+              Sloane is looking into it...
             </div>
             <div style="font-size: 11.5px; color: var(--muted);">
-              Connecting to secure executive reasoning engine
+              Looking through your records
             </div>
           </div>
         `;
@@ -2292,7 +2173,7 @@ class SloaneApp {
         inlineLoading.style.padding = '16px 10px';
         inlineLoading.innerHTML = `
           <div class="ai-pulse-bar" style="width: 40px; height: 3px;"></div>
-          <div style="font-size: 11.5px; color: var(--muted);">Sloane is analyzing follow-up instructions...</div>
+          <div style="font-size: 11.5px; color: var(--muted);">Sloane is looking into it...</div>
         `;
         modalBody.appendChild(inlineLoading);
         modalBody.scrollTop = modalBody.scrollHeight;
@@ -2321,7 +2202,7 @@ class SloaneApp {
         source: 'error',
         data: {
           response_type: 'conversational',
-          answer: 'Sloane was temporarily unable to process the query. Please ensure the backend service is running or check server connection.',
+          answer: 'Sloane could not answer just now. Please try again in a minute.',
           risk_level: null,
           key_reasons: [],
           recommended_actions: [],
@@ -2336,7 +2217,7 @@ class SloaneApp {
 
       const riskLevel = data.risk_level;
       const riskClass = riskLevel === 'red' ? 'risk-red' : riskLevel === 'amber' ? 'risk-amber' : riskLevel === 'low' ? 'risk-low' : 'risk-neutral';
-      const riskIcon = riskLevel === 'red' ? '🔴 RED CRITICAL' : riskLevel === 'amber' ? '🟠 AMBER ATTENTION' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ PRACTICE ASSESSMENT';
+      const riskIcon = riskLevel === 'red' ? '🔴 RED: needs action now' : riskLevel === 'amber' ? '🟠 AMBER: keep an eye on this' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ SUMMARY';
 
       const isClaude = res.source === 'anthropic_claude';
       const isGemini = res.source === 'google_gemini';
@@ -2344,21 +2225,21 @@ class SloaneApp {
         ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
         : isGemini
         ? `<span class="source-badge ch-live" style="font-size: 10px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">✨ Google Gemini</span>`
-        : `<span class="source-badge" style="font-size: 10px; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">🛡️ Offline Grounded Fallback</span>`;
+        : `<span class="source-badge" style="font-size: 10px; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">🛡️ Answered from your saved records (not by AI)</span>`;
 
       // Remove inline loading if present
       const inlineLoadingEl = document.getElementById('aiInlineLoading');
       if (inlineLoadingEl) inlineLoadingEl.remove();
 
       if (modalSubtitle) {
-        modalSubtitle.textContent = isConversational ? 'Executive Dialogue' : 'Grounded Practice Analysis';
+        modalSubtitle.textContent = isConversational ? 'Conversation' : 'Based on your own records';
       }
 
       const cardHtml = `
         <div class="ai-card-shell" style="border: none; padding: 0; box-shadow: none; ${isFollowUp ? 'margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);' : ''}">
           <div class="ai-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 12px; color: var(--muted);">AI Intelligence Engine:</span>
+              <span style="font-size: 12px; color: var(--muted);">Answered by:</span>
               ${providerBadge}
             </div>
             <div style="font-size: 11px; font-family: var(--font-mono); color: var(--muted);">
@@ -2380,7 +2261,7 @@ class SloaneApp {
 
           <!-- Key Drivers (Only if present) -->
           ${data.key_reasons && data.key_reasons.length > 0 ? `
-            <div class="ai-subheading">Key Drivers & Evidence</div>
+            <div class="ai-subheading">Why Sloane says this</div>
             <ul class="ai-reasons-list">
               ${data.key_reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
             </ul>
@@ -2388,7 +2269,7 @@ class SloaneApp {
 
           <!-- Recommended Actions (Only if present) -->
           ${data.recommended_actions && data.recommended_actions.length > 0 ? `
-            <div class="ai-subheading">Recommended Next Actions</div>
+            <div class="ai-subheading">What to do next</div>
             <div class="ai-actions-grid">
               ${data.recommended_actions.map(act => `
                 <div class="ai-action-item">
@@ -2403,7 +2284,7 @@ class SloaneApp {
 
           <!-- Grounded Evidence Links (Only if present) -->
           ${data.evidence && data.evidence.length > 0 ? `
-            <div class="ai-subheading">Grounded Provenance Citations</div>
+            <div class="ai-subheading">Where this comes from</div>
             <div class="ai-evidence-box">
               ${data.evidence.map(ev => `
                 <div class="ai-evidence-item">
@@ -2472,6 +2353,46 @@ class SloaneApp {
     }, 180);
   }
 
+  /** A plain name for who made a history entry. */
+  describeActor(evt) {
+    if (evt.actorId === 'actor_kirsty_allen' || evt.actorType === 'user') return 'You';
+    if (evt.actorType === 'companies_house') return 'Companies House';
+    if (evt.actorType === 'system') return 'Sloane';
+    return evt.actorId || evt.actorType || 'Sloane';
+  }
+
+  /** Settings page: plain facts about where data is saved and what is connected. */
+  async renderSystemStatus() {
+    const card = document.getElementById('systemStatusCard');
+    if (!card) return;
+    const res = await ApiService.getSystemStatus();
+    if (res.status !== 'success' || !res.data) {
+      card.innerHTML = `<div class="card-header"><h3>How Sloane is set up</h3></div><div class="table-empty" style="padding: 18px;">Sloane could not check its set-up just now.</div>`;
+      return;
+    }
+    const d = res.data;
+    const saved = d.storage.persistent;
+    const kind = { sqlite: 'a database file on the server', postgres: 'a Postgres database' }[d.storage.kind] || 'the server';
+    const row = (ok, title, text) => `
+      <div class="status-row">
+        <span class="dot ${ok === true ? 'green' : ok === false ? 'red' : ''}" ${ok === null ? 'style="background: var(--muted);"' : ''}></span>
+        <div><div class="status-title">${escapeHtml(title)}</div><div class="status-text">${escapeHtml(text)}</div></div>
+      </div>`;
+    card.innerHTML = `
+      <div class="card-header"><h3>How Sloane is set up</h3></div>
+      ${row(saved, saved ? 'Your information is saved' : 'Your information is NOT being saved',
+        saved ? `Tasks, notes, documents, deadlines and clients you add are kept in ${kind}.${d.storage.lastSavedAt ? ` Last saved ${new Date(d.storage.lastSavedAt).toLocaleString('en-GB')}.` : ''}`
+              : 'Sloane has no database to save to, so everything you add will disappear when it restarts. Ask your Sloane administrator to set one up.')}
+      ${saved && d.storage.durable === false ? row(false, 'But it is only saved on a temporary disk', 'This server\'s own disk is wiped each time Sloane is updated, so everything you add would be lost then. Ask your Sloane administrator to attach a storage volume (or a Postgres database).') : ''}
+      ${d.storage.lastError ? row(false, 'The last save did not work', d.storage.lastError) : ''}
+      ${row(d.trinova.configured, d.trinova.configured ? 'TriNova is connected' : 'TriNova is not connected',
+        d.trinova.configured ? 'Sloane reads your clients from TriNova. It never changes anything in TriNova.'
+                             : 'Sloane has not been given TriNova\'s access key, so it cannot show your TriNova clients. Ask your Sloane administrator to set it up.')}
+      ${row(null, 'Signing requests', 'Sloane keeps a record of who you have asked to sign a document. It does not send anything to the signers yet.')}
+      ${d.demoData ? row(null, 'Example data is switched on', 'The example clients, tasks and deadlines are only there to show how Sloane works.') : ''}
+    `;
+  }
+
   syncProviderDropdowns(provider) {
     const p = provider || ApiService.getAiProvider();
     const topSelect = document.getElementById('topAiProviderSelect');
@@ -2482,6 +2403,9 @@ class SloaneApp {
     if (configSelect) configSelect.value = p;
   }
 }
+
+// The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

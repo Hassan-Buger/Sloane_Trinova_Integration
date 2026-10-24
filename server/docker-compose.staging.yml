@@ -20,14 +20,14 @@ services:
       - NODE_ENV=staging
       - PORT=4000
       - LOG_LEVEL=debug
-      - SLOANE_API_KEY=tn_sec_live_sloane_readwrite_2026
-      - SLOANE_READONLY_API_KEY=tn_sec_live_sloane_readonly_2026
+      - SLOANE_API_KEY=${SLOANE_API_KEY:?set SLOANE_API_KEY in your shell before starting staging}
+      - SLOANE_READONLY_API_KEY=${SLOANE_READONLY_API_KEY:?set SLOANE_READONLY_API_KEY in your shell before starting staging}
       - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-ch_test_staging_key}
       - COMPANIES_HOUSE_BASE_URL=https://api.company-information.service.gov.uk
       - SIGNING_PROVIDER=documenso
       - SIGNING_API_URL=http://documenso:3000/api/v1
-      - SIGNING_API_KEY=documenso_staging_key
-      - SIGNING_WEBHOOK_SECRET=documenso_webhook_secret_hmac_2026
+      - SIGNING_API_KEY=${SIGNING_API_KEY:?set SIGNING_API_KEY in your shell before starting staging}
+      - SIGNING_WEBHOOK_SECRET=${SIGNING_WEBHOOK_SECRET:?set SIGNING_WEBHOOK_SECRET in your shell before starting staging}
       - STORAGE_ROOT_PATH=/var/data/trinova/documents
       # Mail Sandboxing: Diverts all emails to Mailpit container
       - MAIL_HOST=mailpit

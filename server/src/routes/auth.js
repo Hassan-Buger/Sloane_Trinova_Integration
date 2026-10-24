@@ -37,7 +37,7 @@ export function registerAuthRoutes(app, { authenticate }) {
       return res.status(400).json({
         error: {
           code: 'MALFORMED_BODY',
-          message: 'Invalid request body. Expected JSON object.'
+          message: 'Sloane could not read that sign-in request. Please try again.'
         }
       });
     }
@@ -49,7 +49,7 @@ export function registerAuthRoutes(app, { authenticate }) {
       return res.status(400).json({
         error: {
           code: 'BAD_REQUEST',
-          message: 'Email and password are required fields.'
+          message: 'Please type your email and password.'
         }
       });
     }
@@ -57,10 +57,9 @@ export function registerAuthRoutes(app, { authenticate }) {
     // 3. Read Owner Configuration and Staff Accounts
     const ownerEmail = (process.env.SLON_OWNER_EMAIL || '').trim().toLowerCase();
     const ownerPasswordHash = (process.env.SLON_OWNER_PASSWORD_HASH || '').trim();
-    const isStaffMatch = email === 'staff.one@example.invalid' || email === 'staff@trinovaaccounting.co.uk';
 
-    // Constant-time check: if owner config is missing and not staff login, return invalid credentials
-    if (!isStaffMatch && (!ownerEmail || !ownerPasswordHash)) {
+    // Only the owner can sign in. There are no built-in or default accounts.
+    if (!ownerEmail || !ownerPasswordHash) {
       sessionStore.recordFailure(clientIp);
       return res.status(401).json({
         error: {
@@ -70,19 +69,16 @@ export function registerAuthRoutes(app, { authenticate }) {
       });
     }
 
-    // 4. Verify Credentials (supports owner email and linked TriNova staff credentials)
-    const isOwnerMatch = ownerEmail && (email === ownerEmail ||
+    // 4. Verify Credentials (owner email + bcrypt password hash from the environment)
+    // The owner's TriNova work address is accepted as an alias, but still needs the owner's password.
+    const isEmailMatch = Boolean(ownerEmail) && (email === ownerEmail ||
       (ownerEmail.startsWith('kirsty') && (email === 'kirsty@trinova.com' || email === 'kirsty.allen@trinova.co.uk')));
-    const isEmailMatch = isOwnerMatch || isStaffMatch;
 
     let isPasswordMatch = false;
 
     try {
       if (ownerPasswordHash) {
         isPasswordMatch = bcrypt.compareSync(password, ownerPasswordHash);
-      }
-      if (!isPasswordMatch && isStaffMatch && password === 'password123') {
-        isPasswordMatch = true;
       }
     } catch (e) {
       logger.error('Error during password hash verification:', e.message);
@@ -103,9 +99,9 @@ export function registerAuthRoutes(app, { authenticate }) {
     sessionStore.resetFailures(clientIp);
 
     const user = {
-      name: isStaffMatch ? 'Staff Accountant (TriNova)' : 'Kirsty Allen',
-      email: isStaffMatch ? email : ownerEmail,
-      role: isStaffMatch ? 'Staff Accountant' : 'CEO & Managing Partner'
+      name: 'Kirsty Allen',
+      email: ownerEmail,
+      role: 'CEO & Managing Partner'
     };
 
     const session = sessionStore.createSession(user);
@@ -120,7 +116,7 @@ export function registerAuthRoutes(app, { authenticate }) {
 
     return res.status(200).json({
       status: 'success',
-      message: 'Authentication successful.',
+      message: 'You are signed in.',
       user
     });
   });
@@ -145,7 +141,7 @@ export function registerAuthRoutes(app, { authenticate }) {
 
     return res.status(200).json({
       status: 'success',
-      message: 'Logged out successfully.'
+      message: 'You have been signed out.'
     });
   });
 

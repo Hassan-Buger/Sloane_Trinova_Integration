@@ -37,10 +37,17 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
   app.get('/api/v1/integrations/outlook/connect', authenticate, (req, res) => {
     const clientId = process.env.OUTLOOK_CLIENT_ID;
     if (!clientId) {
+      // A person clicking "Connect" in the browser should land back in Sloane with a
+      // readable message, not a page of raw JSON. API callers still get the 503 JSON.
+      if (String(req.headers?.accept || '').includes('text/html')) {
+        const msg = 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.';
+        res.writeHead(302, { Location: `/?outlook_error=${encodeURIComponent(msg)}` });
+        return res.end();
+      }
       return res.status(503).json({
         error: {
           code: 'OUTLOOK_NOT_CONFIGURED',
-          message: 'Outlook integration is not configured on this server. Missing OUTLOOK_CLIENT_ID.'
+          message: 'Email connection is not switched on for this Sloane yet. Please ask your Sloane administrator to finish the Microsoft setup.'
         }
       });
     }
@@ -111,7 +118,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(400).json({
         error: {
           code: 'MISSING_CODE',
-          message: 'Missing authorization code parameter in Microsoft callback.'
+          message: 'Microsoft did not send back what Sloane needed. Please try connecting again.'
         }
       });
     }
@@ -147,7 +154,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(502).json({
         error: {
           code: 'MICROSOFT_NETWORK_ERROR',
-          message: `Failed to contact Microsoft token endpoint: ${netErr.message}`
+          message: 'Sloane could not reach Microsoft to finish connecting. Please try again in a minute.'
         }
       });
     }
@@ -163,7 +170,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(status >= 500 ? 502 : 400).json({
         error: {
           code: 'TOKEN_ENDPOINT_ERROR',
-          message: `Microsoft token endpoint responded with status ${status}.`,
+          message: 'Microsoft would not finish the connection. Please try connecting again.',
           details: errDetails
         }
       });
@@ -176,7 +183,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(502).json({
         error: {
           code: 'INVALID_TOKEN_RESPONSE',
-          message: `Malformed JSON from Microsoft token endpoint: ${parseErr.message}`
+          message: 'Microsoft sent an answer that Sloane could not read. Please try connecting again.'
         }
       });
     }
@@ -187,7 +194,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(400).json({
         error: {
           code: 'MISSING_REFRESH_TOKEN',
-          message: 'Microsoft did not return a refresh token. Ensure offline_access scope was requested and consented.'
+          message: 'Microsoft did not give Sloane lasting access. Please try connecting again and choose Accept on every screen.'
         }
       });
     }
@@ -207,7 +214,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(401).json({
         error: {
           code: 'INVALID_ID_TOKEN',
-          message: `ID token verification failed: ${identErr.message}`
+          message: 'Sloane could not confirm who signed in at Microsoft (verification failed). Please try connecting again.'
         }
       });
     }
@@ -247,7 +254,7 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       return res.status(500).json({
         error: {
           code: 'VAULT_SAVE_ERROR',
-          message: 'Failed to securely persist connection in encrypted vault.'
+          message: 'Sloane could not save the connection safely. Please tell your Sloane administrator.'
         }
       });
     }

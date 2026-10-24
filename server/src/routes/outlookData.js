@@ -66,7 +66,7 @@ export function registerOutlookDataRoutes(app, { authenticate }, options = {}) {
       return res.status(500).json({
         error: {
           code: 'VAULT_READ_ERROR',
-          message: 'Failed to access encrypted Outlook connection vault'
+          message: 'Sloane could not open its saved Outlook connection. Please tell your Sloane administrator.'
         }
       });
     }
@@ -148,14 +148,14 @@ export function registerOutlookDataRoutes(app, { authenticate }, options = {}) {
         try {
           connectionStore.saveConnection({
             status: 'reconnect_required',
-            lastError: 'Outlook connection requires re-authentication'
+            lastError: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }, vaultOptions);
         } catch {}
 
         return res.status(401).json({
           error: {
             code: 'OUTLOOK_RECONNECT_REQUIRED',
-            message: 'Outlook connection requires re-authentication'
+            message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }
         });
       }
@@ -212,7 +212,7 @@ export function registerOutlookDataRoutes(app, { authenticate }, options = {}) {
       return res.status(500).json({
         error: {
           code: 'VAULT_READ_ERROR',
-          message: 'Failed to access encrypted Outlook connection vault'
+          message: 'Sloane could not open its saved Outlook connection. Please tell your Sloane administrator.'
         }
       });
     }
@@ -317,14 +317,14 @@ export function registerOutlookDataRoutes(app, { authenticate }, options = {}) {
         try {
           connectionStore.saveConnection({
             status: 'reconnect_required',
-            lastError: 'Outlook connection requires re-authentication'
+            lastError: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }, vaultOptions);
         } catch {}
 
         return res.status(401).json({
           error: {
             code: 'OUTLOOK_RECONNECT_REQUIRED',
-            message: 'Outlook connection requires re-authentication'
+            message: 'Your Outlook connection needs to be set up again. Please reconnect Outlook in Settings.'
           }
         });
       }

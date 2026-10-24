@@ -1,19 +1,29 @@
 /**
- * Trinova Shared Database Store (Source of Truth)
- * Models Clients, Companies, Officers, Contacts, and Services
- * adhering to context/04_backend_integration_context.md §4.
+ * Sloane's working data set.
+ *
+ * `mockDb` (kept under this name for the routes and tests that import it) is the in-memory
+ * working copy of everything Sloane stores itself: businesses, clients added in Sloane, tasks,
+ * notes, documents, history, team, deadlines and private notes.
+ *
+ * - It is saved to a real database (SQLite file or Postgres via DATABASE_URL) by
+ *   ./persistence.js, so nothing is lost when the server restarts.
+ * - Built-in EXAMPLE records (Woofington Park and friends) are only loaded when
+ *   NODE_ENV=test or SLOANE_DEMO_DATA=true. A real install starts with no example data.
  */
 
-export const mockDb = {
+/** The businesses a brand-new Sloane starts with. The owner can rename or remove them. */
+export const DEFAULT_BUSINESSES = [
+  { id: "biz-1", name: "Trinova Accounting", type: "Accountancy & Tax", status: "Active" },
+  { id: "biz-2", name: "CFI Awarding", type: "Awarding Organisation", status: "Active" },
+  { id: "biz-3", name: "The Thinking Tent / Yellow Brick", type: "Consultancy & Design", status: "Active" },
+  { id: "biz-4", name: "MTDflow", type: "Fintech / SaaS", status: "Active" },
+  { id: "biz-5", name: "Meta Digital Accounting", type: "Digital Accounting", status: "Active" },
+  { id: "biz-6", name: "Other ventures & property", type: "Holdings & Investments", status: "Active" }
+];
+
+const SAMPLE_DATA = {
   // Business Areas (Practice verticals / business divisions)
-  businesses: [
-    { id: "biz-1", name: "Trinova Accounting", type: "Accountancy & Tax", status: "Active" },
-    { id: "biz-2", name: "CFI Awarding", type: "Awarding Organisation", status: "Active" },
-    { id: "biz-3", name: "The Thinking Tent / Yellow Brick", type: "Consultancy & Design", status: "Active" },
-    { id: "biz-4", name: "MTDflow", type: "Fintech / SaaS", status: "Active" },
-    { id: "biz-5", name: "Meta Digital Accounting", type: "Digital Accounting", status: "Active" },
-    { id: "biz-6", name: "Other ventures & property", type: "Holdings & Investments", status: "Active" }
-  ],
+  businesses: DEFAULT_BUSINESSES.map(b => ({ ...b })),
 
   // Clients (Top-level client entities)
   clients: [
@@ -710,3 +720,70 @@ export const mockDb = {
     }
   ]
 };
+
+/** Every list Sloane keeps. The id column is how a row is told apart when saving. */
+export const COLLECTIONS = {
+  businesses: { id: r => r.id },
+  clients: { id: r => r.id },
+  companies: { id: r => r.id },
+  statutoryTracker: { id: r => r.id || r.companyNumber },
+  vatReturns: { id: r => r.id },
+  tasks: { id: r => r.id },
+  teamMembers: { id: r => r.id },
+  conversations: { id: r => r.id },
+  messages: { id: r => r.id },
+  notes: { id: r => r.id },
+  documents: { id: r => r.id },
+  timeline_events: { id: r => r.id },
+  signingRequests: { id: r => r.id },
+  ceoNotes: { id: r => r.id },
+  clientBusiness: { id: r => r.id }
+};
+
+/** Whether the built-in example records should be loaded (tests and explicit demo mode only). */
+export function sampleDataEnabled() {
+  // NODE_TEST_CONTEXT is set by `node --test`; test files can import this module before
+  // their fixtures have had a chance to set NODE_ENV.
+  return process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT) || process.env.SLOANE_DEMO_DATA === 'true';
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/** Gives the example filing-tracker rows an id so they can be edited and removed like any other. */
+function withTrackerIds(rows) {
+  return rows.map(r => ({ ...r, id: r.id || `dl_${r.companyNumber}`, origin: 'sample' }));
+}
+
+/** Builds a fresh data set: either empty (real install) or with the example records. */
+export function buildInitialData(withSamples = sampleDataEnabled()) {
+  const data = {};
+  for (const name of Object.keys(COLLECTIONS)) data[name] = [];
+  data.businesses = DEFAULT_BUSINESSES.map(b => ({ ...b }));
+
+  if (withSamples) {
+    const sample = clone(SAMPLE_DATA);
+    for (const name of Object.keys(sample)) data[name] = sample[name];
+    data.statutoryTracker = withTrackerIds(data.statutoryTracker);
+    data.teamMembers = [
+      { id: 'usr_kirsty_allen', name: 'Kirsty Allen', role: 'Chief Executive', email: '' },
+      { id: 'usr_jessica_taylor', name: 'Jessica Taylor', role: 'Accountant', email: '' },
+      { id: 'usr_hamza_malik', name: 'Hamza Malik', role: 'Accountant', email: '' }
+    ];
+  }
+  return data;
+}
+
+export const mockDb = buildInitialData();
+export const db = mockDb;
+
+/** Puts a fresh data set back into mockDb without replacing the object other modules hold. */
+export function resetData(withSamples = sampleDataEnabled()) {
+  const fresh = buildInitialData(withSamples);
+  for (const name of Object.keys(COLLECTIONS)) {
+    mockDb[name].length = 0;
+    mockDb[name].push(...fresh[name]);
+  }
+  return mockDb;
+}

@@ -18,11 +18,16 @@ import { registerSigningRoutes } from './routes/signing.js';
 import { registerTimelineRoutes } from './routes/timeline.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerBusinessRoutes } from './routes/businesses.js';
+import { registerCeoNoteRoutes } from './routes/ceoNotes.js';
+import { registerTeamRoutes } from './routes/team.js';
 import { registerOutlookAuthRoutes } from './routes/outlookAuth.js';
 import { registerOutlookSettingsRoutes } from './routes/outlookSettings.js';
 import { registerOutlookDataRoutes } from './routes/outlookData.js';
 import { telemetry } from './services/telemetry.js';
 import { sessionStore } from './services/sessionStore.js';
+import { persistence } from './data/persistence.js';
+import { config } from './config.js';
+import { sampleDataEnabled } from './data/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +98,9 @@ export function createApp(options = {}) {
     patch(path, ...handlers) {
       addRoute('PATCH', path, handlers);
     },
+    put(path, ...handlers) {
+      addRoute('PUT', path, handlers);
+    },
     delete(path, ...handlers) {
       addRoute('DELETE', path, handlers);
     },
@@ -117,6 +125,11 @@ export function createApp(options = {}) {
         res.end();
       };
 
+      // Anything that changes data is saved to the database as soon as the response has gone out.
+      if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+        res.once('finish', () => persistence.scheduleFlush());
+      }
+
       // CORS handling with explicit origin whitelist (Section 1.5)
       const allowedOrigins = [
         'http://localhost:4000',
@@ -139,7 +152,7 @@ export function createApp(options = {}) {
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
 
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trinova-API-Key, Idempotency-Key, If-Match, X-Documenso-Signature, X-Requested-With');
 
       // Security Headers: Content-Security-Policy & Defensive Headers (Section 1.4)
@@ -247,10 +260,20 @@ export function createApp(options = {}) {
 
           const ext = path.extname(targetPath).toLowerCase();
           const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+          // Pages, scripts and styles are re-checked on every load (cheap: a 304 when unchanged),
+          // so after an update nobody is left running a mix of old and new files.
+          const revalidate = ['.html', '.js', '.mjs', '.css'].includes(ext);
+          const etag = `W/"${stats.size.toString(16)}-${Math.floor(stats.mtimeMs).toString(16)}"`;
+          if (revalidate && req.headers['if-none-match'] === etag) {
+            res.writeHead(304, { 'ETag': etag, 'Cache-Control': 'no-cache' });
+            res.end();
+            return;
+          }
           res.writeHead(200, {
             'Content-Type': contentType,
             'Content-Length': stats.size,
-            'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600'
+            ...(revalidate ? { 'ETag': etag } : {}),
+            'Cache-Control': revalidate ? 'no-cache' : 'public, max-age=3600'
           });
           const stream = fs.createReadStream(targetPath);
           stream.pipe(res);
@@ -311,7 +334,20 @@ export function createApp(options = {}) {
             if (index < matchedRoute.handlers.length) {
               const handler = matchedRoute.handlers[index++];
               try {
-                handler(req, res, next);
+                const result = handler(req, res, next);
+                // An async handler that throws must answer with an error, not crash the server.
+                if (result && typeof result.catch === 'function') {
+                  result.catch(err => {
+                    if (res.headersSent) return;
+                    res.status(500).json({
+                      error: {
+                        code: 'INTERNAL_SERVER_ERROR',
+                        message: 'Something went wrong on the server. Please try again.'
+                      }
+                    });
+                    console.error('[Server] Unhandled error in route:', err && err.message);
+                  });
+                }
               } catch (err) {
                 res.status(500).json({
                   error: {
@@ -383,7 +419,30 @@ export function createApp(options = {}) {
       status: 'ok',
       service: 'trinova-api-server',
       version: '1.0.0',
+      storage: persistence.status().kind,
       timestamp: new Date().toISOString()
+    });
+  });
+
+  // Plain facts about this Sloane install, for the Settings page.
+  app.get('/api/v1/system/status', authenticate, requireScope('sloane:read'), (req, res) => {
+    const storage = persistence.status();
+    res.status(200).json({
+      status: 'success',
+      data: {
+        storage: {
+          kind: storage.kind,
+          persistent: storage.persistent,
+          durable: storage.durable,
+          lastSavedAt: storage.lastSavedAt,
+          lastError: storage.lastError
+        },
+        trinova: { configured: Boolean(config.trinova.apiKey) },
+        // Signing requests are recorded in Sloane; nothing is sent to signers or a signing service yet.
+        signing: { mode: 'record_only' },
+        demoData: sampleDataEnabled(),
+        environment: process.env.NODE_ENV || 'development'
+      }
     });
   });
 
@@ -441,6 +500,12 @@ export function createApp(options = {}) {
 
   // --- Mount Business Areas Routes (Task P7.4.2) ---
   registerBusinessRoutes(app, { authenticate, requireScope });
+
+  // --- Mount Team members (people tasks can be given to) ---
+  registerTeamRoutes(app, { authenticate, requireScope });
+
+  // --- Mount My Private Notes (saved on the server, owner session only) ---
+  registerCeoNoteRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 03 Companies House & Statutory Reconciliation Routes ---
   registerStatutoryRoutes(app, { authenticate, requireScope }, options.chService);

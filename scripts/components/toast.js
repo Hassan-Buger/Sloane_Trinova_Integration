@@ -23,11 +23,11 @@ export const Toast = {
 
     let icon = 'ℹ️';
     if (type === 'success') icon = '✓';
-    if (type === 'error') icon = '⚠';
+    if (type === 'error' || type === 'warning') icon = '⚠';
 
     const iconSpan = document.createElement('span');
     iconSpan.style.fontWeight = 'bold';
-    iconSpan.style.color = type === 'success' ? 'var(--green)' : type === 'error' ? 'var(--red)' : 'var(--accent)';
+    iconSpan.style.color = type === 'success' ? 'var(--green)' : type === 'error' ? 'var(--red)' : type === 'warning' ? 'var(--amber)' : 'var(--accent)';
     iconSpan.textContent = icon;
 
     const msgSpan = document.createElement('span');
@@ -57,5 +57,9 @@ export const Toast = {
 
   info(msg) {
     this.show(msg, 'info');
+  },
+
+  warning(msg) {
+    this.show(msg, 'warning', 4500);
   }
 };

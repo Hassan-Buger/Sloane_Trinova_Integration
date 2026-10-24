@@ -8,6 +8,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../../config.js';
 import { SLOANE_SYSTEM_PROMPT, BRIEFING_SYSTEM_PROMPT } from './prompts.js';
 import { mockDb } from '../../data/db.js';
+import { clientDirectory } from '../clientDirectory.js';
+import { buildDeadlineList } from '../../routes/statutory.js';
 
 export class ClaudeService {
   constructor(options = {}) {
@@ -67,7 +69,7 @@ export class ClaudeService {
 
     // If neither Anthropic nor Gemini is configured
     if (!this.isConfigured()) {
-      return this._generateGracefulFallback({
+      return this._generateGracefulFallback({ history,
         query,
         context,
         durationMs: Date.now() - startTime,
@@ -93,7 +95,7 @@ export class ClaudeService {
             }
           }
           const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
-          return this._generateGracefulFallback({
+          return this._generateGracefulFallback({ history,
             query,
             context,
             durationMs: Date.now() - startTime,
@@ -124,7 +126,7 @@ export class ClaudeService {
             }
           }
           const isTimeout = anthropicErr.name === 'AbortError' || anthropicErr.message?.includes('aborted');
-          return this._generateGracefulFallback({
+          return this._generateGracefulFallback({ history,
             query,
             context,
             durationMs: Date.now() - startTime,
@@ -154,7 +156,7 @@ export class ClaudeService {
           }
         }
         const isTimeout = anthropicErr.name === 'AbortError' || anthropicErr.message?.includes('aborted');
-        return this._generateGracefulFallback({
+        return this._generateGracefulFallback({ history,
           query,
           context,
           durationMs: Date.now() - startTime,
@@ -170,7 +172,7 @@ export class ClaudeService {
         return await this._askGemini({ query, context, history, systemPrompt, startTime, requestId, model });
       } catch (geminiErr) {
         const isTimeout = geminiErr.name === 'AbortError' || geminiErr.message?.includes('aborted');
-        return this._generateGracefulFallback({
+        return this._generateGracefulFallback({ history,
           query,
           context,
           durationMs: Date.now() - startTime,
@@ -181,7 +183,7 @@ export class ClaudeService {
       }
     }
 
-    return this._generateGracefulFallback({
+    return this._generateGracefulFallback({ history,
       query,
       context,
       durationMs: Date.now() - startTime,
@@ -451,7 +453,7 @@ ${query}`;
    * Generates grounded deterministic fallback based on context.
    * Adheres strictly to Section 33 (Never pretend fallback is Claude).
    */
-  _generateGracefulFallback({ query, context = {}, durationMs, requestId, reason, errorMessage }) {
+  _generateGracefulFallback({ history = [], query, context = {}, durationMs, requestId, reason, errorMessage }) {
     const q = (query || '').trim().toLowerCase();
 
     // 1. Check for Casual Greeting
@@ -592,12 +594,55 @@ ${query}`;
       };
     }
 
-    // 3.5 Specific Client / Company Existence or Lookup Query
+    // 3.5 Looking up a client or company by name (live TriNova clients included)
     const allCompanies = mockDb.companies || [];
-    const redCompanies = allCompanies.filter(c => c.riskLevel === 'High');
+    const knownClients = clientDirectory.all();
+    const openTasks0 = () => (mockDb.tasks || []).filter(t => !['Completed', 'Cancelled'].includes(t.status));
+    const deadlines = buildDeadlineList().filter(d => !d.isDissolved);
 
-    const mentionsClientOrCompany = /(client|company|entities|portfolio)/i.test(q);
-    const mentionsSearchOrQuery = /(is there|are there|do we have|any|find|search|lookup|named|name)/i.test(q);
+    // 3.4 A follow-up such as "tell me more about the first company you mentioned":
+    // find the first client named in the last answer and talk about that one.
+    const refersBack = /(tell me more|more about|the first (one|company|client)|that (one|company|client)|this (one|company|client)|the same (one|company|client))/i.test(q);
+    if (refersBack && Array.isArray(history)) {
+      const lastAnswer = [...history].reverse().find(h => h && h.role === 'assistant' && typeof h.content === 'string');
+      if (lastAnswer) {
+        const text = lastAnswer.content.toLowerCase();
+        const names = [...new Set([...deadlines.map(d => d.name), ...knownClients.map(c => c.name)])]
+          .filter(n => n && text.includes(n.toLowerCase()))
+          .sort((a, b) => text.indexOf(a.toLowerCase()) - text.indexOf(b.toLowerCase()));
+        if (names.length > 0) {
+          const name = names[0];
+          const row = deadlines.find(d => d.name === name);
+          const reasons = row
+            ? [`${row.urgency}: ${row.urgencyReason}`, row.accountsDue ? `Accounts due ${row.accountsDue}` : null, row.confirmDue ? `Yearly update due ${row.confirmDue}` : null, row.note ? `Note: ${row.note}` : null].filter(Boolean)
+            : ['Sloane has no deadline saved for this client.'];
+          const tasksFor = openTasks0().filter(t => (t.companyName || '').toLowerCase() === name.toLowerCase());
+          for (const t of tasksFor.slice(0, 3)) reasons.push(`Task: ${t.title}${t.isBlocked ? ' (stuck)' : ''}`);
+          return {
+            status: 'fallback',
+            source: 'sloane_rules_engine',
+            model: 'deterministic_grounded_fallback',
+            requestId,
+            reason,
+            errorMessage,
+            data: {
+              response_type: 'practice_assessment',
+              answer: `About ${name}: ${reasons[0]}.`,
+              risk_level: row ? row.urgency.toLowerCase() : 'neutral',
+              key_reasons: reasons,
+              recommended_actions: row && row.urgency !== 'CLEAR' ? [{ action: `Check the filing for ${name}`, priority: 'high' }] : [],
+              evidence: []
+            },
+            usage: { durationMs }
+          };
+        }
+      }
+    }
+
+
+
+    const mentionsClientOrCompany = /\b(client|company|entities|portfolio)\b/i.test(q);
+    const mentionsSearchOrQuery = /\b(is there|are there|do we have|any|find|search|lookup|named|name)\b/i.test(q);
 
     if (mentionsClientOrCompany && mentionsSearchOrQuery) {
       const candidates = [];
@@ -616,13 +661,12 @@ ${query}`;
       }
 
       if (candidates.length > 0) {
-        const allClients = mockDb.clients || [];
         const foundClients = [];
         const notFound = [];
 
         for (const cand of candidates) {
           const cleanCand = cand.toLowerCase();
-          const matchClient = allClients.find(c => c.name.toLowerCase().includes(cleanCand));
+          const matchClient = knownClients.find(c => c.name.toLowerCase().includes(cleanCand));
           const matchComp = allCompanies.find(c => c.companyName.toLowerCase().includes(cleanCand));
           if (matchClient) {
             foundClients.push(`Client: ${matchClient.name}`);
@@ -634,11 +678,11 @@ ${query}`;
         }
 
         if (notFound.length > 0) {
-          let answer = `No practice records found for: ${notFound.map(n => `"${n}"`).join(', ')}. `;
+          let answer = `Sloane has no client or company called ${notFound.map(n => `"${n}"`).join(', ')}. `;
           if (foundClients.length > 0) {
-            answer += `However, found matching entities: ${foundClients.join(', ')}.`;
+            answer += `It does have: ${foundClients.join(', ')}.`;
           } else {
-            answer += `They are not registered in TriNova's active portfolio. Across your connected records, ${redCompanies.map(c => c.companyName).join(' and ')} require priority attention today.`;
+            answer += `Sloane can see ${knownClients.length} client${knownClients.length === 1 ? '' : 's'} in total.`;
           }
 
           return {
@@ -651,10 +695,10 @@ ${query}`;
             data: {
               response_type: 'practice_assessment',
               answer,
-              risk_level: notFound.length > 0 && foundClients.length === 0 ? 'neutral' : 'amber',
+              risk_level: foundClients.length === 0 ? 'neutral' : 'amber',
               key_reasons: [
-                ...notFound.map(n => `"${n}" does not exist in practice database.`),
-                ...foundClients.map(f => `${f} is actively tracked.`)
+                ...notFound.map(n => `"${n}" is not in the records Sloane can see.`),
+                ...foundClients.map(f => `${f} is in Sloane.`)
               ],
               recommended_actions: [],
               evidence: []
@@ -665,37 +709,54 @@ ${query}`;
       }
     }
 
-    // 4. Practice-Wide Query (Compute directly from authentic mockDb records)
+    // 4. Practice-wide question: answered only from what is really saved in Sloane
+    const redFilings = deadlines.filter(d => d.urgency === 'RED');
+    const amberFilings = deadlines.filter(d => d.urgency === 'AMBER');
+    const openTasks = (mockDb.tasks || []).filter(t => !['Completed', 'Cancelled'].includes(t.status));
+    const stuckTasks = openTasks.filter(t => t.isBlocked);
 
     const isRedCountQuery = /how\s+many.*(red|flagged)/i.test(q) || /count.*(red|high)/i.test(q);
     const isUrgentPriorityQuery = /which.*(most\s+urgent|priority|attention)/i.test(q) || /highest\s+priority/i.test(q);
+    const names = list => list.map(d => d.name).join(', ');
+    const noun = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-    let answer = `Across the practice portfolio, ${allCompanies.length} companies are monitored. ${redCompanies.length} entities are flagged RED at high statutory risk.`;
-    let risk_level = redCompanies.length > 0 ? 'red' : 'low';
+    let answer;
+    let risk_level = redFilings.length > 0 ? 'red' : (amberFilings.length > 0 ? 'amber' : 'low');
     const key_reasons = [];
     const recommended_actions = [];
     const evidence = [];
 
-    if (isRedCountQuery) {
-      answer = `There are currently ${redCompanies.length} companies flagged RED at high statutory risk: ${redCompanies.map(c => c.companyName).join(' and ')}.`;
-      key_reasons.push(`${redCompanies.length} of ${allCompanies.length} active practice entities require urgent intervention.`);
-      for (const comp of redCompanies) {
-        key_reasons.push(`${comp.companyName}: ${comp.notes || 'Critical statutory filing overdue'}`);
-      }
-      recommended_actions.push({ action: 'Review strike-off defenses and overdue accounts filing queue', priority: 'high' });
+    if (deadlines.length === 0 && openTasks.length === 0 && knownClients.length === 0) {
+      answer = 'Nothing is saved in Sloane yet: no clients, deadlines or tasks. Add some, or connect TriNova, and I can answer questions about them.';
+      risk_level = null;
+    } else if (isRedCountQuery) {
+      answer = redFilings.length > 0
+        ? `${noun(redFilings.length, 'filing is', 'filings are')} flagged RED: ${names(redFilings)}.`
+        : 'No filings are flagged RED right now.';
+      for (const d of redFilings.slice(0, 6)) key_reasons.push(`${d.name}: ${d.urgencyReason}`);
+      if (redFilings.length > 0) recommended_actions.push({ action: 'Open Deadlines and deal with the RED rows first', priority: 'high' });
     } else if (isUrgentPriorityQuery) {
-      const topUrgent = redCompanies[0] || allCompanies[0];
-      answer = `The most urgent company requiring immediate CEO attention is ${topUrgent.companyName}. An active strike-off notice has been registered at Companies House and accounts are overdue.`;
-      key_reasons.push(`${topUrgent.companyName}: ${topUrgent.notes || 'Active strike-off notice'}`);
-      recommended_actions.push({ action: `Submit formal objection to strike-off for ${topUrgent.companyName}`, priority: 'high' });
-      recommended_actions.push({ action: 'Obtain director signature on balance sheet today', priority: 'high' });
+      const top = redFilings[0] || amberFilings[0];
+      if (top) {
+        answer = `${top.name} is the most urgent: ${top.urgencyReason.charAt(0).toLowerCase()}${top.urgencyReason.slice(1)}.`;
+        key_reasons.push(`${top.name}: ${top.note || top.urgencyReason}`);
+        recommended_actions.push({ action: `Check the latest filing for ${top.name}`, priority: 'high' });
+      } else if (stuckTasks.length > 0) {
+        answer = `No filing is urgent. ${noun(stuckTasks.length, 'task is', 'tasks are')} stuck: ${stuckTasks.slice(0, 3).map(t => t.title).join(', ')}.`;
+        recommended_actions.push({ action: `Unblock: ${stuckTasks[0].title}`, priority: 'high' });
+      } else {
+        answer = 'Nothing is urgent right now.';
+      }
     } else {
-      // General overview
-      answer = `Reviewing connected practice records: ${redCompanies.map(c => c.companyName).join(' and ')} require primary attention today.`;
-      key_reasons.push('Woofington Park Limited: Strike-off defense deadline active.');
-      key_reasons.push('R GB Elevations Ltd: Statutory accounts overdue.');
-      recommended_actions.push({ action: 'Check signing status for Woofington balance sheet', priority: 'high' });
-      recommended_actions.push({ action: 'Follow up with Hamza on R GB bank records', priority: 'normal' });
+      const parts = [];
+      parts.push(`${noun(redFilings.length, 'filing is', 'filings are')} RED`);
+      parts.push(`${noun(amberFilings.length, 'is', 'are')} AMBER`);
+      parts.push(`${noun(stuckTasks.length, 'task is', 'tasks are')} stuck`);
+      answer = `Right now ${parts.join(', ')}.${redFilings.length > 0 ? ` Needing attention first: ${names(redFilings.slice(0, 3))}.` : ''}`;
+      for (const d of redFilings.slice(0, 3)) key_reasons.push(`${d.name}: ${d.urgencyReason}`);
+      for (const t of stuckTasks.slice(0, 3)) key_reasons.push(`Stuck: ${t.title}${t.blocker ? ` (${t.blocker})` : ''}`);
+      if (redFilings[0]) recommended_actions.push({ action: `Check the filing for ${redFilings[0].name}`, priority: 'high' });
+      if (stuckTasks[0]) recommended_actions.push({ action: `Unblock: ${stuckTasks[0].title}`, priority: 'normal' });
     }
 
     return {

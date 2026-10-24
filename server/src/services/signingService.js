@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { mockDb } from '../data/db.js';
+import { clientDirectory } from './clientDirectory.js';
 import { TimelineService } from './timelineService.js';
 import { documentStorage } from './storageDriver.js';
 import { sandboxMailService } from './sandboxMailService.js';
@@ -69,9 +70,9 @@ export class SigningService {
   createSigningRequest(params) {
     const { companyId, documentId, title, signers, expiresAt, requestedBy } = params;
 
-    const company = (mockDb.companies || []).find(c => c.id === companyId);
+    const company = clientDirectory.findCompany(companyId);
     if (!company) {
-      const err = new Error(`Company with ID '${companyId}' not found.`);
+      const err = new Error('We could not find that client. Refresh the Clients page and try again.');
       err.code = 'COMPANY_NOT_FOUND';
       err.status = 404;
       throw err;
@@ -79,21 +80,21 @@ export class SigningService {
 
     const document = (mockDb.documents || []).find(d => d.id === documentId);
     if (!document) {
-      const err = new Error(`Document with ID '${documentId}' not found.`);
+      const err = new Error('Please choose one of this client\'s documents to send for signing.');
       err.code = 'DOCUMENT_NOT_FOUND';
       err.status = 404;
       throw err;
     }
 
     if (!document.isOriginal) {
-      const err = new Error('Cannot create signing request: Document is already a signed version or certificate.');
+      const err = new Error('This document is already signed (or is a certificate), so it cannot be sent for signing again.');
       err.code = 'INVALID_DOCUMENT_TARGET';
       err.status = 422;
       throw err;
     }
 
     if (!Array.isArray(signers) || signers.length === 0) {
-      const err = new Error('At least one signer is required.');
+      const err = new Error('Please add at least one person who needs to sign.');
       err.code = 'VALIDATION_ERROR';
       err.status = 422;
       throw err;
@@ -104,7 +105,7 @@ export class SigningService {
       const email = String(s.email || '').trim().toLowerCase();
       const name = String(s.name || '').trim();
       if (!email || !name) {
-        const err = new Error(`Signer #${index + 1} requires valid name and email.`);
+        const err = new Error(`Please give a name and an email address for signer ${index + 1}.`);
         err.code = 'VALIDATION_ERROR';
         err.status = 422;
         throw err;

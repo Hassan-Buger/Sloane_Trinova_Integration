@@ -102,7 +102,7 @@ export function consumeState(state) {
     return {
       valid: false,
       error: 'INVALID_STATE',
-      message: 'OAuth state parameter is missing or malformed'
+      message: 'This sign-in link is not valid. Please try connecting again.'
     };
   }
 

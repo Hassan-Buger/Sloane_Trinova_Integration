@@ -6,6 +6,7 @@
  */
 
 import { mockDb } from '../data/db.js';
+import { clientDirectory } from './clientDirectory.js';
 
 // Controlled Event Taxonomy (Section 8)
 export const TIMELINE_EVENT_TYPES = [
@@ -122,8 +123,8 @@ export class TimelineService {
       mockDb.timeline_events = [];
     }
 
-    // Verify client exists
-    const client = (mockDb.clients || []).find(c => c.id === clientId);
+    // Verify client exists (a client added in Sloane, or a live TriNova client)
+    const client = clientDirectory.find(clientId);
     if (!client) {
       return null;
     }
@@ -204,6 +205,65 @@ export class TimelineService {
         nextCursor
       }
     };
+  }
+
+  /**
+   * Entries the owner wrote by hand can be edited. Entries Sloane wrote automatically
+   * (task, document, Companies House ...) can only be removed.
+   */
+  static isEditable(event) {
+    return event.source === 'user';
+  }
+
+  /**
+   * Change an entry the owner wrote. Returns { event } or { error: [code, message] }.
+   */
+  static updateEvent(clientId, eventId, changes = {}) {
+    const event = TimelineService.getEventById(clientId, eventId);
+    if (!event) return { error: ['EVENT_NOT_FOUND', 'We could not find that history entry. It may already have been deleted.'] };
+    if (!TimelineService.isEditable(event)) {
+      return { error: ['AUTOMATIC_ENTRY', 'Sloane wrote this entry automatically, so it can only be deleted, not changed.'] };
+    }
+
+    if (changes.title !== undefined) {
+      const title = typeof changes.title === 'string' ? changes.title.trim() : '';
+      if (!title) return { error: ['VALIDATION_FAILED', 'Please give the entry a short title.'] };
+      if (title.length > 200) return { error: ['VALIDATION_FAILED', 'The title can be up to 200 characters.'] };
+    }
+    if (changes.description !== undefined && String(changes.description).length > 4000) {
+      return { error: ['VALIDATION_FAILED', 'The description can be up to 4,000 characters.'] };
+    }
+    if (changes.eventType !== undefined && !TIMELINE_EVENT_TYPES.includes(changes.eventType)) {
+      return { error: ['VALIDATION_FAILED', 'That kind of entry is not allowed.'] };
+    }
+    if (changes.severity !== undefined && !TIMELINE_SEVERITIES.includes(changes.severity)) {
+      return { error: ['VALIDATION_FAILED', 'That importance level is not allowed.'] };
+    }
+    if (changes.visibility !== undefined && !TIMELINE_VISIBILITIES.includes(changes.visibility)) {
+      return { error: ['VALIDATION_FAILED', 'That visibility is not allowed.'] };
+    }
+    if (changes.occurredAt !== undefined && Number.isNaN(new Date(changes.occurredAt).getTime())) {
+      return { error: ['VALIDATION_FAILED', 'Please enter a real date and time.'] };
+    }
+
+    if (changes.title !== undefined) event.title = changes.title.trim();
+    if (changes.description !== undefined) event.description = String(changes.description).trim();
+    if (changes.eventType !== undefined) event.eventType = changes.eventType;
+    if (changes.severity !== undefined) event.severity = changes.severity;
+    if (changes.visibility !== undefined) event.visibility = changes.visibility;
+    if (changes.occurredAt !== undefined) event.occurredAt = new Date(changes.occurredAt).toISOString();
+    event.updatedAt = new Date().toISOString();
+    return { event };
+  }
+
+  /**
+   * Remove an entry. Returns { event } or { error: [code, message] }.
+   */
+  static deleteEvent(clientId, eventId) {
+    const idx = (mockDb.timeline_events || []).findIndex(e => e.clientId === clientId && e.id === eventId);
+    if (idx === -1) return { error: ['EVENT_NOT_FOUND', 'We could not find that history entry. It may already have been deleted.'] };
+    const [event] = mockDb.timeline_events.splice(idx, 1);
+    return { event };
   }
 
   /**

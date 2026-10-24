@@ -65,7 +65,7 @@ export function requireIdempotency(req, res, next) {
     return res.status(400).json({
       error: {
         code: 'MISSING_IDEMPOTENCY_KEY',
-        message: 'Idempotency-Key header (UUID v4) is required for this operation.'
+        message: 'Something went wrong while sending that. Please try again.'
       }
     });
   }
@@ -76,7 +76,7 @@ export function requireIdempotency(req, res, next) {
     return res.status(400).json({
       error: {
         code: 'INVALID_IDEMPOTENCY_KEY',
-        message: 'Idempotency-Key header must be a valid UUID v4 format.'
+        message: 'Something went wrong while sending that. Please try again.'
       }
     });
   }
@@ -90,7 +90,7 @@ export function requireIdempotency(req, res, next) {
       return res.status(409).json({
         error: {
           code: 'IDEMPOTENCY_KEY_REUSE_PAYLOAD_MISMATCH',
-          message: 'Idempotency key was previously used with a different request payload.'
+          message: 'That looks like a repeat of something sent earlier, but with different details. Please try again.'
         }
       });
     }

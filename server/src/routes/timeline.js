@@ -4,7 +4,8 @@
  */
 
 import { TimelineService } from '../services/timelineService.js';
-import { mockDb } from '../data/db.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { sendError } from './helpers.js';
 
 export function registerTimelineRoutes(app, { authenticate, requireScope }) {
   // 1. Get Client Timeline
@@ -39,7 +40,7 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
       return res.status(404).json({
         error: {
           code: 'CLIENT_NOT_FOUND',
-          message: `Client with ID "${clientId}" does not exist in TriNova.`
+          message: 'We could not find that client. Refresh the Clients page and try again.'
         }
       });
     }
@@ -60,12 +61,12 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
   app.get('/api/v1/clients/:clientId/timeline/:eventId', authenticate, requireScope('sloane:read'), (req, res) => {
     const { clientId, eventId } = req.params;
 
-    const client = (mockDb.clients || []).find(c => c.id === clientId);
+    const client = clientDirectory.find(clientId);
     if (!client) {
       return res.status(404).json({
         error: {
           code: 'CLIENT_NOT_FOUND',
-          message: `Client with ID "${clientId}" does not exist.`
+          message: 'We could not find that client. Refresh the Clients page and try again.'
         }
       });
     }
@@ -94,12 +95,12 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
   app.post('/api/v1/clients/:clientId/timeline/events', authenticate, requireScope('sloane:write'), (req, res) => {
     const { clientId } = req.params;
 
-    const client = (mockDb.clients || []).find(c => c.id === clientId);
+    const client = clientDirectory.find(clientId);
     if (!client) {
       return res.status(404).json({
         error: {
           code: 'CLIENT_NOT_FOUND',
-          message: `Client with ID "${clientId}" does not exist.`
+          message: 'We could not find that client. Refresh the Clients page and try again.'
         }
       });
     }
@@ -111,7 +112,7 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
         ...body,
         clientId,
         actorType: body.actorType || 'user',
-        actorId: body.actorId || req.actor?.id || 'actor_unknown',
+        actorId: body.actorId || req.actor?.actorId || 'actor_unknown',
         source: body.source || 'user'
       });
 
@@ -131,5 +132,41 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
         }
       });
     }
+  });
+
+  // 4. Change a history entry the owner wrote
+  // PATCH /api/v1/clients/:clientId/timeline/:eventId
+  app.patch('/api/v1/clients/:clientId/timeline/:eventId', authenticate, requireScope('sloane:write'), (req, res) => {
+    const { clientId, eventId } = req.params;
+    req.auditAction = 'timeline_event_updated';
+    req.resourceType = `timeline_event:${eventId}`;
+
+    if (!clientDirectory.find(clientId)) {
+      return sendError(res, 404, 'CLIENT_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.');
+    }
+
+    const result = TimelineService.updateEvent(clientId, eventId, req.body || {});
+    if (result.error) {
+      const [code, message] = result.error;
+      const status = code === 'EVENT_NOT_FOUND' ? 404 : code === 'AUTOMATIC_ENTRY' ? 409 : 422;
+      return sendError(res, status, code, message);
+    }
+    return res.status(200).json({ status: 'success', data: result.event });
+  });
+
+  // 5. Delete a history entry
+  // DELETE /api/v1/clients/:clientId/timeline/:eventId
+  app.delete('/api/v1/clients/:clientId/timeline/:eventId', authenticate, requireScope('sloane:write'), (req, res) => {
+    const { clientId, eventId } = req.params;
+    req.auditAction = 'timeline_event_deleted';
+    req.resourceType = `timeline_event:${eventId}`;
+
+    if (!clientDirectory.find(clientId)) {
+      return sendError(res, 404, 'CLIENT_NOT_FOUND', 'We could not find that client. Refresh the Clients page and try again.');
+    }
+
+    const result = TimelineService.deleteEvent(clientId, eventId);
+    if (result.error) return sendError(res, 404, result.error[0], result.error[1]);
+    return res.status(200).json({ status: 'success', message: 'History entry deleted.', data: { id: eventId } });
   });
 }

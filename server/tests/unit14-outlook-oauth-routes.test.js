@@ -236,6 +236,26 @@ describe('Task P3.2: Outlook OAuth 2.0 Connect & Callback Routes', () => {
     });
   });
 
+  describe('Connect link clicked in a browser when Outlook is not configured', () => {
+    test('3b. Redirects back to Sloane with a plain-English message instead of raw JSON', async () => {
+      const oldClientId = process.env.OUTLOOK_CLIENT_ID;
+      delete process.env.OUTLOOK_CLIENT_ID;
+
+      try {
+        const res = await makeRequest('/api/v1/integrations/outlook/connect', {
+          headers: { Cookie: sessionCookie, Accept: 'text/html,application/xhtml+xml' }
+        });
+        assert.equal(res.status, 302);
+        const loc = res.headers.location || '';
+        assert.ok(loc.startsWith('/?outlook_error='), 'Redirects to the app with outlook_error');
+        assert.ok(decodeURIComponent(loc).includes('not switched on'), 'Message is plain English');
+        assert.ok(!decodeURIComponent(loc).includes('OUTLOOK_CLIENT_ID'), 'Message does not expose config names');
+      } finally {
+        process.env.OUTLOOK_CLIENT_ID = oldClientId;
+      }
+    });
+  });
+
   describe('GET /api/v1/integrations/outlook/callback', () => {
     test('4. Does not require session cookie to handle callback', async () => {
       // Create state entry directly
