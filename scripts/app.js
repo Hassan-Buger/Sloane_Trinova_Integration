@@ -130,6 +130,8 @@ class SloaneApp {
     if (mobileNav) mobileNav.style.display = 'none';
     this.closeNavDrawer();
 
+    document.body.classList.remove('session-check');
+
     const emailInput = document.getElementById('loginEmail');
     const passInput = document.getElementById('loginPassword');
     if (emailInput) {
@@ -150,6 +152,7 @@ class SloaneApp {
     if (authShell) authShell.classList.add('auth-hidden');
     if (appShell) appShell.style.display = 'grid';
     if (mobileNav) mobileNav.style.display = 'flex';
+    document.body.classList.remove('session-check');
 
     // Update profile display with active authenticated user
     const user = AuthService.getUser();
@@ -239,7 +242,11 @@ class SloaneApp {
 
       await this.renderAll();
       await this.checkTrinovaBackend();
-      this.switchView('command');
+      if (typeof window !== 'undefined' && window.location && /[?&]outlook(_error)?=/.test(window.location.search || '')) {
+        OutlookSettings.checkUrlParams();
+      } else {
+        this.switchView('command');
+      }
 
       const passInput = document.getElementById('loginPassword');
       if (passInput) passInput.value = '';

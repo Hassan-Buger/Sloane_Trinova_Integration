@@ -109,6 +109,10 @@ Set these in your host's settings (Railway: *Variables*). Values below are examp
 
 See `server/.env.example` for a copy-and-fill template.
 
+### Checking the TriNova connection
+
+`node server/scripts/check-trinova.js` (with `TRINOVA_API_KEY` set in your own terminal) checks that TriNova is up and accepts the key, then saves the **shape** of what TriNova returns (field names and kinds of value, never client data) to `server/data-private/trinova-shape.json`. The live API is `https://portal.trinovaaccounting.co.uk/api/v1`; it expects `Authorization: Bearer <key>`. The older `testnova-…railway.app` address no longer exists.
+
 ---
 
 ## 4. Deploying on Railway

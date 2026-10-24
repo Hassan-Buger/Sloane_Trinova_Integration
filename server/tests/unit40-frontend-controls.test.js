@@ -217,6 +217,25 @@ describe('Unit 40: Front-end controls', () => {
       assert.match(read('scripts/features/privateNotes.js'), /createdAt: e\.createdAt \|\| parseBrowserDate\(e\.at\)/);
     });
 
+    test('4b.7 The sign-in form never flashes up while Sloane checks you are already signed in', () => {
+      assert.match(html, /<body class="session-check">/);
+      assert.match(read('styles/auth.css'), /\.session-check \.auth-shell[\s\S]*?visibility: hidden/);
+      const app = read('scripts/app.js');
+      assert.equal((app.match(/classList\.remove\('session-check'\)/g) || []).length, 2, 'cleared when showing the sign-in page or the dashboard');
+      assert.match(html, /setTimeout\(function \(\) \{ document\.body\.classList\.remove\("session-check"\)/, 'never stays blank');
+    });
+
+    test('4b.8 The message from the Outlook button is kept until the dashboard is up, then shown on Settings', () => {
+      const settings = read('scripts/components/outlookSettings.js');
+      const start = settings.indexOf('  init() {');
+      const init = settings.slice(start, settings.indexOf('\n  },', start));
+      assert.ok(start > 0 && init.length > 20);
+      assert.ok(!init.includes('this.checkUrlParams()'), 'init must not clear the URL message before the app is ready');
+      const app = read('scripts/app.js');
+      assert.ok(app.includes("window.location.search.includes('outlook_error=')"), 'read after the dashboard is up');
+      assert.ok(app.includes('outlook(_error)?='), 'and also after signing in');
+    });
+
     test('4b.6 On a phone the question box wraps and messages never block the button under them', () => {
       assert.match(read('styles/layout.css'), /@media \(max-width: 600px\)[\s\S]*?\.ask-form[\s\S]*?flex-wrap: wrap/);
       assert.match(read('styles/components.css'), /\.toast \{[\s\S]*?pointer-events: none/);

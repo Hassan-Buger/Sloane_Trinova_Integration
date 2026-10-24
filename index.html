@@ -19,7 +19,8 @@
   <link rel="stylesheet" href="styles/views.css?v=2.6.0">
   <link rel="stylesheet" href="styles/auth.css?v=2.6.0">
 </head>
-<body>
+<body class="session-check">
+  <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
 
   <!-- Full-Page Executive CEO Login Screen (TriNova Aligned) -->
   <main class="auth-shell" id="authShell">

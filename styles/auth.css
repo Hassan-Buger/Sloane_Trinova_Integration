@@ -20,6 +20,15 @@
   --auth-focus-ring: 0 0 0 3px rgba(201, 166, 107, 0.25);
 }
 
+/* While Sloane is checking whether you are already signed in, show neither the sign-in page
+   nor the dashboard, so the sign-in form never flashes up on every page load. */
+.session-check .auth-shell,
+.session-check .shell,
+.session-check .mobile-nav-bar {
+  visibility: hidden;
+  transition: none;
+}
+
 /* Authentication Shell (Full Page) */
 .auth-shell {
   position: fixed;

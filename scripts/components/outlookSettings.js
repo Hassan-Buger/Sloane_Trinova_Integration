@@ -60,7 +60,8 @@ export const OutlookSettings = {
    * Initializes the Outlook Settings component and URL param listener.
    */
   init() {
-    this.checkUrlParams();
+    // The URL message (?outlook=... / ?outlook_error=...) is read by the app once the page has
+    // loaded and the owner is signed in (see SloaneApp.init), so it is not lost on the way.
     this.bindModalEvents();
   },
 

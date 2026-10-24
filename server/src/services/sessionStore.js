@@ -32,16 +32,42 @@ class SessionStore {
   createSession(user) {
     const sessionId = this.generateSessionId();
     const now = Date.now();
-    const session = {
-      sessionId,
+    const stored = {
       user,
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + SESSION_TTL_MS).toISOString(),
       expiresAtMs: now + SESSION_TTL_MS
     };
 
-    this.sessions.set(sessionId, session);
-    return session;
+    // Sessions are kept under a hash of the cookie value. Only the browser holds the cookie
+    // value itself, so a copy of the saved data cannot be used to sign in as the owner.
+    this.sessions.set(this.hashId(sessionId), stored);
+    return { sessionId, ...stored };
+  }
+
+  /** The key a session is stored under (and saved to the database under). */
+  hashId(sessionId) {
+    return crypto.createHash('sha256').update(String(sessionId)).digest('hex');
+  }
+
+  /** Sessions in the form that is saved to the database (still hashed, never the cookie value). */
+  exportSessions() {
+    const now = Date.now();
+    return [...this.sessions.entries()]
+      .filter(([, s]) => s.expiresAtMs > now)
+      .map(([id, s]) => ({ id, ...s }));
+  }
+
+  /** Puts saved sessions back after a restart. Expired ones are dropped. */
+  importSessions(rows) {
+    const now = Date.now();
+    this.sessions.clear();
+    for (const row of rows || []) {
+      if (row && row.id && row.expiresAtMs > now) {
+        const { id, ...stored } = row;
+        this.sessions.set(id, stored);
+      }
+    }
   }
 
   /**
@@ -50,15 +76,16 @@ class SessionStore {
   getSession(sessionId) {
     if (!sessionId || typeof sessionId !== 'string') return null;
 
-    const session = this.sessions.get(sessionId);
-    if (!session) return null;
+    const key = this.hashId(sessionId);
+    const stored = this.sessions.get(key);
+    if (!stored) return null;
 
-    if (Date.now() > session.expiresAtMs) {
-      this.sessions.delete(sessionId);
+    if (Date.now() > stored.expiresAtMs) {
+      this.sessions.delete(key);
       return null;
     }
 
-    return session;
+    return { sessionId, ...stored };
   }
 
   /**
@@ -66,7 +93,7 @@ class SessionStore {
    */
   deleteSession(sessionId) {
     if (!sessionId) return false;
-    return this.sessions.delete(sessionId);
+    return this.sessions.delete(this.hashId(sessionId));
   }
 
   /**

@@ -21,6 +21,8 @@ import { randomUUID } from 'node:crypto';
 import { createApp } from '../src/app.js';
 import { mockDb, resetData, buildInitialData, DEFAULT_BUSINESSES } from '../src/data/db.js';
 import { auditStore } from '../src/middleware/audit.js';
+import { sessionStore } from '../src/services/sessionStore.js';
+import { loginCookie } from './support.js';
 import { Persistence, SqliteDriver, PostgresDriver } from '../src/data/persistence.js';
 import { databaseFilePath, documentsDirPath, outlookVaultFilePath } from '../src/data/paths.js';
 import { persistence } from '../src/data/persistence.js';
@@ -69,6 +71,7 @@ describe('Unit 33: Persistence', () => {
     resetData(false);
     mockDb.businesses.length = 0;
     auditStore.logs = [];
+    sessionStore.sessions.clear();
     persistence.driver = new SqliteDriver(tmp.file);
     persistence.saved = new Map();
     await persistence.start();
@@ -165,6 +168,50 @@ describe('Unit 33: Persistence', () => {
       assert.equal(mockDb.businesses.length, 0);
       await reload();
       assert.equal(mockDb.businesses.length, 0, 'must not be re-seeded');
+    });
+  });
+
+  describe('1b. Staying signed in across a restart', () => {
+    test('1b.1 A signed-in browser is still signed in after the server restarts', async () => {
+      const cookie = await loginCookie(baseUrl);
+      const before = await fetch(`${baseUrl}/api/v1/auth/session`, { headers: { Cookie: cookie } });
+      assert.equal(before.status, 200);
+
+      await reload();   // wipes memory (including sessions), then loads what was saved
+      const after = await fetch(`${baseUrl}/api/v1/auth/session`, { headers: { Cookie: cookie } });
+      assert.equal(after.status, 200, 'the same cookie must still work after a restart');
+      assert.equal((await after.json()).status, 'authenticated');
+    });
+
+    test('1b.2 The saved data holds a hash, never the cookie value itself', async () => {
+      const cookie = await loginCookie(baseUrl);
+      const raw = decodeURIComponent(cookie.split('=')[1]);
+      await persistence.flush();
+      const rows = await persistence.driver.all("SELECT record_id, data FROM sloane_records WHERE collection = 'sessions'");
+      assert.ok(rows.length >= 1);
+      for (const r of rows) {
+        assert.ok(!r.record_id.includes(raw) && !r.data.includes(raw), 'the cookie value must not be stored');
+        assert.match(r.record_id, /^[0-9a-f]{64}$/);
+      }
+    });
+
+    test('1b.3 Signing out is saved too: after a restart that cookie no longer works', async () => {
+      const cookie = await loginCookie(baseUrl);
+      const out = await fetch(`${baseUrl}/api/v1/auth/logout`, { method: 'POST', headers: { Cookie: cookie } });
+      assert.equal(out.status, 200);
+      await reload();
+      const res = await fetch(`${baseUrl}/api/v1/auth/session`, { headers: { Cookie: cookie } });
+      assert.equal(res.status, 401);
+    });
+
+    test('1b.4 A session that has run out is not brought back', async () => {
+      const cookie = await loginCookie(baseUrl);
+      const raw = decodeURIComponent(cookie.split('=')[1]);
+      sessionStore.sessions.get(sessionStore.hashId(raw)).expiresAtMs = Date.now() - 1000;
+      await persistence.flush();
+      await reload();
+      const res = await fetch(`${baseUrl}/api/v1/auth/session`, { headers: { Cookie: cookie } });
+      assert.equal(res.status, 401);
     });
   });
 

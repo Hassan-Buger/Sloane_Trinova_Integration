@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { mockDb, COLLECTIONS } from './db.js';
 import { databaseFilePath, dataDir } from './paths.js';
 import { auditStore } from '../middleware/audit.js';
+import { sessionStore } from '../services/sessionStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE_MIGRATIONS_DIR = path.join(__dirname, 'migrations', 'store');
@@ -176,6 +177,13 @@ export class Persistence {
       set: rows => { auditStore.logs = rows; },
       // Newest first, and stable when a new entry is added at the front.
       position: r => -(Date.parse(r.timestamp) || 0)
+    };
+    // Sign-in sessions: saved (as hashes) so a deploy or restart does not sign the owner out.
+    list.sessions = {
+      id: r => r.id,
+      get: () => sessionStore.exportSessions(),
+      set: rows => sessionStore.importSessions(rows),
+      position: r => -(r.expiresAtMs || 0)
     };
     return list;
   }
