@@ -26,6 +26,7 @@ import { registerOutlookDataRoutes } from './routes/outlookData.js';
 import { telemetry } from './services/telemetry.js';
 import { sessionStore } from './services/sessionStore.js';
 import { persistence } from './data/persistence.js';
+import { APP_VERSION, buildId } from './version.js';
 import { config } from './config.js';
 import { sampleDataEnabled } from './data/db.js';
 
@@ -379,7 +380,8 @@ export function createApp(options = {}) {
     res.status(200).json({
       service: 'trinova-api-server',
       name: 'Sloane ⇄ Trinova Backend API & Signing Integration Service',
-      version: '1.0.0',
+      version: APP_VERSION,
+      build: buildId(),
       status: 'online',
       environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString(),
@@ -418,7 +420,8 @@ export function createApp(options = {}) {
     res.status(200).json({
       status: 'ok',
       service: 'trinova-api-server',
-      version: '1.0.0',
+      version: APP_VERSION,
+      build: buildId(),
       storage: persistence.status().kind,
       timestamp: new Date().toISOString()
     });
@@ -441,6 +444,8 @@ export function createApp(options = {}) {
         // Signing requests are recorded in Sloane; nothing is sent to signers or a signing service yet.
         signing: { mode: 'record_only' },
         demoData: sampleDataEnabled(),
+        version: APP_VERSION,
+        build: buildId(),
         environment: process.env.NODE_ENV || 'development'
       }
     });

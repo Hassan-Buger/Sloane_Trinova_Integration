@@ -13,11 +13,11 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c9a66b'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='700' text-anchor='middle' fill='%23080b10' font-family='Arial,sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.6.0">
-  <link rel="stylesheet" href="styles/layout.css?v=2.6.0">
-  <link rel="stylesheet" href="styles/components.css?v=2.6.0">
-  <link rel="stylesheet" href="styles/views.css?v=2.6.0">
-  <link rel="stylesheet" href="styles/auth.css?v=2.6.0">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.6.1">
+  <link rel="stylesheet" href="styles/layout.css?v=2.6.1">
+  <link rel="stylesheet" href="styles/components.css?v=2.6.1">
+  <link rel="stylesheet" href="styles/views.css?v=2.6.1">
+  <link rel="stylesheet" href="styles/auth.css?v=2.6.1">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -120,6 +120,7 @@
 
       <p class="auth-support">
         For authorised users only · TriNova Accounting Group
+        <span class="auth-version" id="authVersion"></span>
       </p>
     </section>
   </main>
@@ -148,6 +149,7 @@
         <div class="brand-text">
           <span class="brand-title">SLOANE</span>
           <span class="brand-subtitle">Your private dashboard</span>
+          <span class="brand-version" id="appVersion" title="The version of Sloane that is running"></span>
         </div>
         <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close navigation drawer" title="Close drawer">✕</button>
       </div>
@@ -1333,6 +1335,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.6.0"></script>
+  <script type="module" src="scripts/app.js?v=2.6.1"></script>
 </body>
 </html>

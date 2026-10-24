@@ -79,7 +79,27 @@ class SloaneApp {
     this.renderIntelligence();
   }
 
+  /** Shows which version of Sloane is running (sidebar and sign-in page), so updates can be checked. */
+  async showVersion() {
+    try {
+      const res = await fetch('/api/v1/health', { credentials: 'same-origin' });
+      const info = (await res.json()) || {};
+      const data = info.data || info;
+      if (!data.version) return;
+      const text = `v${data.version}${data.build ? ` · ${data.build}` : ''}`;
+      const longText = `Sloane version ${data.version}${data.build ? `, build ${data.build} (the commit that is running)` : ''}`;
+      for (const id of ['appVersion', 'authVersion']) {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = text; el.title = longText; }
+      }
+    } catch (_) {
+      // The version label is a nicety: Sloane works without it.
+    }
+  }
+
   async init() {
+    this.showVersion();
+
     // Initialize component managers
     ModalManager.init();
     Toast.init();
@@ -2408,6 +2428,7 @@ class SloaneApp {
         d.trinova.configured ? 'Sloane reads your clients from TriNova. It never changes anything in TriNova.'
                              : 'Sloane has not been given TriNova\'s access key, so it cannot show your TriNova clients. Ask your Sloane administrator to set it up.')}
       ${row(null, 'Signing requests', 'Sloane keeps a record of who you have asked to sign a document. It does not send anything to the signers yet.')}
+      ${row(null, `Version ${d.version || 'unknown'}`, d.build ? `Running build ${d.build}. Compare it with the latest commit on GitHub to be sure the newest update is live.` : 'The host did not say which build is running.')}
       ${d.demoData ? row(null, 'Example data is switched on', 'The example clients, tasks and deadlines are only there to show how Sloane works.') : ''}
     `;
   }

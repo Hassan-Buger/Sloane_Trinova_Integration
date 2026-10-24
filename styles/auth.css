@@ -22,6 +22,14 @@
 
 /* While Sloane is checking whether you are already signed in, show neither the sign-in page
    nor the dashboard, so the sign-in form never flashes up on every page load. */
+.auth-version {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
 .session-check .auth-shell,
 .session-check .shell,
 .session-check .mobile-nav-bar {
