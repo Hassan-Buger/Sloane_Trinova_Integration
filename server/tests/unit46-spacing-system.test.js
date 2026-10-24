@@ -41,7 +41,9 @@ describe('Unit 46: spacing system', () => {
 
   test('46.4 the phone-style top bar is hidden on desktop, and Sign out never squeezes the name', () => {
     assert.match(views, /@media \(min-width: 1101px\) \{\s*\.mobile-nav-bar \{\s*display: none !important;/);
-    assert.match(views, /\.profile \.btn-lock-session \{\s*flex: 1 0 100%;/);
+    // Sign out sits under the name (no extra line), and the sidebar scrolls so it is never cut off
+    assert.match(html, /<div class="profile-info">\s*<span class="profile-name" id="sidebarUserName"><\/span>\s*<button[^>]*id="sidebarLockBtn"/);
+    assert.match(views, /@media \(min-width: 1101px\) \{\s*\.side \{\s*overflow-y: auto;/);
     assert.match(read('styles/auth.css'), /\.btn-lock-session \{[\s\S]*?white-space: nowrap;/);
   });
 });

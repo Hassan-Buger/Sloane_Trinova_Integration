@@ -1521,31 +1521,69 @@
   }
 }
 
-/* Sidebar footer: the name gets the whole line; Sign out sits under it, full width */
+/* Sidebar footer: avatar, then the name with Sign out right under it (no extra line, so it fits) */
 .profile {
-  flex-wrap: wrap;
-  row-gap: var(--space-3);
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 
-.profile > :first-child {
-  flex: 1 1 140px;
-}
-
-.profile .btn-lock-session {
-  flex: 1 0 100%;
-  justify-content: center;
-  padding: 6px 10px;
+.profile .avatar {
+  flex-shrink: 0;
 }
 
 .profile .profile-info {
-  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: var(--space-1);
 }
 
-.profile .profile-name,
-.profile .profile-role {
+.profile .profile-name {
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.profile .profile-signout {
+  padding: 3px 8px;
+  font-size: 10.5px;
+}
+
+/* The sidebar scrolls if the screen is short or zoomed in, so Sign out is never cut off */
+@media (min-width: 1101px) {
+  .side {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .nav-list {
+    flex: 1 0 auto;
+  }
+}
+
+/* Short desktop screens (or a zoomed-in browser): a more compact sidebar */
+@media (min-width: 1101px) and (max-height: 760px) {
+  .side {
+    padding: var(--space-4) var(--space-3) var(--space-3);
+  }
+
+  .brand {
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .nav-list {
+    gap: 2px;
+  }
+
+  .nav-btn {
+    padding: 7px 12px;
+  }
+
+  .profile {
+    padding: 10px 12px;
+  }
 }
 
 /* Tablet and phone: a slightly tighter rhythm */
