@@ -368,7 +368,7 @@ class SloaneApp {
         db.style.color = 'var(--green)';
       }
       if (actor) {
-        actor.textContent = auth?.actor || 'sloane_ceo';
+        actor.textContent = auth?.actor || 'You';
         actor.title = auth?.scopes ? `Scopes: ${auth.scopes.join(', ')}` : '';
       }
     } else {

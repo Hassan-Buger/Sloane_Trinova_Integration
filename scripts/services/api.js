@@ -219,13 +219,21 @@ export const ApiService = {
   async verifyAuth() {
     try {
       const res = await this.request('/auth/verify', { timeout: 6000 });
+      // The server sends the actor as { actorId, actorName, scopes }; show the name, not the object.
+      const rawActor = res.data?.actor;
+      const actor = rawActor && typeof rawActor === 'object'
+        ? (rawActor.actorName || rawActor.actorId || null)
+        : (rawActor || null);
+      const scopes = (rawActor && typeof rawActor === 'object' && Array.isArray(rawActor.scopes))
+        ? rawActor.scopes
+        : (res.data?.scopes || []);
       this.config.status = 'online';
-      this.config.actor = res.data?.actor || 'sloane_ceo_command_centre';
+      this.config.actor = actor || 'sloane_ceo_command_centre';
       return {
         ok: true,
         authenticated: res.data?.authenticated ?? true,
-        actor: res.data?.actor,
-        scopes: res.data?.scopes || [],
+        actor,
+        scopes,
         durationMs: res.durationMs
       };
     } catch (err) {
