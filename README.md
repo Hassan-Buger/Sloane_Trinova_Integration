@@ -158,6 +158,10 @@ On a redeploy Railway stops the old copy with `SIGTERM`; Sloane finishes saving 
 
 Every change goes through server validation, answers with plain-English 400 / 404 / 409 / 422 messages, and writes an entry to the audit log (`GET /api/v1/audit/logs`).
 
+### This week (one-page report)
+
+Menu → **This week** (`GET /api/v1/reports/this-week`) shows a one-page summary built from Sloane's own records: what is late (filings, VAT returns, tasks), what is due today and in the next 6 days, stuck tasks with the reason, who is doing what, tasks finished in the last 7 days, and how much falls due in the 8 to 30 days after. All dates are UK dates (Europe/London). **Print or save as PDF** opens the browser's print window; the print rules (`body.printing-report` in `styles/views.css`) print only the report, black on white, on A4, with table headings repeated on each page.
+
 ### Download a copy of everything (Excel)
 
 Settings → **Your data** → **Download a copy of everything (Excel)** (`GET /api/v1/export/excel`, signed-in owner only) gives one `.xlsx` file with a sheet for each kind of record: About this file, Clients (Sloane and TriNova), Deadlines, VAT returns, Tasks, Team, Businesses, Client notes, Documents (a list; the files themselves stay in Sloane), History, Signing requests, Private notes and the Bin. Dates are real Excel dates (dd/mm/yyyy), headers are bold and frozen, and text is never written as a formula. The file is written by `server/src/services/xlsx.js` (no extra libraries).

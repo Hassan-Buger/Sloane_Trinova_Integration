@@ -19,6 +19,7 @@ import { clientDetailMethods, CLIENT_DETAIL_ACTIONS } from './features/clientDet
 import { privateNoteMethods, PRIVATE_NOTE_ACTIONS } from './features/privateNotes.js';
 import { binMethods, BIN_ACTIONS } from './features/bin.js';
 import { dataExportMethods, DATA_EXPORT_ACTIONS } from './features/dataExport.js';
+import { reportMethods, REPORT_ACTIONS } from './features/reports.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -68,7 +69,7 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
@@ -932,6 +933,10 @@ class SloaneApp {
 
     if (viewId === 'bin') {
       this.renderBin();
+    }
+
+    if (viewId === 'reports') {
+      this.renderWeeklyReport();
     }
 
     // Close mobile/tablet navigation drawer if open
@@ -2510,7 +2515,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

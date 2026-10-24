@@ -1133,6 +1133,12 @@ export const ApiService = {
     return { blob: await res.blob(), filename: match ? match[1] : 'sloane-copy.xlsx' };
   },
 
+  /** The "This week" report. */
+  async getWeeklyReport() {
+    const res = await this.request('/reports/this-week', { timeout: 20000 });
+    return { status: 'success', data: res.data };
+  },
+
   /* The Bin: deleted items kept for 30 days */
 
   async getBin() {

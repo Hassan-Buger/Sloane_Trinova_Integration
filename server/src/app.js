@@ -15,6 +15,7 @@ import { registerStatutoryRoutes } from './routes/statutory.js';
 import { registerTrinovaRoutes } from './routes/trinova.js';
 import { registerBinRoutes } from './routes/bin.js';
 import { registerExportRoutes } from './routes/exportData.js';
+import { registerReportRoutes } from './routes/reports.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -526,6 +527,9 @@ export function createApp(options = {}) {
 
   // "Download a copy of everything" (Excel)
   registerExportRoutes(app, { authenticate, requireScope });
+
+  // Reports: the "This week" one-pager
+  registerReportRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });
