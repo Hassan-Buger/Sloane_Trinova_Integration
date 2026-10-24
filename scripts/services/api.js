@@ -1133,6 +1133,43 @@ export const ApiService = {
     return { blob: await res.blob(), filename: match ? match[1] : 'sloane-copy.xlsx' };
   },
 
+  /* Sign-in security: two-step sign-in, recovery codes, trusted browsers */
+
+  async getTwoFactorStatus() {
+    const res = await this.request('/auth/two-factor');
+    return { status: 'success', data: res.data };
+  },
+
+  async startTwoFactorSetup() {
+    const res = await this.request('/auth/two-factor/setup', { method: 'POST', body: {} });
+    return { status: 'success', data: res.data };
+  },
+
+  async confirmTwoFactorSetup(code) {
+    const res = await this.request('/auth/two-factor/confirm', { method: 'POST', body: { code } });
+    return { status: 'success', data: res.data, message: res.raw?.message };
+  },
+
+  async renewRecoveryCodes(code) {
+    const res = await this.request('/auth/two-factor/recovery-codes', { method: 'POST', body: { code } });
+    return { status: 'success', data: res.data, message: res.raw?.message };
+  },
+
+  async turnOffTwoFactor(code) {
+    const res = await this.request('/auth/two-factor/disable', { method: 'POST', body: { code } });
+    return { status: 'success', message: res.raw?.message };
+  },
+
+  async forgetTrustedBrowser(id) {
+    const res = await this.request(`/auth/two-factor/browsers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success', message: res.raw?.message };
+  },
+
+  async forgetAllTrustedBrowsers() {
+    const res = await this.request('/auth/two-factor/browsers', { method: 'DELETE' });
+    return { status: 'success', message: res.raw?.message };
+  },
+
   /** The "This week" report. */
   async getWeeklyReport() {
     const res = await this.request('/reports/this-week', { timeout: 20000 });

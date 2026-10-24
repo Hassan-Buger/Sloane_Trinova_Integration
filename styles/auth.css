@@ -652,3 +652,38 @@
     padding: 20px 18px;
   }
 }
+
+/* Step 2: the code from the authenticator app */
+.auth-code-input {
+  letter-spacing: 0.35em;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-code-input.is-recovery {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.auth-code-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.auth-code-links a {
+  color: var(--auth-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-code-links a:hover {
+  text-decoration: underline;
+}
+
+.auth-form[hidden] {
+  display: none;
+}

@@ -20,6 +20,7 @@ import { privateNoteMethods, PRIVATE_NOTE_ACTIONS } from './features/privateNote
 import { binMethods, BIN_ACTIONS } from './features/bin.js';
 import { dataExportMethods, DATA_EXPORT_ACTIONS } from './features/dataExport.js';
 import { reportMethods, REPORT_ACTIONS } from './features/reports.js';
+import { securityMethods, SECURITY_ACTIONS } from './features/security.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -69,7 +70,7 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
@@ -211,6 +212,26 @@ class SloaneApp {
       loginForm.addEventListener('submit', (e) => this.handleLogin(e));
     }
 
+    // Step 2: the code from the authenticator app
+    const codeForm = document.getElementById('codeForm');
+    if (codeForm) {
+      codeForm.addEventListener('submit', (e) => this.handleCodeSubmit(e));
+    }
+    document.getElementById('useRecoveryLink')?.addEventListener('click', () => {
+      this.setCodeMode(this.codeMode === 'recovery' ? 'app' : 'recovery');
+    });
+    document.getElementById('backToPasswordLink')?.addEventListener('click', () => {
+      this.showSignInStep('password');
+      document.getElementById('loginPassword')?.focus();
+    });
+    // A 6-digit code is sent as soon as it is complete
+    document.getElementById('loginCode')?.addEventListener('input', (e) => {
+      if (this.codeMode !== 'recovery') {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+        if (e.target.value.length === 6) document.getElementById('codeForm')?.requestSubmit();
+      }
+    });
+
     // Password Visibility Toggle
     const togglePassBtn = document.getElementById('btnTogglePassword');
     const passInput = document.getElementById('loginPassword');
@@ -243,6 +264,76 @@ class SloaneApp {
     }
   }
 
+  /** Shows a message in the red box on the sign-in page (or a pop-up if the box is missing). */
+  showAuthError(message) {
+    const alertEl = document.getElementById('authAlert');
+    const alertMsg = document.getElementById('authAlertMsg');
+    if (alertEl && alertMsg) {
+      alertMsg.textContent = message;
+      alertEl.classList.add('visible');
+    } else {
+      Toast.error(message);
+    }
+  }
+
+  setButtonBusy(btn, busy) {
+    if (!btn) return;
+    btn.classList.toggle('is-loading', busy);
+    btn.disabled = busy;
+  }
+
+  /** Step 1 (email and password) or step 2 (the code from the authenticator app). */
+  showSignInStep(step) {
+    const loginForm = document.getElementById('loginForm');
+    const codeForm = document.getElementById('codeForm');
+    const title = document.getElementById('authTitle');
+    const intro = document.getElementById('authIntro');
+    const alertEl = document.getElementById('authAlert');
+    if (alertEl) alertEl.classList.remove('visible');
+    if (step === 'code') {
+      if (loginForm) loginForm.hidden = true;
+      if (codeForm) codeForm.hidden = false;
+      if (title) title.textContent = 'Enter your code';
+      if (intro) intro.textContent = 'Open your authenticator app on your phone and type the 6-digit code shown for Sloane.';
+      this.setCodeMode('app');
+      setTimeout(() => document.getElementById('loginCode')?.focus(), 80);
+    } else {
+      this.pendingChallenge = null;
+      if (codeForm) codeForm.hidden = true;
+      if (loginForm) loginForm.hidden = false;
+      if (title) title.textContent = 'Sign in to Sloane';
+      if (intro) intro.textContent = 'Welcome back. Sign in to see your deadlines, clients, team tasks and private notes.';
+    }
+  }
+
+  /** The code box takes a 6-digit app code, or a recovery code (XXXXX-XXXXX). */
+  setCodeMode(mode) {
+    this.codeMode = mode;
+    const input = document.getElementById('loginCode');
+    const label = document.getElementById('loginCodeLabel');
+    const link = document.getElementById('useRecoveryLink');
+    if (!input) return;
+    input.value = '';
+    if (mode === 'recovery') {
+      input.inputMode = 'text';
+      input.maxLength = 11;
+      input.placeholder = 'XXXXX-XXXXX';
+      input.autocomplete = 'off';
+      input.classList.add('is-recovery');
+      if (label) label.textContent = 'One of your recovery codes';
+      if (link) link.textContent = 'Use the code from my app instead';
+    } else {
+      input.inputMode = 'numeric';
+      input.maxLength = 6;
+      input.placeholder = '123456';
+      input.autocomplete = 'one-time-code';
+      input.classList.remove('is-recovery');
+      if (label) label.textContent = '6-digit code from your authenticator app';
+      if (link) link.textContent = 'Lost your phone? Use a recovery code';
+    }
+    input.focus();
+  }
+
   async handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail')?.value;
@@ -250,55 +341,96 @@ class SloaneApp {
     const remember = document.getElementById('loginRemember')?.checked ?? true;
     const submitBtn = document.getElementById('btnLoginSubmit');
     const alertEl = document.getElementById('authAlert');
-    const alertMsg = document.getElementById('authAlertMsg');
 
     if (alertEl) alertEl.classList.remove('visible');
-    if (submitBtn) {
-      submitBtn.classList.add('is-loading');
-      submitBtn.disabled = true;
-    }
+    this.setButtonBusy(submitBtn, true);
 
     try {
-      const session = await AuthService.login({ email, password, remember });
-      
-      Toast.success(`Welcome back, ${session.user.name}.`);
-      
-      this.showAppView();
-      
-      if (!this.appEventsBound) {
-        this.bindEvents();
-        this.appEventsBound = true;
+      const result = await AuthService.login({ email, password, remember });
+      if (result.twoFactorRequired) {
+        // Keep the email and password in the (hidden) form, so the browser can offer to save them at the end
+        this.pendingChallenge = { challengeId: result.challengeId, email, password, remember };
+        this.showSignInStep('code');
+        return;
       }
-
-      await this.renderAll();
-      await this.checkTrinovaBackend();
-      if (typeof window !== 'undefined' && window.location && /[?&]outlook(_error)?=/.test(window.location.search || '')) {
-        OutlookSettings.checkUrlParams();
-      } else {
-        this.switchView('command');
-      }
-
-      const passInput = document.getElementById('loginPassword');
-      if (passInput) passInput.value = '';
-
+      await this.finishLogin(result, { email, password });
     } catch (err) {
-      if (alertEl && alertMsg) {
-        alertMsg.textContent = err.message || 'Authentication failed. Please verify credentials.';
-        alertEl.classList.add('visible');
-      } else {
-        Toast.error(err.message || 'Authentication failed.');
-      }
+      this.showAuthError(err.message || 'Authentication failed. Please verify credentials.');
       const passInput = document.getElementById('loginPassword');
       if (passInput) {
         passInput.focus();
         passInput.select();
       }
     } finally {
-      if (submitBtn) {
-        submitBtn.classList.remove('is-loading');
-        submitBtn.disabled = false;
-      }
+      this.setButtonBusy(submitBtn, false);
     }
+  }
+
+  async handleCodeSubmit(e) {
+    e.preventDefault();
+    const pending = this.pendingChallenge;
+    const codeBtn = document.getElementById('btnCodeSubmit');
+    const alertEl = document.getElementById('authAlert');
+    if (alertEl) alertEl.classList.remove('visible');
+    if (!pending) {
+      this.showSignInStep('password');
+      return;
+    }
+    if (this.codeBusy) return;
+    this.codeBusy = true;
+    this.setButtonBusy(codeBtn, true);
+    try {
+      const session = await AuthService.verifyCode({
+        challengeId: pending.challengeId,
+        code: document.getElementById('loginCode')?.value,
+        trustBrowser: document.getElementById('trustBrowser')?.checked === true,
+        email: pending.email,
+        remember: pending.remember
+      });
+      await this.finishLogin(session, { email: pending.email, password: pending.password });
+    } catch (err) {
+      if (err.expired) {
+        this.showSignInStep('password');
+        this.showAuthError(err.message);
+        document.getElementById('loginPassword')?.focus();
+      } else {
+        this.showAuthError(err.message || 'That code is not right.');
+        const input = document.getElementById('loginCode');
+        if (input) { input.focus(); input.select(); }
+      }
+    } finally {
+      this.codeBusy = false;
+      this.setButtonBusy(codeBtn, false);
+    }
+  }
+
+  /** After a successful sign-in (one step or two): open Sloane. */
+  async finishLogin(session, { email, password }) {
+    Toast.success(`Welcome back, ${session.user.name}.`);
+    // Let the browser offer to save the password (Chrome / Edge); others offer it from the form
+    AuthService.offerToSavePassword({ email, password, name: session.user.name });
+    this.pendingChallenge = null;
+
+    this.showAppView();
+
+    if (!this.appEventsBound) {
+      this.bindEvents();
+      this.appEventsBound = true;
+    }
+
+    await this.renderAll();
+    await this.checkTrinovaBackend();
+    if (typeof window !== 'undefined' && window.location && /[?&]outlook(_error)?=/.test(window.location.search || '')) {
+      OutlookSettings.checkUrlParams();
+    } else {
+      this.switchView('command');
+    }
+
+    const passInput = document.getElementById('loginPassword');
+    if (passInput) passInput.value = '';
+    const codeInput = document.getElementById('loginCode');
+    if (codeInput) codeInput.value = '';
+    this.showSignInStep('password');
   }
 
   handleLogout() {
@@ -936,6 +1068,7 @@ class SloaneApp {
     if (viewId === 'settings') {
       OutlookSettings.loadStatus();
       this.renderSystemStatus();
+      this.renderSecurity();
     }
 
     if (viewId === 'bin') {
@@ -2522,7 +2655,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

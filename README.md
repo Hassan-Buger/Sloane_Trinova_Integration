@@ -186,6 +186,14 @@ Every delete above moves what it removes into the **Bin** (menu → Bin) instead
 ## 7. Security notes
 
 - **Only the owner can sign in** (`SLON_OWNER_EMAIL` + bcrypt hash). There are **no built-in logins or default passwords.** An older hard-coded staff login was removed.
+- **Two-step sign-in (optional, recommended).** Settings → *Sign-in security* → *Set up with an authenticator app*. Signing in then needs the password **and** a 6-digit code (TOTP, RFC 6238) from Microsoft Authenticator, Google Authenticator or similar. The QR code is drawn by Sloane itself (`server/src/services/qrcode.js`), so the key never goes to an outside service.
+  - **Stored safely:** the authenticator key is encrypted (AES-256-GCM, key derived from `STORAGE_PRESIGNED_TOKEN_SECRET`, or `TWO_FACTOR_ENC_KEY` if set; changing that secret makes the saved key unreadable, so sign in with a recovery code and set up again). Recovery codes and trusted-browser tokens are stored as SHA-256 hashes only.
+  - **Trust this browser:** an `HttpOnly`, `SameSite=Strict`, `Secure` (in production) cookie `slon_trusted`, sent only to `/api/v1/auth`, for 30 days. A trusted browser skips the code, never the password. Trusted browsers can be forgotten one by one or all at once in Settings.
+  - **Recovery codes:** 10 one-time codes, shown once at set-up; new ones replace the old ones.
+  - **Guessing:** a code can be used only once; 5 wrong codes end the sign-in attempt; wrong codes count towards the same 5-per-15-minutes lockout as wrong passwords.
+  - **Emergency switch:** if the owner loses both the phone and the recovery codes, set `TWO_FACTOR_RESET=true` on the server, redeploy, sign in with the password, then **remove the variable** and set up again.
+  - Routes: `POST /auth/login` (answers `two_factor_required` + `challengeId`), `POST /auth/login/verify`, and `/auth/two-factor` (status, setup, confirm, recovery-codes, disable, browsers).
+- **Browsers can save the password:** the sign-in form uses `autocomplete="username"` / `current-password` / `one-time-code`, and Chrome / Edge are offered the credential after a successful sign-in.
 - **No committed keys.** There is no default TriNova key, and Sloane's own `SLON_API_KEY` is never sent to TriNova. The key that used to be in `server/src/config.js` must be rotated (section 3).
 - The session cookie is `HttpOnly`, `SameSite=Strict`, and `Secure` over HTTPS. Login attempts are rate-limited.
 - Private notes need a browser session, are never included in AI answers, and the audit log records only ids, not note text.

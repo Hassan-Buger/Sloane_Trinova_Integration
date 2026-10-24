@@ -13,11 +13,11 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c9a66b'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='700' text-anchor='middle' fill='%23080b10' font-family='Arial,sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.10.2">
-  <link rel="stylesheet" href="styles/layout.css?v=2.10.2">
-  <link rel="stylesheet" href="styles/components.css?v=2.10.2">
-  <link rel="stylesheet" href="styles/views.css?v=2.10.2">
-  <link rel="stylesheet" href="styles/auth.css?v=2.10.2">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.11.0">
+  <link rel="stylesheet" href="styles/layout.css?v=2.11.0">
+  <link rel="stylesheet" href="styles/components.css?v=2.11.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.11.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.11.0">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -40,7 +40,7 @@
       <div class="auth-card">
         <header class="auth-card-header">
           <h1 id="authTitle">Sign in to Sloane</h1>
-          <p>Welcome back. Sign in to see your deadlines, clients, team tasks and private notes.</p>
+          <p id="authIntro">Welcome back. Sign in to see your deadlines, clients, team tasks and private notes.</p>
         </header>
 
         <!-- Alert Notification -->
@@ -61,7 +61,7 @@
                 <rect x="3" y="5" width="18" height="14" rx="2.5"></rect>
                 <path d="m4 7 8 6 8-6"></path>
               </svg>
-              <input class="auth-input" id="loginEmail" type="email" name="email" placeholder="Corporate email address" required autocomplete="email" spellcheck="false">
+              <input class="auth-input" id="loginEmail" type="email" name="username" placeholder="Corporate email address" required autocomplete="username" spellcheck="false">
             </div>
           </div>
 
@@ -107,6 +107,41 @@
             </svg>
             <span class="auth-spinner" aria-hidden="true"></span>
           </button>
+        </form>
+
+        <!-- Step 2 (only when two-step sign-in is on): the code from the authenticator app -->
+        <form class="auth-form" id="codeForm" hidden novalidate>
+          <div class="auth-field">
+            <label for="loginCode" id="loginCodeLabel">6-digit code from your authenticator app</label>
+            <div class="auth-input-wrap">
+              <svg class="auth-input-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="2.5" width="12" height="19" rx="2.5"></rect>
+                <path d="M11 18.5h2"></path>
+              </svg>
+              <input class="auth-input auth-code-input" id="loginCode" type="text" name="one-time-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="auth-options">
+            <label class="auth-checkbox-label">
+              <input type="checkbox" id="trustBrowser">
+              <span>Trust this browser for 30 days (do not ask for a code here again)</span>
+            </label>
+          </div>
+
+          <button class="auth-submit" type="submit" id="btnCodeSubmit">
+            <span class="auth-submit-label">Verify and sign in</span>
+            <svg class="auth-submit-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"></path>
+              <path d="m14 7 5 5-5 5"></path>
+            </svg>
+            <span class="auth-spinner" aria-hidden="true"></span>
+          </button>
+
+          <div class="auth-code-links">
+            <a href="javascript:void(0)" id="useRecoveryLink">Lost your phone? Use a recovery code</a>
+            <a href="javascript:void(0)" id="backToPasswordLink">Back</a>
+          </div>
         </form>
 
         <div class="auth-trust">
@@ -881,6 +916,10 @@
             <!-- Populated dynamically: where data is saved, what is connected -->
           </div>
 
+          <div class="card" id="securityCard">
+            <!-- Filled in by scripts/features/security.js -->
+          </div>
+
           <div class="card" id="yourDataCard">
             <div class="card-header"><h2>Your data</h2></div>
             <p class="card-help">Download a copy of everything kept in Sloane as one Excel file: clients, deadlines, VAT returns, tasks, team, notes, history, documents list, signing requests, your private notes and the Bin. Keep it somewhere safe, because it holds client information.</p>
@@ -1389,6 +1428,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.10.2"></script>
+  <script type="module" src="scripts/app.js?v=2.11.0"></script>
 </body>
 </html>

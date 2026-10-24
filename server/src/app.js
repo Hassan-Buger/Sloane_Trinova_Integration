@@ -16,6 +16,7 @@ import { registerTrinovaRoutes } from './routes/trinova.js';
 import { registerBinRoutes } from './routes/bin.js';
 import { registerExportRoutes } from './routes/exportData.js';
 import { registerReportRoutes } from './routes/reports.js';
+import { registerTwoFactorRoutes } from './routes/twoFactor.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -503,6 +504,9 @@ export function createApp(options = {}) {
 
   // --- Mount Section 1.1 Auth Routes ---
   registerAuthRoutes(app, { authenticate, requireScope });
+
+  // Two-step sign-in settings (authenticator app, recovery codes, trusted browsers)
+  registerTwoFactorRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 02 Client & Company Read Routes ---
   registerClientRoutes(app, { authenticate, requireScope });

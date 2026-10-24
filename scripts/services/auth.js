@@ -119,6 +119,52 @@ export const AuthService = {
       throw new Error(result.error?.message || 'Invalid email or password.');
     }
 
+    // Two-step sign-in is on and this browser is not trusted: the code is needed next
+    if (result.status === 'two_factor_required') {
+      return { twoFactorRequired: true, challengeId: result.challengeId, message: result.message };
+    }
+
+    return this.finishSignIn(result, { email: cleanEmail, remember });
+  },
+
+  /**
+   * Second step: the 6-digit code (or a recovery code). `trustBrowser` asks the server to
+   * remember this browser for 30 days.
+   */
+  async verifyCode({ challengeId, code, trustBrowser = false, email, remember = true }) {
+    const clean = String(code || '').trim();
+    if (!clean) throw new Error('Please type the code from your authenticator app.');
+    const response = await fetch('/api/v1/auth/login/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId, code: clean, trustBrowser: Boolean(trustBrowser) }),
+      credentials: 'same-origin'
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      const err = new Error(result.error?.message || 'That code is not right.');
+      err.expired = result.error?.code === 'CHALLENGE_EXPIRED';
+      throw err;
+    }
+    return this.finishSignIn(result, { email: (email || '').trim().toLowerCase(), remember });
+  },
+
+  /**
+   * Asks the browser to save the email and password in its password manager (Chrome and Edge
+   * offer "Save password?"). Other browsers offer it themselves from the form.
+   */
+  async offerToSavePassword({ email, password, name }) {
+    try {
+      if (typeof window !== 'undefined' && window.PasswordCredential && navigator.credentials && email && password) {
+        await navigator.credentials.store(new window.PasswordCredential({ id: email, password, name: name || email }));
+      }
+    } catch (_) {
+      // Saving is up to the browser and the person; signing in works either way
+    }
+  },
+
+  /** Records a successful sign-in in this browser. */
+  finishSignIn(result, { email: cleanEmail, remember }) {
     this._serverVerified = true;
 
     const user = result.user || {

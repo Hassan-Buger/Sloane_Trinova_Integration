@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { logger } from './middleware/sanitizer.js';
 import { persistence } from './data/persistence.js';
 import { clearExpired, BIN_DAYS } from './services/bin.js';
+import { resetAll as resetTwoFactor } from './services/twoFactor.js';
 
 /**
  * Validates required environment variables on startup.
@@ -63,6 +64,14 @@ if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
       }
     } catch (err) {
       logger.error(`Could not open the database: ${err.message}. Sloane will start, but nothing will be saved.`);
+    }
+
+    // Emergency switch for the developer: TWO_FACTOR_RESET=true turns two-step sign-in off
+    // (for when the owner has lost both the phone and the recovery codes). Remove it afterwards.
+    if (String(process.env.TWO_FACTOR_RESET || '').toLowerCase() === 'true') {
+      const n = resetTwoFactor();
+      persistence.scheduleFlush();
+      logger.warn(`TWO_FACTOR_RESET is set: two-step sign-in was turned off for ${n} account(s). Remove TWO_FACTOR_RESET now.`);
     }
 
     if (!config.trinova.apiKey) {
