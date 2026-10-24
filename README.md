@@ -158,6 +158,10 @@ On a redeploy Railway stops the old copy with `SIGTERM`; Sloane finishes saving 
 
 Every change goes through server validation, answers with plain-English 400 / 404 / 409 / 422 messages, and writes an entry to the audit log (`GET /api/v1/audit/logs`).
 
+### Download a copy of everything (Excel)
+
+Settings → **Your data** → **Download a copy of everything (Excel)** (`GET /api/v1/export/excel`, signed-in owner only) gives one `.xlsx` file with a sheet for each kind of record: About this file, Clients (Sloane and TriNova), Deadlines, VAT returns, Tasks, Team, Businesses, Client notes, Documents (a list; the files themselves stay in Sloane), History, Signing requests, Private notes and the Bin. Dates are real Excel dates (dd/mm/yyyy), headers are bold and frozen, and text is never written as a formula. The file is written by `server/src/services/xlsx.js` (no extra libraries).
+
 ### The Bin (30 days)
 
 Every delete above moves what it removes into the **Bin** (menu → Bin) instead of deleting it. One delete is one Bin item: a client comes back with its tasks, notes, documents and history. From the Bin the owner can **Put back** an item (it returns where it was) or **Delete for good**; **Empty the Bin** deletes everything in it. Items older than 30 days are deleted for good automatically (checked at start-up and every 6 hours). Uploaded files are only removed when their item is deleted for good. The Bin is saved like everything else (collection `bin`) and needs a signed-in browser session (it can hold private notes). Routes: `GET /api/v1/bin`, `POST /api/v1/bin/:id/restore`, `DELETE /api/v1/bin/:id`, `DELETE /api/v1/bin`.

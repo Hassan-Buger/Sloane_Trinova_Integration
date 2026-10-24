@@ -44,8 +44,9 @@ describe('Unit 40: Front-end controls', () => {
       const c = await import('../../scripts/features/clientDetail.js');
       const p = await import('../../scripts/features/privateNotes.js');
       const b = await import('../../scripts/features/bin.js');
-      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods);
-      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS]);
+      const x = await import('../../scripts/features/dataExport.js');
+      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods, x.dataExportMethods);
+      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS, ...x.DATA_EXPORT_ACTIONS]);
       assert.ok(Object.keys(mixins).length > 40);
     });
 

@@ -1114,6 +1114,25 @@ export const ApiService = {
     return { status: 'success' };
   },
 
+  /**
+   * "Download a copy of everything": the Excel file, as a Blob, with the name the server gave it.
+   * Throws a plain-English error if it could not be made (for example after signing out).
+   */
+  async downloadEverything() {
+    const base = (typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file:'))
+      ? `${window.location.origin}/api/v1` : this.config.baseUrl;
+    const res = await fetch(`${base}/export/excel`, { credentials: 'same-origin', headers: { 'X-Requested-With': 'sloane' } });
+    if (!res.ok) {
+      let message = 'Sloane could not make the file just now. Please try again.';
+      try { message = (await res.json())?.error?.message || message; } catch (_) { /* not JSON */ }
+      if (res.status === 401) message = 'You have been signed out. Please sign in again, then download your copy.';
+      throw new Error(message);
+    }
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { blob: await res.blob(), filename: match ? match[1] : 'sloane-copy.xlsx' };
+  },
+
   /* The Bin: deleted items kept for 30 days */
 
   async getBin() {

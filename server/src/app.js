@@ -14,6 +14,7 @@ import { registerClientRoutes } from './routes/clients.js';
 import { registerStatutoryRoutes } from './routes/statutory.js';
 import { registerTrinovaRoutes } from './routes/trinova.js';
 import { registerBinRoutes } from './routes/bin.js';
+import { registerExportRoutes } from './routes/exportData.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -522,6 +523,9 @@ export function createApp(options = {}) {
 
   // The Bin: deleted items kept for 30 days
   registerBinRoutes(app, { authenticate, requireScope });
+
+  // "Download a copy of everything" (Excel)
+  registerExportRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });
