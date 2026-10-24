@@ -12,7 +12,7 @@ import { ModalManager } from './components/modal.js';
 import { Toast } from './components/toast.js';
 import { OutlookSettings } from './components/outlookSettings.js';
 import { FormModal, ConfirmDialog } from './components/formModal.js';
-import { escapeHtml, sanitizeId } from './utils/html.js';
+import { escapeHtml, sanitizeId, ukPartOfDay } from './utils/html.js';
 import { teamTaskMethods, TEAM_TASK_ACTIONS } from './features/teamTasks.js';
 import { deadlineMethods, DEADLINE_ACTIONS } from './features/deadlines.js';
 import { clientDetailMethods, CLIENT_DETAIL_ACTIONS } from './features/clientDetail.js';
@@ -185,13 +185,20 @@ class SloaneApp {
     const nameEls = document.querySelectorAll('#sidebarUserName, .profile-name');
     nameEls.forEach(el => { el.textContent = user.name || 'Kirsty Allen'; });
 
-    const greetingEl = document.querySelector('.greeting-block h1');
-    if (greetingEl) {
-      const firstName = (user.name || 'Kirsty').split(' ')[0];
-      const hour = new Date().getHours();
-      const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
-      greetingEl.textContent = `Good ${timeOfDay}, ${firstName}`;
+    this.updateGreeting();
+    // Keep it right if the page stays open past noon or 5pm
+    if (!this.greetingTimer) {
+      this.greetingTimer = setInterval(() => this.updateGreeting(), 60 * 1000);
     }
+  }
+
+  /** "Good morning / afternoon / evening, Kirsty", by UK time (Kirsty is in the UK). */
+  updateGreeting() {
+    const greetingEl = document.querySelector('.greeting-block h1');
+    if (!greetingEl) return;
+    const user = AuthService.getUser() || {};
+    const firstName = (user.name || 'Kirsty').split(' ')[0];
+    greetingEl.textContent = `Good ${ukPartOfDay()}, ${firstName}`;
   }
 
   bindAuthEvents() {

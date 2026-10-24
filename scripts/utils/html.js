@@ -43,6 +43,23 @@ export function todayIso() {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
+/**
+ * The hour in the UK (0-23), whatever time zone this computer is in. Kirsty is in the UK, so the
+ * greeting follows her clock, not the clock of whoever is looking at Sloane.
+ */
+export function ukHour(date = new Date()) {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/London' }).format(date));
+  return Number.isNaN(h) ? date.getHours() : h;
+}
+
+/** "morning" (5:00-11:59), "afternoon" (12:00-16:59) or "evening" (17:00-4:59), UK time. */
+export function ukPartOfDay(date = new Date()) {
+  const h = ukHour(date);
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 17) return 'afternoon';
+  return 'evening';
+}
+
 /** "3 days late", "due today", "due in 5 days" for a YYYY-MM-DD date. */
 export function describeDue(value) {
   if (!value) return 'No due date';

@@ -14,6 +14,7 @@ import { clientDirectory } from '../services/clientDirectory.js';
 import { buildDeadlineList } from './statutory.js';
 import { claudeService } from '../services/ai/claudeService.js';
 import { config } from '../config.js';
+import { ukPartOfDay } from '../services/ukTime.js';
 
 // Simple sliding window in-memory rate limiter (Section 38)
 const rateLimitMap = new Map();
@@ -225,8 +226,8 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
       const briefing = {
         date: new Date().toISOString().split('T')[0],
         summary: nothingYet
-          ? 'Good morning, Kirsty. There is nothing to report yet: no clients, deadlines or tasks are saved in Sloane.'
-          : `Good morning, Kirsty. ${plural(redFilings.length, 'filing is', 'filings are')} RED and ${plural(stuckTasks.length, 'task is', 'tasks are')} stuck, across ${plural(clientCount, 'client', 'clients')}.`,
+          ? `Good ${ukPartOfDay()}, Kirsty. There is nothing to report yet: no clients, deadlines or tasks are saved in Sloane.`
+          : `Good ${ukPartOfDay()}, Kirsty. ${plural(redFilings.length, 'filing is', 'filings are')} RED and ${plural(stuckTasks.length, 'task is', 'tasks are')} stuck, across ${plural(clientCount, 'client', 'clients')}.`,
         priorities: [
           ...redFilings.slice(0, 3).map(d => `${d.name}: ${d.urgencyReason}`),
           ...stuckTasks.slice(0, 3).map(t => `Unblock "${t.title}"${t.blocker ? ` (${t.blocker})` : ''}`)
