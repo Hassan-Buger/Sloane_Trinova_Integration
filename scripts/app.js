@@ -789,8 +789,15 @@ class SloaneApp {
         const auth = await ApiService.verifyAuth();
         this.updateConfigModalTelemetry(health, auth);
         this.logToTrinovaConsole(`Result: Health=${health.ok ? 'OK' : 'FAIL'}, Database=${health.database || 'n/a'}, Actor=${auth.actor || 'none'}, Scopes=${(auth.scopes || []).join(',')}`);
-        Toast.info(health.ok ? 'TriNova is connected.' : 'Sloane cannot reach TriNova right now.');
+        // This button only checks Sloane's own server; "Check TriNova data" checks TriNova itself.
+        Toast.info(health.ok ? 'Sloane\'s server is working. Press "Check TriNova data" to test TriNova itself.' : 'Sloane\'s server is not answering right now.');
       });
+    }
+
+    // Diagnostic Tool: what TriNova sends (field names only, no client data)
+    const checkDataBtn = document.getElementById('btnCheckTrinovaData');
+    if (checkDataBtn) {
+      checkDataBtn.addEventListener('click', () => this.handleCheckTrinovaData(checkDataBtn));
     }
 
     // Diagnostic Tool: Force Sync Clients
@@ -822,9 +829,59 @@ class SloaneApp {
     const syncStatutoryBtn = document.getElementById('btnForceSyncStatutory');
     if (syncStatutoryBtn) {
       syncStatutoryBtn.addEventListener('click', async () => {
+        const fresh = await ApiService.getStatutory({ refresh: '1' });
+        const m = fresh.meta || {};
+        this.logToTrinovaConsole(`Deadlines refreshed: ${(fresh.data || []).length} shown, ${m.trinovaDeadlineCount || 0} from TriNova (TriNova deadlines: ${m.trinovaDeadlinesStatus || 'unknown'}).`);
         this.logToTrinovaConsole('Executing POST /api/v1/statutory/sync...');
         await this.handleSyncCompaniesHouse();
       });
+    }
+  }
+
+  /** Runs the TriNova data check on the server and downloads its report (field names only). */
+  async handleCheckTrinovaData(btn) {
+    if (btn) btn.disabled = true;
+    this.logToTrinovaConsole('Asking TriNova each question Sloane relies on. This can take up to a minute...');
+    try {
+      const result = await ApiService.checkTrinovaData();
+      if (!result.configured) {
+        this.logToTrinovaConsole(result.message || 'TriNova is not set up yet.');
+        Toast.error(result.message || 'TriNova is not set up yet.');
+        return;
+      }
+      // One block, so the lines read top to bottom (the panel shows the newest entry first)
+      this.logToTrinovaConsole(`TriNova data check:\n${(result.lines || []).join('\n')}`);
+
+      const summary = result.report?.summary || {};
+      this.downloadJson(result.report, `trinova-data-check-${new Date().toISOString().slice(0, 10)}.json`);
+      this.logToTrinovaConsole('The full report (field names only, no client data) has been downloaded. You can send it to your developer.');
+      if (summary.keyAccepted === false) {
+        Toast.error('TriNova did not accept the key. See "What happened" below.');
+      } else {
+        Toast.success(`Check finished: ${summary.stepsOk || 0} of ${summary.stepsTotal || 0} questions answered. The report has been downloaded.`);
+      }
+    } catch (err) {
+      this.logToTrinovaConsole(`The check could not run: ${err.message}`);
+      Toast.error(err.message || 'The check could not run just now.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /** Saves an object as a .json file in the browser's downloads. */
+  downloadJson(obj, filename) {
+    try {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (_) {
+      // The lines in "What happened" still show the result.
     }
   }
 

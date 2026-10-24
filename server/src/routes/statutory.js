@@ -4,7 +4,8 @@
  * Where the deadline list comes from, in this order (the first one found for a company wins):
  *  1. Dates the owner typed in (or changed) on the Deadlines page.
  *  2. The company details of clients added in Sloane.
- *  3. The live TriNova client records (accounts due, yearly update due).
+ *  3. TriNova's deadlines feed (GET /statutory on the TriNova portal).
+ *  4. The live TriNova client records (accounts due, yearly update due).
  * Companies House can then confirm or correct each date (POST /statutory/sync).
  *
  * Adheres to:
@@ -16,6 +17,7 @@ import { mockDb, sampleDataEnabled } from '../data/db.js';
 import { companiesHouseService } from '../services/companiesHouse.js';
 import { StatutoryReconciliationEngine } from '../services/reconciliation.js';
 import { clientDirectory } from '../services/clientDirectory.js';
+import { trinovaDeadlines } from '../services/trinovaDeadlines.js';
 import { sendError, newId, isIsoDate, cleanText } from './helpers.js';
 
 const VAT_STATUSES = ['Not started', 'In progress', 'Filed'];
@@ -64,8 +66,32 @@ function collectRows() {
     });
   }
 
-  // 3. Live TriNova clients, only when they carry at least one date
-  for (const c of clientDirectory.trinovaClients()) {
+  // 3. TriNova's deadlines feed. A date missing there is filled in from the TriNova client record.
+  const trinovaClients = clientDirectory.trinovaClients();
+  for (const d of trinovaDeadlines.rows()) {
+    const client = (d.clientId && clientDirectory.find(d.clientId)) ||
+      (d.companyNumber && trinovaClients.find(c => cleanText(c.companyNumber).toUpperCase() === d.companyNumber)) || null;
+    const key = numberKey(d.companyNumber) || (client ? `client:${client.id}` : `trinova:${(d.name || '').toLowerCase()}`);
+    if (rows.has(key)) continue;
+    rows.set(key, {
+      key,
+      origin: 'trinova',
+      recordId: null,
+      clientId: client ? client.id : null,
+      record: {
+        companyNumber: d.companyNumber || (client && client.companyNumber) || '',
+        name: d.name || (client && client.name) || d.companyNumber || 'Unnamed company',
+        yearEnd: d.yearEnd || (client && client.yearEnd) || null,
+        accountsDueDate: d.accountsDueDate || (client && client.accountsDueDate) || null,
+        confirmationDueDate: d.confirmationDueDate || (client && client.confirmationDueDate) || null,
+        status: 'Active',
+        notes: ''
+      }
+    });
+  }
+
+  // 4. Live TriNova clients, only when they carry at least one date
+  for (const c of trinovaClients) {
     const key = numberKey(c.companyNumber) || `client:${c.id}`;
     if (rows.has(key)) continue;
     if (!c.accountsDueDate && !c.confirmationDueDate) continue;
@@ -172,7 +198,8 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
     req.auditAction = 'statutory_list_read';
     req.resourceType = 'statutory';
 
-    await clientDirectory.refresh();
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    await Promise.all([clientDirectory.refresh({ force }), trinovaDeadlines.refresh({ force })]);
 
     const reconciledList = buildDeadlineList(chService);
 
@@ -218,6 +245,9 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
         // 'sample' only while the built-in example records are switched on
         dataSource: sampleDataEnabled() ? 'sample' : 'live',
         trinovaStatus: trinovaStatus(),
+        // TriNova's own deadlines feed: ok | not_available | unreachable | not_configured | not_checked
+        trinovaDeadlinesStatus: trinovaDeadlines.status(),
+        trinovaDeadlineCount: reconciledList.filter(i => i.origin === 'trinova').length,
         asOf: new Date().toISOString()
       }
     });
@@ -376,7 +406,7 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
     if (Array.isArray(req.body?.companyNumbers) && req.body.companyNumbers.length > 0) {
       targets = req.body.companyNumbers;
     } else {
-      await clientDirectory.refresh();
+      await Promise.all([clientDirectory.refresh(), trinovaDeadlines.refresh()]);
       targets = Array.from(new Set(collectRows().map(r => r.record.companyNumber).filter(Boolean)));
     }
 

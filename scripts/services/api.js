@@ -535,6 +535,15 @@ export const ApiService = {
   },
 
   /**
+   * "Check TriNova data": the server asks TriNova its questions and returns the shape of each
+   * answer (field names only, no client data). The TriNova key stays on the server.
+   */
+  async checkTrinovaData() {
+    const res = await this.request('/integrations/trinova/check', { timeout: 90000 });
+    return res.data || {};
+  },
+
+  /**
    * Asks the server to check companies against the real Companies House register.
    * POST /api/v1/statutory/sync. With no company numbers, the server checks every
    * company it knows about. The result is exactly what the server reports.

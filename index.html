@@ -13,11 +13,11 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c9a66b'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='700' text-anchor='middle' fill='%23080b10' font-family='Arial,sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.6.2">
-  <link rel="stylesheet" href="styles/layout.css?v=2.6.2">
-  <link rel="stylesheet" href="styles/components.css?v=2.6.2">
-  <link rel="stylesheet" href="styles/views.css?v=2.6.2">
-  <link rel="stylesheet" href="styles/auth.css?v=2.6.2">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.7.0">
+  <link rel="stylesheet" href="styles/layout.css?v=2.7.0">
+  <link rel="stylesheet" href="styles/components.css?v=2.7.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.7.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.7.0">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -1138,13 +1138,16 @@
             <button type="button" class="card-action-btn" id="btnForceSyncStatutory">
               ⚖️ Refresh deadlines now
             </button>
+            <button type="button" class="card-action-btn" id="btnCheckTrinovaData" title="Asks TriNova each question Sloane relies on and downloads a report of field names only, with no client data">
+              🔎 Check TriNova data
+            </button>
           </div>
         </div>
 
         <!-- Realtime Output Console -->
         <div>
           <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;">What happened</label>
-          <pre id="trinovaConsoleOutput" style="background: #0d1117; color: #58a6ff; font-family: var(--font-mono); font-size: 10.5px; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.08); max-height: 120px; overflow-y: auto; white-space: pre-wrap; margin: 0;">Ready. Press a button above to test the connection.</pre>
+          <pre id="trinovaConsoleOutput" style="background: #0d1117; color: #58a6ff; font-family: var(--font-mono); font-size: 10.5px; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.08); max-height: 200px; overflow-y: auto; white-space: pre-wrap; margin: 0;">Ready. Press a button above to test the connection.</pre>
         </div>
 
       </div>
@@ -1335,6 +1338,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.6.2"></script>
+  <script type="module" src="scripts/app.js?v=2.7.0"></script>
 </body>
 </html>

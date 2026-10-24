@@ -12,6 +12,7 @@ import { auditMiddleware, auditStore } from './middleware/audit.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerClientRoutes } from './routes/clients.js';
 import { registerStatutoryRoutes } from './routes/statutory.js';
+import { registerTrinovaRoutes } from './routes/trinova.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -514,6 +515,9 @@ export function createApp(options = {}) {
 
   // --- Mount Unit 03 Companies House & Statutory Reconciliation Routes ---
   registerStatutoryRoutes(app, { authenticate, requireScope }, options.chService);
+
+  // TriNova connection tools: the "Check TriNova data" button
+  registerTrinovaRoutes(app, { authenticate, requireScope }, options);
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });

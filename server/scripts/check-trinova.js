@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { shape } from './lib/describeShape.js';
+import { runTrinovaCheck } from '../src/services/trinovaCheck.js';
 
 const BASE = (process.env.TRINOVA_API_URL || 'https://portal.trinovaaccounting.co.uk/api/v1').trim().replace(/\/+$/, '');
 const KEY = (process.env.TRINOVA_API_KEY || '').trim();
@@ -44,45 +44,8 @@ async function get(pathAndQuery, { auth = true } = {}) {
   }
 }
 
-const report = { checkedAt: new Date().toISOString(), base: BASE, steps: [] };
-
-async function step(name, pathAndQuery, options) {
-  const r = await get(pathAndQuery, options);
-  const entry = { name, path: pathAndQuery, httpStatus: r.status, ok: r.ok };
-  if (r.error) entry.problem = r.error;
-  if (r.json) {
-    entry.topLevelKeys = Object.keys(r.json);
-    if (r.json.error) entry.error = { code: r.json.error.code, message: r.json.error.message };
-    entry.shape = shape(r.json);
-  }
-  report.steps.push(entry);
-  const mark = r.ok ? 'OK ' : 'FAIL';
-  console.log(`${mark} ${String(r.status).padEnd(4)} ${name}  (${pathAndQuery})${r.error ? `  ${r.error}` : ''}${r.json?.error ? `  ${r.json.error.message}` : ''}`);
-  return r;
-}
-
 console.log(`Checking TriNova at ${BASE}\n`);
-await step('Is TriNova up? (no key needed)', '/health', { auth: false });
-const who = await step('Is the key accepted?', '/auth/verify');
-
-if (who.status === 401) {
-  console.log('\nTriNova refused the key. It is missing, wrong, expired or revoked. Ask TriNova for a new one.');
-} else {
-  const clients = await step('Clients (first 2)', '/clients?per_page=2&page=1');
-  await step('Clients, second page (does paging work?)', '/clients?per_page=2&page=2');
-  await step('Deadlines feed', '/statutory');
-
-  const first = Array.isArray(clients.json?.data) ? clients.json.data[0] : null;
-  const companyId = first && ((first.companies && first.companies[0] && first.companies[0].id) || first.company_id || first.id);
-  if (companyId !== undefined && companyId !== null) {
-    const id = encodeURIComponent(String(companyId));
-    await step('One company', `/companies/${id}`);
-    await step('A company\'s documents', `/companies/${id}/documents`);
-    await step('A company\'s signing requests', `/companies/${id}/signing-requests`);
-  } else {
-    console.log('\n(No client came back, so the single-company checks were skipped.)');
-  }
-}
+const report = await runTrinovaCheck({ get, base: BASE, log: line => console.log(line) });
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data-private');
 fs.mkdirSync(dir, { recursive: true });

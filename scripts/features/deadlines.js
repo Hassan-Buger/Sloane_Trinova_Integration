@@ -45,6 +45,7 @@ export const deadlineMethods = {
       if (loadError) msg = `Sloane could not load your deadlines just now: ${loadError}`;
       else if (meta.trinovaStatus === 'not_configured') msg = 'Sloane has not been given TriNova\'s access key, so it cannot read dates from your TriNova clients. You can still add your own dates below.';
       else if (meta.trinovaStatus === 'unreachable') msg = 'Sloane could not reach TriNova just now, so dates from TriNova clients may be missing.';
+      else if (meta.trinovaDeadlinesStatus === 'unreachable') msg = 'Sloane could not read TriNova\'s list of deadlines just now, so some TriNova dates may be missing.';
       noteEl.style.display = msg ? 'flex' : 'none';
       const span = noteEl.querySelector('span:last-child');
       if (span) span.textContent = msg;

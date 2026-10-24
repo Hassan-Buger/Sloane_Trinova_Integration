@@ -113,6 +113,12 @@ See `server/.env.example` for a copy-and-fill template.
 
 `node server/scripts/check-trinova.js` (with `TRINOVA_API_KEY` set in your own terminal) checks that TriNova is up and accepts the key, then saves the **shape** of what TriNova returns (field names and kinds of value, never client data) to `server/data-private/trinova-shape.json`. The live API is `https://portal.trinovaaccounting.co.uk/api/v1`; it expects `Authorization: Bearer <key>`. The older `testnova-…railway.app` address no longer exists.
 
+The same check runs from inside Sloane, with the key kept on the server: open the **TriNova connection** panel and press **🔎 Check TriNova data**. The results show under "What happened" and the report downloads as `trinova-data-check-<date>.json` (field names and counts only). It also says how many rows of TriNova's deadlines feed Sloane can read.
+
+### Deadlines from TriNova
+
+Sloane reads TriNova's deadlines feed (`GET /statutory`) as well as the dates on each TriNova client, and keeps them for a minute. Order of precedence on the Deadlines page: your own dates, then clients added in Sloane, then TriNova's deadlines feed, then dates on TriNova client records. A date missing from the feed is filled in from the TriNova client record. The feed may list one row per company or one row per deadline (with a type such as "Annual accounts" or "Confirmation statement"); filed or completed deadlines are skipped. "Refresh deadlines now" in the panel reads TriNova again straight away. If TriNova has no deadlines feed, the panel reports it as `not_available` and the client dates are used.
+
 ---
 
 ## 4. Deploying on Railway
