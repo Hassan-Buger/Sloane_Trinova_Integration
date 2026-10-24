@@ -498,7 +498,7 @@ h1 {
 /* Mobile Devices (<= 768px) */
 @media (max-width: 768px) {
   main {
-    padding: 16px 14px 44px;
+    padding: 16px 16px 44px;
   }
 
   .top {
@@ -562,7 +562,7 @@ h1 {
 
 @media (max-width: 400px) {
   main {
-    padding: 12px 10px 36px;
+    padding: 14px 14px 36px;
   }
 
   h1 {

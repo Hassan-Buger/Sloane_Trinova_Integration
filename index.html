@@ -13,11 +13,11 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c9a66b'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='700' text-anchor='middle' fill='%23080b10' font-family='Arial,sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.7.0">
-  <link rel="stylesheet" href="styles/layout.css?v=2.7.0">
-  <link rel="stylesheet" href="styles/components.css?v=2.7.0">
-  <link rel="stylesheet" href="styles/views.css?v=2.7.0">
-  <link rel="stylesheet" href="styles/auth.css?v=2.7.0">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.7.1">
+  <link rel="stylesheet" href="styles/layout.css?v=2.7.1">
+  <link rel="stylesheet" href="styles/components.css?v=2.7.1">
+  <link rel="stylesheet" href="styles/views.css?v=2.7.1">
+  <link rel="stylesheet" href="styles/auth.css?v=2.7.1">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -570,28 +570,28 @@
 
         <!-- Tab 3: Statutory Detail -->
         <div class="client-tab-content hidden" id="clientTabContent-statutory">
-          <div class="card" style="padding: 20px;" id="clientStatutoryDetailCard">
+          <div class="card" id="clientStatutoryDetailCard">
             <!-- Dynamically Populated -->
           </div>
         </div>
 
         <!-- Tab 4: Documents -->
         <div class="client-tab-content hidden" id="clientTabContent-documents">
-          <div class="card" style="padding: 20px;" id="clientDocumentsDetailCard">
+          <div class="card" id="clientDocumentsDetailCard">
             <!-- Dynamically Populated -->
           </div>
         </div>
 
         <!-- Tab 5: Notes -->
         <div class="client-tab-content hidden" id="clientTabContent-notes">
-          <div class="card" style="padding: 20px;" id="clientNotesDetailCard">
+          <div class="card" id="clientNotesDetailCard">
             <!-- Dynamically Populated -->
           </div>
         </div>
 
         <!-- Tab 6: Tasks for this client -->
         <div class="client-tab-content hidden" id="clientTabContent-tasks">
-          <div class="card" style="padding: 20px;" id="clientTasksDetailCard">
+          <div class="card" id="clientTasksDetailCard">
             <!-- Dynamically Populated -->
           </div>
         </div>
@@ -832,12 +832,12 @@
           <!-- Alert Notification Banner -->
           <div id="outlookAlertBanner" style="display: none; margin-bottom: 16px;"></div>
 
-          <div class="card" id="systemStatusCard" style="padding: 22px; margin-bottom: 16px;">
+          <div class="card" id="systemStatusCard">
             <!-- Populated dynamically: where data is saved, what is connected -->
           </div>
 
           <!-- Outlook Integration Card per §4.1 -->
-          <div class="card" id="outlookSettingsCard" style="padding: 22px;">
+          <div class="card" id="outlookSettingsCard">
             <!-- Populated dynamically by OutlookSettings component post-session -->
           </div>
 
@@ -1338,6 +1338,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.7.0"></script>
+  <script type="module" src="scripts/app.js?v=2.7.1"></script>
 </body>
 </html>

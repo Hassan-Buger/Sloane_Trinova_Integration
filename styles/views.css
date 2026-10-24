@@ -1414,3 +1414,171 @@
 .status-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .status-text { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
 
+
+/* ==========================================================================
+   Spacing system
+   One rhythm for every page, so sections, grids and cards line up the same
+   way everywhere. The values live in tokens.css (--section-gap, --grid-gap,
+   --card-pad, --card-head-gap). Sections on a page are spaced by the page,
+   not by one-off margins on each block.
+   ========================================================================== */
+
+/* The header block (greeting + question box) sits one section-gap above the page */
+.top {
+  margin-bottom: var(--space-6);
+}
+
+/* Sections on a page: an even gap between each, whatever margins they carried before */
+.view:not(.hidden),
+.brain-wrapper,
+.settings-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+}
+
+.view > *,
+.brain-wrapper > *,
+.settings-wrapper > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  /* A wide table scrolls inside its own box instead of making the whole page wider */
+  min-width: 0;
+}
+
+.shell > main {
+  min-width: 0;
+}
+
+/* A small section title belongs to the table under it: close to its table, apart from the one above */
+.view > .stat-section-title {
+  margin-top: var(--space-2) !important;
+  margin-bottom: calc(var(--space-2) - var(--section-gap)) !important;
+}
+
+/* Grids of cards: one gap everywhere */
+.cmd-top-grid,
+.pulse-grid,
+.cmd-bottom-grid,
+.biz-grid,
+.intel-grid,
+.people-grid,
+.stat-radar-grid {
+  gap: var(--grid-gap);
+}
+
+.biz-grid {
+  margin-top: 0;
+}
+
+/* Cards: the same padding inside every card, and the same space under every card heading */
+.card {
+  padding: var(--card-pad);
+}
+
+.card.metric {
+  padding: var(--space-4) var(--card-pad);
+}
+
+.card-header {
+  gap: var(--space-3);
+  margin-bottom: var(--card-head-gap);
+}
+
+/* A heading and its button never touch, and a long heading wraps instead of pushing the button out */
+.card-header > :first-child {
+  min-width: 0;
+}
+
+.card-header > button,
+.card-header > .pill,
+.card-header > .btn {
+  flex-shrink: 0;
+}
+
+/* Banners and the box under the Deadlines numbers use the same inner spacing */
+.sourcebanner {
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+}
+
+/* Rows of buttons and chips: a steady gap, and they wrap rather than squeeze */
+.panel-manage-row,
+.ask-suggestions {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.panel-manage-row {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+}
+
+/* Desktop: the sidebar already shows the Sloane name, so the phone-style top bar is not needed */
+@media (min-width: 1101px) {
+  .mobile-nav-bar {
+    display: none !important;
+  }
+}
+
+/* Sidebar footer: the name gets the whole line; Sign out sits under it, full width */
+.profile {
+  flex-wrap: wrap;
+  row-gap: var(--space-3);
+}
+
+.profile > :first-child {
+  flex: 1 1 140px;
+}
+
+.profile .btn-lock-session {
+  flex: 1 0 100%;
+  justify-content: center;
+  padding: 6px 10px;
+}
+
+.profile .profile-info {
+  overflow: hidden;
+}
+
+.profile .profile-name,
+.profile .profile-role {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tablet and phone: a slightly tighter rhythm */
+@media (max-width: 1100px) {
+  :root {
+    --section-gap: 16px;
+    --grid-gap: 14px;
+  }
+
+  .top {
+    margin-bottom: var(--space-5);
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --card-pad: 16px;
+    --grid-gap: 12px;
+    --card-head-gap: 12px;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 400px) {
+  :root {
+    --card-pad: 14px;
+    --section-gap: 14px;
+  }
+
+  .card {
+    padding: var(--card-pad);
+  }
+}

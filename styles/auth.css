@@ -496,6 +496,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
   background: rgba(255, 93, 103, 0.1);
   border: 1px solid rgba(255, 93, 103, 0.3);
   color: #ff8b93;

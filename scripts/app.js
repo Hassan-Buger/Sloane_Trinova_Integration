@@ -1185,7 +1185,7 @@ class SloaneApp {
     const cmdBizGrid = document.getElementById('cmdBizCards');
     if (cmdBizGrid) {
       cmdBizGrid.innerHTML = (businesses || []).slice(0, 6).map(b => `
-        <div class="card" style="padding: 14px; cursor: pointer;" onclick="app.switchView('businesses')">
+        <div class="card" style="padding: var(--space-4); cursor: pointer;" onclick="app.switchView('businesses')">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span class="pill green" style="font-size: 10px;">${escapeHtml(b.status)}</span>
             <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${escapeHtml(b.clientCount)} ${Number(b.clientCount) === 1 ? 'client' : 'clients'}</span>
@@ -2463,7 +2463,7 @@ class SloaneApp {
     if (!card) return;
     const res = await ApiService.getSystemStatus();
     if (res.status !== 'success' || !res.data) {
-      card.innerHTML = `<div class="card-header"><h3>How Sloane is set up</h3></div><div class="table-empty" style="padding: 18px;">Sloane could not check its set-up just now.</div>`;
+      card.innerHTML = `<div class="card-header"><h2>How Sloane is set up</h2></div><div class="table-empty" style="padding: 18px;">Sloane could not check its set-up just now.</div>`;
       return;
     }
     const d = res.data;
@@ -2475,7 +2475,7 @@ class SloaneApp {
         <div><div class="status-title">${escapeHtml(title)}</div><div class="status-text">${escapeHtml(text)}</div></div>
       </div>`;
     card.innerHTML = `
-      <div class="card-header"><h3>How Sloane is set up</h3></div>
+      <div class="card-header"><h2>How Sloane is set up</h2></div>
       ${row(saved, saved ? 'Your information is saved' : 'Your information is NOT being saved',
         saved ? `Tasks, notes, documents, deadlines and clients you add are kept in ${kind}.${d.storage.lastSavedAt ? ` Last saved ${new Date(d.storage.lastSavedAt).toLocaleString('en-GB')}.` : ''}`
               : 'Sloane has no database to save to, so everything you add will disappear when it restarts. Ask your Sloane administrator to set one up.')}

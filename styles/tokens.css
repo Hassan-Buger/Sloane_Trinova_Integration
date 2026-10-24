@@ -44,6 +44,21 @@
   --radius-md: 10px;
   --radius-lg: 15px;
 
+  /* Spacing scale (use these instead of one-off numbers) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Page rhythm: the gap between sections on a page, between cards in a grid, and inside a card */
+  --section-gap: 20px;
+  --grid-gap: 16px;
+  --card-pad: 20px;
+  --card-head-gap: 16px;
+
   /* Transitions */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);

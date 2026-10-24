@@ -65,13 +65,13 @@ export const privateNoteMethods = {
     try {
       entries = (await ApiService.getPrivateNotes()).data || [];
     } catch (err) {
-      container.innerHTML = `<div class="card" style="text-align: center; color: var(--muted); padding: 30px;">Sloane could not open your private notes just now: ${escapeHtml(err.message)}</div>`;
+      container.innerHTML = `<div class="card" style="text-align: center; color: var(--muted); padding: var(--space-8) var(--card-pad);">Sloane could not open your private notes just now: ${escapeHtml(err.message)}</div>`;
       return;
     }
     this.privateNotes = entries;
 
     if (entries.length === 0) {
-      container.innerHTML = `<div class="card" style="text-align: center; color: var(--muted); padding: 30px;">No private notes yet. Write one in the box above.</div>`;
+      container.innerHTML = `<div class="card" style="text-align: center; color: var(--muted); padding: var(--space-8) var(--card-pad);">No private notes yet. Write one in the box above.</div>`;
       return;
     }
 
