@@ -252,6 +252,7 @@ export const ApiService = {
       if (filters.biz && filters.biz !== 'All') queryParams.set('type', filters.biz);
       if (filters.page) queryParams.set('page', filters.page);
       if (filters.perPage) queryParams.set('per_page', filters.perPage || '50');
+      if (filters.refresh) queryParams.set('refresh', '1');
 
       const endpoint = `/clients${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
       const res = await this.request(endpoint);

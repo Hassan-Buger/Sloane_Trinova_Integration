@@ -675,11 +675,13 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
     const doc = mockDb.documents[idx];
     // A document that has been sent for signing is part of that record: keep it.
+    // A cancelled or expired request no longer needs the document; any other one does.
     const inUse = (mockDb.signingRequests || []).find(r =>
-      r.documentId === doc.id || r.signedDocumentId === doc.id || r.auditCertificateId === doc.id);
+      (r.documentId === doc.id || r.signedDocumentId === doc.id || r.auditCertificateId === doc.id) &&
+      !['CANCELLED', 'EXPIRED'].includes(r.status));
     if (inUse) {
       return sendError(res, 409, 'DOCUMENT_IN_USE',
-        'This document is part of a signing request, so it cannot be deleted.');
+        'This document is part of a signing request that is still open, so it cannot be deleted. Cancel the request first.');
     }
 
     mockDb.documents.splice(idx, 1);

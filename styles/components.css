@@ -580,6 +580,7 @@ textarea.form-control {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -601,7 +602,7 @@ textarea.form-control {
   gap: 10px;
   min-width: 280px;
   max-width: 420px;
-  pointer-events: auto;
+  pointer-events: none; /* a message never blocks the button under it */
   animation: toastIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   transition: all 0.2s ease;
 }

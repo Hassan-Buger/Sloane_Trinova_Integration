@@ -533,6 +533,25 @@ h1 {
 }
 
 /* Very Small Mobile Viewports (<= 400px) */
+@media (max-width: 600px) {
+  /* The question box wraps: the question on its own line, then the choices under it */
+  .ask-form {
+    flex-wrap: wrap;
+    border-radius: 18px;
+    padding: 6px 8px 6px 12px;
+    gap: 6px;
+  }
+
+  .ask-input {
+    flex: 1 1 100%;
+    padding: 6px 0;
+  }
+
+  .ask-provider-select {
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 400px) {
   main {
     padding: 12px 10px 36px;

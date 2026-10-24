@@ -154,6 +154,23 @@ describe('Unit 37: Notes, documents, history and signing', () => {
       assert.match((await res.json()).error.message, /part of a signing request/);
     });
 
+    test('2.7b Once the signing request is cancelled, its document can be deleted (a still-open one cannot)', async () => {
+      const up = await call('POST', '/companies/tn-3001/documents/upload', { filename: 'Cancel then delete.pdf', contentBase64: b64('%PDF') }, keyed());
+      const doc = (await up.json()).data;
+      const sign = await call('POST', '/companies/tn-3001/signing-requests',
+        { documentId: doc.id, signers: [{ name: 'Sam Signer', email: 'sam@example.com' }] }, keyed());
+      const signId = (await sign.json()).data.id;
+
+      const blocked = await call('DELETE', `/documents/${doc.id}`);
+      assert.equal(blocked.status, 409);
+      assert.match((await blocked.json()).error.message, /still open.*Cancel the request first/);
+
+      assert.equal((await call('POST', `/signing-requests/${signId}/cancel`, {})).status, 200);
+      const allowed = await call('DELETE', `/documents/${doc.id}`);
+      assert.equal(allowed.status, 200);
+      assert.equal(mockDb.documents.some(d => d.id === doc.id), false);
+    });
+
     test('2.8 Otherwise it can be deleted, the stored file is removed, and deleting again is a plain 404', async () => {
       const up = await call('POST', '/companies/tn-3001/documents/upload',
         { filename: 'Temp.txt', content: 'temporary' }, keyed());

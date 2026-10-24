@@ -19,6 +19,20 @@ function stamp(value) {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/** The browser saved dates as "24/10/2026, 12:42:10" (day first). Turns that, or a real date, into an ISO date. */
+export function parseBrowserDate(value) {
+  if (!value || typeof value !== 'string') return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const t = Date.parse(value);
+    return Number.isNaN(t) ? null : new Date(t).toISOString();
+  }
+  const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return null;
+  const [, d, mo, y, h = '0', mi = '0', s = '0'] = m;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export const privateNoteMethods = {
   /** Moves notes saved only in this browser to the server (once), then clears the browser copy. */
   async migrateBrowserNotes() {
@@ -26,7 +40,7 @@ export const privateNoteMethods = {
     try { local = StorageService.getBrainEntries() || []; } catch (_) { local = []; }
     if (!local.length) return;
     try {
-      const notes = local.map(e => ({ id: e.id, text: e.text, createdAt: e.createdAt || null, editedAt: e.editedAt && !Number.isNaN(Date.parse(e.editedAt)) ? e.editedAt : null }));
+      const notes = local.map(e => ({ id: e.id, text: e.text, createdAt: e.createdAt || parseBrowserDate(e.at), editedAt: parseBrowserDate(e.editedAt) }));
       const res = await ApiService.importPrivateNotes(notes);
       StorageService.saveBrainEntries([]);
       if (res.data.imported > 0) {

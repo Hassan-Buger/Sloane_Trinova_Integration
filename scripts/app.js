@@ -377,6 +377,8 @@ class SloaneApp {
       btn.addEventListener('click', (e) => {
         const viewId = btn.getAttribute('data-view');
         if (viewId) this.switchView(viewId);
+        // The menu always opens the list of clients, not the last client's tab
+        if (viewId === 'clients') this.switchClientTab('overview');
       });
     });
 
@@ -768,15 +770,22 @@ class SloaneApp {
     const syncClientsBtn = document.getElementById('btnForceSyncClients');
     const syncTrinovaToolbarBtn = document.getElementById('clientSyncTrinovaBtn');
     const handleSyncClientsClick = async () => {
-      Toast.info('Fetching the latest clients from TriNova...');
-      this.logToTrinovaConsole('Executing GET /api/v1/clients against live TriNova...');
+      Toast.info('Asking TriNova for the latest clients...');
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('sloane_clients_v2');
       }
-      const res = await ApiService.getClients({ search: this.searchQuery, biz: this.selectedBizFilter });
+      const res = await ApiService.getClients({ search: this.searchQuery, biz: this.selectedBizFilter, refresh: true });
       await this.renderClients();
-      this.logToTrinovaConsole(`Client sync complete. Loaded ${res.data.length} records (Source: ${res.source}).`);
-      Toast.success(`Loaded ${res.data.length} client${res.data.length === 1 ? '' : 's'} (${res.source === 'trinova_live' ? 'from TriNova' : 'saved on this device'}).`);
+      const n = res.data.length;
+      const clients = `${n} client${n === 1 ? '' : 's'}`;
+      this.logToTrinovaConsole(`Refresh from TriNova: ${clients} shown (TriNova: ${res.trinovaStatus || 'unknown'}).`);
+      if (res.trinovaStatus === 'ok') {
+        Toast.success(`Up to date. ${clients} shown, from TriNova and Sloane.`);
+      } else if (res.trinovaStatus === 'not_configured') {
+        Toast.error(`TriNova is not set up yet, so only the ${clients} you added here are shown.`);
+      } else {
+        Toast.error(`Sloane could not reach TriNova just now. Showing ${clients} it already knew about.`);
+      }
     };
 
     if (syncClientsBtn) syncClientsBtn.addEventListener('click', handleSyncClientsClick);
@@ -1303,6 +1312,9 @@ class SloaneApp {
         badge.textContent = `Saved on this device (${clients.length})`;
       }
     }
+
+    const countMeta = document.getElementById('clientCountMeta');
+    if (countMeta) countMeta.textContent = `Showing ${clients.length} client${clients.length === 1 ? '' : 's'}`;
 
     const tbody = document.getElementById('clientTableBody');
     if (!tbody) return;
@@ -1914,7 +1926,7 @@ class SloaneApp {
 
       // Update badge
       const countBadge = document.getElementById('clientTimelineCountBadge');
-      if (countBadge) countBadge.textContent = `${events.length} events`;
+      if (countBadge) countBadge.textContent = `${events.length} ${events.length === 1 ? 'entry' : 'entries'}`;
 
       const connBadge = document.getElementById('timelineConnectionBadge');
       if (connBadge) {

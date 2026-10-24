@@ -216,6 +216,43 @@ describe('Unit 38: TriNova clients', () => {
     });
   });
 
+  describe('6. Search works without TriNova too, and Refresh really asks TriNova again', () => {
+    test('6.1 With no TriNova key, the search (q) and business filter (type) the page sends still narrow the list', async () => {
+      const mk = async (name, biz) => (await (await realFetch(`${baseUrl}/api/v1/clients`, { method: 'POST', headers: auth, body: JSON.stringify({ name, biz }) })).json()).data;
+      await mk('Search Apple Ltd', 'MTDflow');
+      await mk('Search Banana Ltd', 'CFI Awarding');
+      const list = async qs => (await (await realFetch(`${baseUrl}/api/v1/clients${qs}`, { headers: auth })).json()).data.map(c => c.name);
+      assert.deepEqual((await list('?q=apple')).filter(n => n.startsWith('Search')), ['Search Apple Ltd']);
+      const byType = await list('?type=CFI%20Awarding');
+      assert.ok(byType.includes('Search Banana Ltd'));
+      assert.ok(!byType.includes('Search Apple Ltd'));
+      const both = await list('?q=banana&type=CFI%20Awarding');
+      assert.deepEqual(both.filter(n => n.startsWith('Search')), ['Search Banana Ltd']);
+    });
+
+    test('6.2 "Refresh" (refresh=1) goes back to TriNova even when the list was read a moment ago', async () => {
+      process.env.TRINOVA_API_KEY = TRINOVA_KEY;
+      let calls = 0;
+      trinovaHandler = async () => { calls++; return json({ data: [{ id: `r${calls}`, name: `Read number ${calls}` }], pagination: { hasMore: false } }); };
+      await realFetch(`${baseUrl}/api/v1/clients`, { headers: auth });
+      await realFetch(`${baseUrl}/api/v1/clients`, { headers: auth });   // remembered: no new call
+      assert.equal(calls, 1);
+      const fresh = await (await realFetch(`${baseUrl}/api/v1/clients?refresh=1`, { headers: auth })).json();
+      assert.equal(calls, 2);
+      assert.ok(fresh.data.some(c => c.name === 'Read number 2'));
+    });
+
+    test('6.3 If a forced refresh fails, the answer says TriNova is unreachable', async () => {
+      process.env.TRINOVA_API_KEY = TRINOVA_KEY;
+      trinovaHandler = async () => json({ data: [{ id: 'k1', name: 'Known Client' }], pagination: { hasMore: false } });
+      await realFetch(`${baseUrl}/api/v1/clients?refresh=1`, { headers: auth });
+      trinovaHandler = async () => { throw new Error('connect ECONNREFUSED'); };
+      const body = await (await realFetch(`${baseUrl}/api/v1/clients?refresh=1`, { headers: auth })).json();
+      assert.equal(body.meta.trinovaStatus, 'unreachable');
+      assert.ok(body.data.some(c => c.name === 'Known Client'), 'still shows what it knew');
+    });
+  });
+
   describe('4. Reading the whole list (for deadlines)', () => {
     test('4.1 refresh() reads every page and remembers the clients', async () => {
       process.env.TRINOVA_API_KEY = TRINOVA_KEY;

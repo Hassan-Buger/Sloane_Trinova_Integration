@@ -149,11 +149,13 @@ function toPortalShape(client) {
 
 function sloaneAddedClients(req) {
   let added = (mockDb.clients || []).filter(c => c.addedInSloane);
-  if (req.query.biz && req.query.biz !== 'All') {
-    added = added.filter(c => c.businessArea === req.query.biz);
+  const biz = req.query.biz || req.query.type;
+  if (biz && biz !== 'All') {
+    added = added.filter(c => c.businessArea === biz);
   }
-  if (req.query.search) {
-    const q = String(req.query.search).toLowerCase();
+  const search = req.query.search || req.query.q;
+  if (search) {
+    const q = String(search).toLowerCase();
     added = added.filter(c => {
       const company = (mockDb.companies || []).find(comp => (c.companyIds || []).includes(comp.id)) || {};
       return c.name.toLowerCase().includes(q) || (company.companyNumber || '').includes(q);
@@ -205,7 +207,8 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
 
     // Read every client from TriNova (remembered for a minute), then search, filter and
     // page them here, so the Clients page and the pickers always see the whole list.
-    await clientDirectory.refresh();
+    // "Refresh from TriNova" asks for a fresh copy instead of the one remembered for a minute
+    await clientDirectory.refresh({ force: req.query.refresh === '1' });
     const live = clientDirectory.trinovaClients();
     if (live.length === 0 && clientDirectory.lastError) {
       return respondWithSloaneClientsOnly(req, res, 'unreachable');

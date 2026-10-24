@@ -181,6 +181,48 @@ describe('Unit 40: Front-end controls', () => {
     });
   });
 
+  describe('4b. Walkthrough fixes', () => {
+    test('4b.1 The menu always opens the list of clients (Overview), not the last client tab', () => {
+      assert.match(read('scripts/app.js'), /if \(viewId === 'clients'\) this\.switchClientTab\('overview'\);/);
+    });
+
+    test('4b.2 The page has an icon, so every load does not log a 404', () => {
+      assert.match(html, /<link rel="icon" href="data:image\/svg\+xml/);
+    });
+
+    test('4b.3 "Refresh from TriNova" forces a fresh read and tells the truth about the result', () => {
+      assert.match(api, /filters\.refresh/);
+      const app = read('scripts/app.js');
+      assert.match(app, /refresh: true/);
+      assert.match(app, /Sloane could not reach TriNova just now\. Showing/);
+      assert.match(app, /TriNova is not set up yet, so only the/);
+    });
+
+    test('4b.4 Counts read correctly: "1 entry" not "1 events", and the client count is live', () => {
+      assert.match(read('scripts/app.js'), /events\.length === 1 \? 'entry' : 'entries'/);
+      assert.doesNotMatch(html, /clientTimelineCountBadge[^>]*>Live</);
+      assert.match(read('scripts/app.js'), /clientCountMeta/);
+    });
+
+    test('4b.5 Notes moved from the browser keep their original dates', async () => {
+      const { parseBrowserDate } = await import('../../scripts/features/privateNotes.js');
+      const iso = parseBrowserDate('24/10/2026, 12:42:10');
+      assert.equal(new Date(iso).getDate(), 24);
+      assert.equal(new Date(iso).getMonth(), 9);           // October: day comes first
+      assert.equal(new Date(iso).getFullYear(), 2026);
+      assert.equal(new Date(iso).getHours(), 12);
+      assert.equal(parseBrowserDate('2026-03-04T10:00:00.000Z'), '2026-03-04T10:00:00.000Z');
+      assert.equal(parseBrowserDate('not a date'), null);
+      assert.equal(parseBrowserDate(undefined), null);
+      assert.match(read('scripts/features/privateNotes.js'), /createdAt: e\.createdAt \|\| parseBrowserDate\(e\.at\)/);
+    });
+
+    test('4b.6 On a phone the question box wraps and messages never block the button under them', () => {
+      assert.match(read('styles/layout.css'), /@media \(max-width: 600px\)[\s\S]*?\.ask-form[\s\S]*?flex-wrap: wrap/);
+      assert.match(read('styles/components.css'), /\.toast \{[\s\S]*?pointer-events: none/);
+    });
+  });
+
   describe('5. Every script is valid JavaScript', () => {
     for (const file of listScripts(path.join(rootDir, 'scripts'))) {
       test(`5.x ${path.relative(rootDir, file).replace(/\\/g, '/')}`, () => {
