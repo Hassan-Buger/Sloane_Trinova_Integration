@@ -6,6 +6,7 @@
 import { TimelineService } from '../services/timelineService.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { sendError } from './helpers.js';
+import { putInBin } from '../services/bin.js';
 
 export function registerTimelineRoutes(app, { authenticate, requireScope }) {
   // 1. Get Client Timeline
@@ -167,6 +168,13 @@ export function registerTimelineRoutes(app, { authenticate, requireScope }) {
 
     const result = TimelineService.deleteEvent(clientId, eventId);
     if (result.error) return sendError(res, 404, result.error[0], result.error[1]);
-    return res.status(200).json({ status: 'success', message: 'History entry deleted.', data: { id: eventId } });
+    const client = clientDirectory.find(clientId);
+    const entry = putInBin({
+      kind: 'history',
+      label: result.event.title || 'History entry',
+      where: (client && client.name) || '',
+      removed: [{ collection: 'timeline_events', index: result.index, record: result.event }]
+    });
+    return res.status(200).json({ status: 'success', message: 'History entry moved to the Bin. You can put it back from the Bin within 30 days.', data: { id: eventId, binId: entry.id } });
   });
 }

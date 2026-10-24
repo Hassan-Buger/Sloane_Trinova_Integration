@@ -737,7 +737,9 @@ export const COLLECTIONS = {
   timeline_events: { id: r => r.id },
   signingRequests: { id: r => r.id },
   ceoNotes: { id: r => r.id },
-  clientBusiness: { id: r => r.id }
+  clientBusiness: { id: r => r.id },
+  // Deleted items, kept for 30 days so they can be put back (see services/bin.js)
+  bin: { id: r => r.id }
 };
 
 /** Whether the built-in example records should be loaded (tests and explicit demo mode only). */

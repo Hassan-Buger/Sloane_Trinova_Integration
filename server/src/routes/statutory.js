@@ -19,6 +19,7 @@ import { StatutoryReconciliationEngine } from '../services/reconciliation.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { trinovaDeadlines } from '../services/trinovaDeadlines.js';
 import { sendError, newId, isIsoDate, cleanText } from './helpers.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 const VAT_STATUSES = ['Not started', 'In progress', 'Filed'];
 const DEADLINE_NOT_FOUND = 'We could not find that deadline. It may already have been removed.';
@@ -337,8 +338,10 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
 
     const idx = (mockDb.statutoryTracker || []).findIndex(r => r.id === req.params.id);
     if (idx === -1) return sendError(res, 404, 'NOT_FOUND', DEADLINE_NOT_FOUND);
-    const [removed] = mockDb.statutoryTracker.splice(idx, 1);
-    res.status(200).json({ status: 'success', message: `The saved deadline for "${removed.name}" has been removed.` });
+    const item = takeOut('statutoryTracker', idx);
+    const removed = item.record;
+    const entry = putInBin({ kind: 'deadline', label: removed.name || removed.companyNumber || 'Deadline', where: 'Deadlines', removed: [item] });
+    res.status(200).json({ status: 'success', message: `The saved deadline for "${removed.name}" has been moved to the Bin. You can put it back from the Bin within 30 days.`, data: { binId: entry.id } });
   });
 
   /**
@@ -527,7 +530,9 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
 
     const idx = (mockDb.vatReturns || []).findIndex(v => v.id === req.params.id);
     if (idx === -1) return sendError(res, 404, 'NOT_FOUND', VAT_NOT_FOUND);
-    mockDb.vatReturns.splice(idx, 1);
-    res.status(200).json({ status: 'success', message: 'VAT return removed.' });
+    const item = takeOut('vatReturns', idx);
+    const v = item.record;
+    const entry = putInBin({ kind: 'vat_return', label: `${v.clientName}${v.period ? ` (${v.period})` : ''}`, where: 'Deadlines', removed: [item] });
+    res.status(200).json({ status: 'success', message: 'VAT return moved to the Bin. You can put it back from the Bin within 30 days.', data: { binId: entry.id } });
   });
 }

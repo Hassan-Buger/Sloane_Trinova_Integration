@@ -315,13 +315,13 @@ export const clientDetailMethods = {
     const d = (this.clientDocs || []).find(x => x.id === docId);
     const ok = await ConfirmDialog.ask({
       title: 'Delete this document?',
-      message: `"${d ? d.filename : 'This document'}" and its file will be deleted for good.`,
+      message: `"${d ? d.filename : 'This document'}" will be deleted. It goes to the Bin, where you can put it back for 30 days.`,
       confirmLabel: 'Delete document'
     });
     if (!ok) return;
     try {
       await ApiService.deleteDocument(docId);
-      Toast.success('Document deleted.');
+      Toast.success('Document moved to the Bin.');
       await this.renderClientDocumentsDetail();
     } catch (err) {
       Toast.error(err.message || 'Could not delete that document.');
@@ -462,13 +462,13 @@ export const clientDetailMethods = {
     if (!client) return;
     const ok = await ConfirmDialog.ask({
       title: 'Delete this note?',
-      message: 'The note will be deleted for good.',
+      message: 'The note will be deleted. It goes to the Bin, where you can put it back for 30 days.',
       confirmLabel: 'Delete note'
     });
     if (!ok) return;
     try {
       await ApiService.deleteCompanyNote(this.companyRef(client), noteId);
-      Toast.success('Note deleted.');
+      Toast.success('Note moved to the Bin.');
       await this.renderClientNotesDetail();
     } catch (err) {
       Toast.error(err.message || 'Could not delete that note.');
@@ -504,13 +504,13 @@ export const clientDetailMethods = {
     const ev = (this.timelineEvents || []).find(e => e.id === eventId);
     const ok = await ConfirmDialog.ask({
       title: 'Delete this history entry?',
-      message: `"${ev ? ev.title : 'This entry'}" will be taken off this client's history.`,
+      message: `"${ev ? ev.title : 'This entry'}" will be taken off this client's history. It goes to the Bin, where you can put it back for 30 days.`,
       confirmLabel: 'Delete entry'
     });
     if (!ok) return;
     try {
       await ApiService.deleteTimelineEvent(this.activeClient360Id, eventId);
-      Toast.success('History entry deleted.');
+      Toast.success('History entry moved to the Bin.');
       await this.renderTimeline(this.activeClient360Id);
     } catch (err) {
       Toast.error(err.message || 'Could not delete that entry.');

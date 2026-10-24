@@ -257,13 +257,14 @@ export class TimelineService {
   }
 
   /**
-   * Remove an entry. Returns { event } or { error: [code, message] }.
+   * Remove an entry. Returns { event, index } or { error: [code, message] }.
+   * The caller puts it in the Bin.
    */
   static deleteEvent(clientId, eventId) {
     const idx = (mockDb.timeline_events || []).findIndex(e => e.clientId === clientId && e.id === eventId);
     if (idx === -1) return { error: ['EVENT_NOT_FOUND', 'We could not find that history entry. It may already have been deleted.'] };
     const [event] = mockDb.timeline_events.splice(idx, 1);
-    return { event };
+    return { event, index: idx };
   }
 
   /**

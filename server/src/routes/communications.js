@@ -15,6 +15,7 @@ import { documentStorage } from '../services/storageDriver.js';
 import { TimelineService } from '../services/timelineService.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { sendError, cleanText } from './helpers.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 const MIME_BY_EXTENSION = {
   '.pdf': 'application/pdf',
@@ -31,16 +32,26 @@ const NOTE_NOT_FOUND = 'We could not find that note. It may already have been de
 const DOC_NOT_FOUND = 'We could not find that document. It may already have been deleted.';
 const CLIENT_NOT_FOUND = 'We could not find that client. Refresh the Clients page and try again.';
 
-/** Keeps the history entry that mirrors a note in step with the note. */
+/**
+ * Keeps the history entry that mirrors a note in step with the note.
+ * On delete it returns the removed history entry, so it can go to the Bin with the note.
+ */
 function mirrorNoteInHistory(note, change) {
   const events = mockDb.timeline_events || [];
   const idx = events.findIndex(e => e.source === 'trinova' && e.externalId === note.id);
-  if (idx === -1) return;
+  if (idx === -1) return null;
   if (change === 'delete') {
-    events.splice(idx, 1);
-  } else {
-    events[idx].description = note.text.substring(0, 160) + (note.text.length > 160 ? '...' : '');
+    return takeOut('timeline_events', idx);
   }
+  events[idx].description = note.text.substring(0, 160) + (note.text.length > 160 ? '...' : '');
+  return null;
+}
+
+/** The client a company or client id belongs to, for "where it came from" in the Bin. */
+function clientNameFor(companyId) {
+  const comp = (mockDb.companies || []).find(c => c.id === companyId);
+  const client = clientDirectory.find(comp ? comp.clientId : companyId) || clientDirectory.find(companyId);
+  return (client && client.name) || (comp && comp.companyName) || '';
 }
 
 /**
@@ -622,9 +633,17 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
     const idx = (mockDb.notes || []).findIndex(n => n.id === req.params.noteId && n.companyId === req.params.companyId);
     if (idx === -1) return sendError(res, 404, 'NOTE_NOT_FOUND', NOTE_NOT_FOUND);
 
-    const [note] = mockDb.notes.splice(idx, 1);
-    mirrorNoteInHistory(note, 'delete');
-    res.status(200).json({ status: 'success', message: 'Note deleted.', data: { id: note.id } });
+    const item = takeOut('notes', idx);
+    const note = item.record;
+    const historyItem = mirrorNoteInHistory(note, 'delete');
+    const text = String(note.text || '').trim();
+    const entry = putInBin({
+      kind: 'note',
+      label: text.length > 60 ? `${text.slice(0, 60)}...` : (text || 'Note'),
+      where: clientNameFor(note.companyId),
+      removed: [item, historyItem]
+    });
+    res.status(200).json({ status: 'success', message: 'Note moved to the Bin. You can put it back from the Bin within 30 days.', data: { id: note.id, binId: entry.id } });
   });
 
   /**
@@ -663,7 +682,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
 
   /**
    * DELETE /api/v1/documents/:id
-   * Deletes the document and its stored file.
+   * Moves the document to the Bin. Its file is kept until the Bin item is deleted for good.
    */
   app.delete('/api/v1/documents/:id', authenticate, requireScope('sloane:write'), (req, res) => {
     req.auditAction = 'document_deleted';
@@ -684,8 +703,7 @@ export function registerCommunicationRoutes(app, { authenticate, requireScope })
         'This document is part of a signing request that is still open, so it cannot be deleted. Cancel the request first.');
     }
 
-    mockDb.documents.splice(idx, 1);
-    documentStorage.deleteDocument(doc);
-    res.status(200).json({ status: 'success', message: 'Document deleted.', data: { id: doc.id } });
+    const entry = putInBin({ kind: 'document', label: doc.filename || 'Document', where: clientNameFor(doc.companyId), removed: [takeOut('documents', idx)] });
+    res.status(200).json({ status: 'success', message: 'Document moved to the Bin. You can put it back from the Bin within 30 days.', data: { id: doc.id, binId: entry.id } });
   });
 }

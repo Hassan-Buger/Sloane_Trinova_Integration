@@ -158,13 +158,13 @@ export const privateNoteMethods = {
   async deleteBrainEntry(entryId) {
     const ok = await ConfirmDialog.ask({
       title: 'Delete this note?',
-      message: 'Your private note will be deleted for good.',
+      message: 'Your private note will be deleted. It goes to the Bin, where you can put it back for 30 days.',
       confirmLabel: 'Delete note'
     });
     if (!ok) return;
     try {
       await ApiService.deletePrivateNote(entryId);
-      Toast.success('Note deleted.');
+      Toast.success('Note moved to the Bin.');
       await this.renderBrain();
     } catch (err) {
       Toast.error(err.message || 'Could not delete that note.');

@@ -17,6 +17,7 @@ import { teamTaskMethods, TEAM_TASK_ACTIONS } from './features/teamTasks.js';
 import { deadlineMethods, DEADLINE_ACTIONS } from './features/deadlines.js';
 import { clientDetailMethods, CLIENT_DETAIL_ACTIONS } from './features/clientDetail.js';
 import { privateNoteMethods, PRIVATE_NOTE_ACTIONS } from './features/privateNotes.js';
+import { binMethods, BIN_ACTIONS } from './features/bin.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -66,7 +67,7 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
@@ -928,6 +929,10 @@ class SloaneApp {
       this.renderSystemStatus();
     }
 
+    if (viewId === 'bin') {
+      this.renderBin();
+    }
+
     // Close mobile/tablet navigation drawer if open
     this.closeNavDrawer();
 
@@ -944,6 +949,8 @@ class SloaneApp {
     await this.renderIntelligence();
     await this.renderBrain();
     await OutlookSettings.loadStatus();
+    // Only the count on the menu; the Bin page itself loads when it is opened
+    ApiService.getBin().then(r => this.updateBinBadge((r.data || []).length)).catch(() => {});
   }
 
   /* ==========================================================================
@@ -1480,13 +1487,13 @@ class SloaneApp {
     }
     const ok = await ConfirmDialog.ask({
       title: `Remove ${clientName}?`,
-      message: 'The client is removed from Sloane, together with its tasks, notes, documents and history. This cannot be undone.',
+      message: 'The client is removed from Sloane, together with its tasks, notes, documents and history. They go to the Bin together, where you can put them back for 30 days.',
       confirmLabel: 'Remove client'
     });
     if (!ok) return;
     try {
       await ApiService.deleteClient(clientId);
-      Toast.success(`Client "${clientName}" removed.`);
+      Toast.success(`Client "${clientName}" moved to the Bin.`);
       if (String(this.activeClient360Id) === String(clientId)) this.activeClient360Id = null;
       await this.renderClients();
       await this.renderBusinesses();
@@ -1710,13 +1717,13 @@ class SloaneApp {
     const name = b ? b.name : 'this business';
     const ok = await ConfirmDialog.ask({
       title: `Remove ${name}?`,
-      message: 'The business is taken off your list. A business that still has clients cannot be removed.',
+      message: 'The business is taken off your list. It goes to the Bin, where you can put it back for 30 days. A business that still has clients cannot be removed.',
       confirmLabel: 'Remove business'
     });
     if (!ok) return;
     try {
       await ApiService.deleteBusiness(bizId);
-      Toast.success(`"${name}" has been removed.`);
+      Toast.success(`"${name}" moved to the Bin.`);
       await this.renderBusinesses();
       await this.renderCommandCentre();
       await this.populateClientModalBizSelect();
@@ -2502,7 +2509,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

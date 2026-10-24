@@ -13,6 +13,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerClientRoutes } from './routes/clients.js';
 import { registerStatutoryRoutes } from './routes/statutory.js';
 import { registerTrinovaRoutes } from './routes/trinova.js';
+import { registerBinRoutes } from './routes/bin.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -518,6 +519,9 @@ export function createApp(options = {}) {
 
   // TriNova connection tools: the "Check TriNova data" button
   registerTrinovaRoutes(app, { authenticate, requireScope }, options);
+
+  // The Bin: deleted items kept for 30 days
+  registerBinRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });

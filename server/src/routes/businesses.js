@@ -1,4 +1,5 @@
 import { mockDb } from '../data/db.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 /**
  * Business Areas Routes
@@ -194,7 +195,7 @@ export function registerBusinessRoutes(app, { authenticate, requireScope }) {
       });
     }
 
-    mockDb.businesses.splice(idx, 1);
-    res.status(200).json({ status: 'success', message: `"${biz.name}" has been removed.` });
+    const entry = putInBin({ kind: 'business', label: biz.name, where: 'My Businesses', removed: [takeOut('businesses', idx)] });
+    res.status(200).json({ status: 'success', message: `"${biz.name}" has been moved to the Bin. You can put it back from the Bin within 30 days.`, data: { binId: entry.id } });
   });
 }

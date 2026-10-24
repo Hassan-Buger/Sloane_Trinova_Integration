@@ -7,27 +7,26 @@
 import { mockDb } from '../data/db.js';
 import { config } from '../config.js';
 import { clientDirectory } from '../services/clientDirectory.js';
-import { documentStorage } from '../services/storageDriver.js';
+import { takeOut, takeOutAll, putInBin } from '../services/bin.js';
 import { sendError } from './helpers.js';
 
 /**
- * Removes everything Sloane stored for a client that is being deleted: its company, tasks,
- * notes, documents (and the files), signing requests, conversations and history.
- * Returns how many of each were removed, so the screen can say so.
+ * Takes out everything Sloane stored for a client that is being deleted: its company, tasks,
+ * notes, documents, signing requests, conversations and history. They go to the Bin together
+ * with the client (uploaded files are only deleted when the Bin item is deleted for good).
+ * Returns how many of each were removed, so the screen can say so, and the removed records.
  */
 function removeClientAndRelatedData(client) {
   const companyIds = new Set(client.companyIds || []);
   const ids = new Set([client.id, ...companyIds]);
   const counts = { tasks: 0, notes: 0, documents: 0, history: 0, signing: 0 };
+  const removed = [];
 
   const prune = (name, test) => {
-    const list = mockDb[name] || [];
-    for (let i = list.length - 1; i >= 0; i--) {
-      if (test(list[i])) { const [gone] = list.splice(i, 1); onRemoved(name, gone); }
-    }
+    for (const item of takeOutAll(name, test)) { removed.push(item); onRemoved(name); }
   };
-  const onRemoved = (name, row) => {
-    if (name === 'documents') { documentStorage.deleteDocument(row); counts.documents++; }
+  const onRemoved = (name) => {
+    if (name === 'documents') counts.documents++;
     if (name === 'tasks') counts.tasks++;
     if (name === 'notes') counts.notes++;
     if (name === 'timeline_events') counts.history++;
@@ -46,7 +45,7 @@ function removeClientAndRelatedData(client) {
   prune('messages', m => convIds.has(m.conversationId));
   prune('conversations', c => ids.has(c.companyId));
   prune('companies', c => companyIds.has(c.id) || c.clientId === client.id);
-  return counts;
+  return { counts, removed };
 }
 
 function serveMockClients(req, res) {
@@ -259,13 +258,14 @@ export function registerClientRoutes(app, { authenticate, requireScope }) {
         }
       });
     }
-    const [removed] = mockDb.clients.splice(idx, 1);
-    const counts = removeClientAndRelatedData(removed);
+    const clientItem = takeOut('clients', idx);
+    const { counts, removed } = removeClientAndRelatedData(clientItem.record);
+    const entry = putInBin({ kind: 'client', label: clientItem.record.name, where: 'Clients', removed: [clientItem, ...removed] });
 
     return res.status(200).json({
       status: 'success',
-      message: 'The client has been removed.',
-      data: { removed: counts }
+      message: 'The client has been moved to the Bin, with its tasks, notes, documents and history. You can put it back from the Bin within 30 days.',
+      data: { removed: counts, binId: entry.id }
     });
   });
 

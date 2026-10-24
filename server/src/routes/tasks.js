@@ -16,6 +16,7 @@ import { WorkflowEngine } from '../services/workflow.js';
 import { TimelineService } from '../services/timelineService.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { sendError, newId, isIsoDate, cleanText } from './helpers.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 export const TASK_PRIORITIES = ['Low', 'Normal', 'Medium', 'High', 'Urgent'];
 const MAX_TITLE = 255;
@@ -370,7 +371,8 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
 
   /**
    * DELETE /api/v1/tasks/:id
-   * Removes a task for good. (To keep a record of it instead, set its status to Cancelled.)
+   * Moves a task to the Bin, where it can be put back for 30 days. (To keep it in the list as a
+   * record instead, set its status to Cancelled.)
    */
   app.delete('/api/v1/tasks/:id', authenticate, requireScope('sloane:write'), (req, res) => {
     const { id } = req.params;
@@ -381,8 +383,10 @@ export function registerTaskRoutes(app, { authenticate, requireScope }) {
     const idx = (mockDb.tasks || []).findIndex(t => t.id === id);
     if (idx === -1) return sendError(res, 404, 'TASK_NOT_FOUND', TASK_NOT_FOUND);
 
-    const [removed] = mockDb.tasks.splice(idx, 1);
-    res.status(200).json({ status: 'success', message: 'Task deleted.', data: { id: removed.id } });
+    const item = takeOut('tasks', idx);
+    const removed = item.record;
+    const entry = putInBin({ kind: 'task', label: removed.title || 'Task', where: removed.clientName || removed.companyName || 'Team & Tasks', removed: [item] });
+    res.status(200).json({ status: 'success', message: 'Task moved to the Bin. You can put it back from the Bin within 30 days.', data: { id: removed.id, binId: entry.id } });
   });
 
   /**

@@ -11,6 +11,7 @@
 
 import { mockDb } from '../data/db.js';
 import { sendError, newId, cleanText, requireSession } from './helpers.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 const MAX_NOTE_LENGTH = 10000;
 
@@ -119,7 +120,14 @@ export function registerCeoNoteRoutes(app, { authenticate, requireScope }) {
 
     const note = mine(req).find(n => n.id === req.params.id);
     if (!note) return sendError(res, 404, 'NOT_FOUND', 'That note no longer exists.');
-    mockDb.ceoNotes.splice(mockDb.ceoNotes.indexOf(note), 1);
-    res.status(200).json({ status: 'success', message: 'Note deleted.' });
+    const text = String(note.text || note.content || '').trim();
+    const entry = putInBin({
+      kind: 'private_note',
+      label: text.length > 60 ? `${text.slice(0, 60)}...` : (text || 'Private note'),
+      where: 'My Private Notes',
+      ownerOnly: true,
+      removed: [takeOut('ceoNotes', mockDb.ceoNotes.indexOf(note))]
+    });
+    res.status(200).json({ status: 'success', message: 'Note moved to the Bin. You can put it back from the Bin within 30 days.', data: { binId: entry.id } });
   });
 }

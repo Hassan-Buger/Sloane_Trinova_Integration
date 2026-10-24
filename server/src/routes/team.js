@@ -7,6 +7,7 @@
 
 import { mockDb } from '../data/db.js';
 import { sendError, newId, cleanText } from './helpers.js';
+import { takeOut, putInBin } from '../services/bin.js';
 
 const CLOSED = ['Completed', 'Cancelled'];
 const NOT_FOUND = 'We could not find that team member. They may already have been removed.';
@@ -120,11 +121,17 @@ export function registerTeamRoutes(app, { authenticate, requireScope }) {
         `${member.name} still has ${open.length} open task${open.length === 1 ? '' : 's'}. Give ${open.length === 1 ? 'it' : 'them'} to someone else first.`);
     }
 
-    mockDb.teamMembers.splice(idx, 1);
+    const item = takeOut('teamMembers', idx);
     // Finished tasks keep the person's name as history, but no longer point at a person who is gone.
+    // The Bin remembers the link so putting the person back restores it.
+    const changes = [];
     for (const t of mockDb.tasks) {
-      if (t.assigneeId === member.id) t.assigneeId = null;
+      if (t.assigneeId === member.id) {
+        changes.push({ collection: 'tasks', id: t.id, field: 'assigneeId', value: member.id });
+        t.assigneeId = null;
+      }
     }
-    res.status(200).json({ status: 'success', message: `${member.name} has been removed from your team.` });
+    const entry = putInBin({ kind: 'team_member', label: member.name, where: 'Team & Tasks', removed: [item], changes });
+    res.status(200).json({ status: 'success', message: `${member.name} has been moved to the Bin. You can put it back from the Bin within 30 days.`, data: { binId: entry.id } });
   });
 }

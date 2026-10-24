@@ -143,20 +143,24 @@ On a redeploy Railway stops the old copy with `SIGTERM`; Sloane finishes saving 
 | Thing | Add | See | Change | Delete | Notes |
 |---|:-:|:-:|:-:|:-:|---|
 | **Businesses** (My Businesses) | ✅ | ✅ | ✅ | ✅ | Cannot delete one that still has clients (plain 409 message). Renaming moves its clients across. |
-| **Clients added in Sloane** | ✅ | ✅ | ✅ | ✅ | Deleting also deletes that client's tasks, notes, documents (and files), history and signing records. |
+| **Clients added in Sloane** | ✅ | ✅ | ✅ | ✅ | Deleting also takes that client's tasks, notes, documents, history and signing records; they go to the Bin together. |
 | **Clients from TriNova** | ❌ | ✅ | ❌ | ❌ | Read-only (managed in TriNova). The one thing Sloane can do: **choose which of your businesses a client belongs to** (`PUT /clients/:id/business`). |
 | **Tasks** | ✅ | ✅ | ✅ | ✅ | For any client (Sloane or TriNova) or none. Edit title, date, priority, "stuck", client; reassign; tick off; cancel; delete. |
 | **Team members** | ✅ | ✅ | ✅ | ✅ | Cannot remove someone with open tasks. Renaming updates their tasks. |
 | **Deadlines** | ✅ | ✅ | ✅ | ✅ | List is built from TriNova clients, clients added in Sloane and your own entries. Your own dates replace TriNova's; deleting them brings the original back. Companies House can confirm dates. |
 | **VAT returns** | ✅ | ✅ | ✅ | ✅ | Kept by hand. |
 | **Client notes** | ✅ | ✅ | ✅ | ✅ | Saved in Sloane only — **not** sent to TriNova or the client. |
-| **Documents** | ✅ upload | ✅ + download | ✅ rename / category | ✅ | Max 15 MB; deleting removes the file. Cannot delete a document that is part of a signing request. |
+| **Documents** | ✅ upload | ✅ + download | ✅ rename / category | ✅ | Max 15 MB; the file is kept while the document is in the Bin and removed when it is deleted for good. Cannot delete a document that is part of a signing request. |
 | **History entries** | ✅ | ✅ | ✅ your own entries only | ✅ all | Entries Sloane writes automatically (task, document, Companies House…) can only be deleted, not edited. |
 | **Signing requests** | ✅ | ✅ | cancel only | ❌ | **Record only:** Sloane keeps a record of who was asked to sign; it does **not** send anything to signers or to Documenso yet. `meta.delivery` is `"not_sent"`. |
 | **My Private Notes** | ✅ | ✅ | ✅ | ✅ | Saved on the server per owner; only a signed-in browser session can use them (API keys get 403). Notes saved in the browser before are moved over once, automatically (`POST /ceo-notes/import`). Never shown to the AI. |
 | **Outlook** (diary, flagged emails) | – | ✅ | – | – | Read only; connect / disconnect / choose what is read in Settings. |
 
 Every change goes through server validation, answers with plain-English 400 / 404 / 409 / 422 messages, and writes an entry to the audit log (`GET /api/v1/audit/logs`).
+
+### The Bin (30 days)
+
+Every delete above moves what it removes into the **Bin** (menu → Bin) instead of deleting it. One delete is one Bin item: a client comes back with its tasks, notes, documents and history. From the Bin the owner can **Put back** an item (it returns where it was) or **Delete for good**; **Empty the Bin** deletes everything in it. Items older than 30 days are deleted for good automatically (checked at start-up and every 6 hours). Uploaded files are only removed when their item is deleted for good. The Bin is saved like everything else (collection `bin`) and needs a signed-in browser session (it can hold private notes). Routes: `GET /api/v1/bin`, `POST /api/v1/bin/:id/restore`, `DELETE /api/v1/bin/:id`, `DELETE /api/v1/bin`.
 
 ---
 

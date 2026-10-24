@@ -163,6 +163,11 @@ export const ApiService = {
         throw error;
       }
 
+      // Anything deleted goes to the Bin: keep its count on the menu up to date
+      if (method === 'DELETE' && typeof window !== 'undefined' && window.app && typeof window.app.refreshBinBadge === 'function') {
+        window.app.refreshBinBadge();
+      }
+
       return {
         ok: true,
         status: response.status,
@@ -1107,6 +1112,28 @@ export const ApiService = {
   async deletePrivateNote(id) {
     await this.request(`/ceo-notes/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return { status: 'success' };
+  },
+
+  /* The Bin: deleted items kept for 30 days */
+
+  async getBin() {
+    const res = await this.request('/bin');
+    return { status: 'success', data: res.data || [], meta: res.meta || {} };
+  },
+
+  async restoreBinItem(id) {
+    const res = await this.request(`/bin/${encodeURIComponent(id)}/restore`, { method: 'POST', body: {} });
+    return { status: 'success', message: res.raw?.message, data: res.data };
+  },
+
+  async deleteBinItem(id) {
+    const res = await this.request(`/bin/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { status: 'success', message: res.raw?.message };
+  },
+
+  async emptyBin() {
+    const res = await this.request('/bin', { method: 'DELETE' });
+    return { status: 'success', message: res.raw?.message };
   },
 
   async importPrivateNotes(notes) {

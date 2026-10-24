@@ -7,6 +7,7 @@ import { createApp } from './app.js';
 import { config } from './config.js';
 import { logger } from './middleware/sanitizer.js';
 import { persistence } from './data/persistence.js';
+import { clearExpired, BIN_DAYS } from './services/bin.js';
 
 /**
  * Validates required environment variables on startup.
@@ -67,6 +68,18 @@ if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
     if (!config.trinova.apiKey) {
       logger.warn('TRINOVA_API_KEY is not set. Sloane cannot read clients from TriNova until it is.');
     }
+
+    // The Bin keeps deleted items for 30 days: clear out older ones now and every 6 hours.
+    const clearBin = () => {
+      const n = clearExpired();
+      if (n > 0) {
+        logger.info(`Bin: ${n} item${n === 1 ? '' : 's'} older than ${BIN_DAYS} days deleted for good.`);
+        persistence.scheduleFlush();
+      }
+    };
+    clearBin();
+    const binTimer = setInterval(clearBin, 6 * 60 * 60 * 1000);
+    if (binTimer.unref) binTimer.unref();
 
     const app = createApp();
     const host = process.env.HOST || '0.0.0.0';

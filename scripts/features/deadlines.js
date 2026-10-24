@@ -221,14 +221,14 @@ export const deadlineMethods = {
     const ok = await ConfirmDialog.ask({
       title: undo ? 'Go back to the original dates?' : 'Remove this deadline?',
       message: undo
-        ? `Your own dates for "${row.name}" will be removed and the dates from the client record will show again.`
-        : `"${row.name}" will be taken off your Deadlines list.`,
+        ? `Your own dates for "${row.name}" will be removed and the dates from the client record will show again. Your dates go to the Bin for 30 days.`
+        : `"${row.name}" will be taken off your Deadlines list. It goes to the Bin, where you can put it back for 30 days.`,
       confirmLabel: undo ? 'Use original dates' : 'Remove deadline'
     });
     if (!ok) return;
     try {
       await ApiService.deleteDeadline(row.recordId);
-      Toast.success(undo ? 'Back to the original dates.' : 'Deadline removed.');
+      Toast.success(undo ? 'Back to the original dates.' : 'Deadline moved to the Bin.');
       await this.renderStatutory();
       await this.renderCommandCentre();
       await this.renderIntelligence();
@@ -281,13 +281,13 @@ export const deadlineMethods = {
     if (!row) return;
     const ok = await ConfirmDialog.ask({
       title: 'Remove this VAT return?',
-      message: `${row.clientName}, ${row.period} will be taken off your list.`,
+      message: `${row.clientName}, ${row.period} will be taken off your list. It goes to the Bin, where you can put it back for 30 days.`,
       confirmLabel: 'Remove'
     });
     if (!ok) return;
     try {
       await ApiService.deleteVatReturn(row.id);
-      Toast.success('VAT return removed.');
+      Toast.success('VAT return moved to the Bin.');
       await this.renderVatReturns();
     } catch (err) {
       Toast.error(err.message || 'Could not remove that VAT return.');

@@ -3,7 +3,8 @@
  *
  * Verifies, for a live TriNova client and for a client added in Sloane:
  * - Notes can be added, edited and deleted (and the history mirror follows)
- * - Documents can be uploaded, renamed, re-categorised, downloaded and deleted (file removed)
+ * - Documents can be uploaded, renamed, re-categorised, downloaded and deleted (to the Bin; the
+ *   file is removed when the Bin item is deleted for good)
  * - History entries the owner wrote can be edited; automatic ones can only be deleted
  * - A signing request can be recorded and cancelled, and says plainly that nothing was sent
  * - Deleting a client removes its own tasks, notes, documents (files), history and signing records
@@ -20,6 +21,7 @@ import { mockDb } from '../src/data/db.js';
 import { auditStore } from '../src/middleware/audit.js';
 import { clientDirectory } from '../src/services/clientDirectory.js';
 import { documentStorage } from '../src/services/storageDriver.js';
+import { deleteForGood } from '../src/services/bin.js';
 import { TEST_API_KEY } from './fixtures.js';
 
 const PORT = 5037;
@@ -171,7 +173,7 @@ describe('Unit 37: Notes, documents, history and signing', () => {
       assert.equal(mockDb.documents.some(d => d.id === doc.id), false);
     });
 
-    test('2.8 Otherwise it can be deleted, the stored file is removed, and deleting again is a plain 404', async () => {
+    test('2.8 Otherwise it can be deleted (to the Bin, file kept until deleted for good), and deleting again is a plain 404', async () => {
       const up = await call('POST', '/companies/tn-3001/documents/upload',
         { filename: 'Temp.txt', content: 'temporary' }, keyed());
       const doc = (await up.json()).data;
@@ -179,8 +181,12 @@ describe('Unit 37: Notes, documents, history and signing', () => {
       assert.ok(fs.existsSync(path));
       const res = await call('DELETE', `/documents/${doc.id}`);
       assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.match(body.message, /Bin/);
       assert.equal(lastAudit().action, 'document_deleted');
-      assert.equal(fs.existsSync(path), false);
+      assert.equal(fs.existsSync(path), true, 'the file is kept while the document is in the Bin');
+      deleteForGood(body.data.binId);
+      assert.equal(fs.existsSync(path), false, 'deleting for good removes the file');
       const again = await call('DELETE', `/documents/${doc.id}`);
       assert.equal(again.status, 404);
     });
@@ -328,7 +334,8 @@ describe('Unit 37: Notes, documents, history and signing', () => {
 
       const res = await call('DELETE', `/clients/${client.id}`);
       assert.equal(res.status, 200);
-      const removed = (await res.json()).data.removed;
+      const delBody = await res.json();
+      const removed = delBody.data.removed;
       assert.equal(removed.tasks, 1);
       assert.equal(removed.notes, 1);
       assert.equal(removed.documents, 1);
@@ -339,7 +346,9 @@ describe('Unit 37: Notes, documents, history and signing', () => {
       assert.equal(mockDb.documents.some(d => d.companyId === companyId), false);
       assert.equal(mockDb.companies.some(c => c.id === companyId), false);
       assert.equal(mockDb.timeline_events.some(e => e.clientId === client.id), false);
-      assert.equal(fs.existsSync(file), false, 'stored file removed');
+      assert.equal(fs.existsSync(file), true, 'the file is kept while the client is in the Bin');
+      deleteForGood(delBody.data.binId);
+      assert.equal(fs.existsSync(file), false, 'deleting the client for good removes the file');
       assert.ok(mockDb.tasks.find(t => t.id === keepTask.id), 'another client\'s task stays');
       assert.equal(mockDb.vatReturns.some(v => v.clientId === client.id), false, 'its VAT returns are removed');
       assert.equal(mockDb.statutoryTracker.some(d => d.clientId === client.id), false, 'its own-date deadlines are removed');

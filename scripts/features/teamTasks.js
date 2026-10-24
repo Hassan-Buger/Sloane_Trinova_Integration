@@ -114,7 +114,7 @@ export const teamTaskMethods = {
               </select>
               ${done ? '' : `<button type="button" class="btn-done" data-action="markTaskDone" data-id="${escapeHtml(t.id)}" title="Tick this off as finished">✓ Done</button>`}
               <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}" title="Change this task">✎ Edit</button>
-              <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}" title="Delete this task for good">🗑 Delete</button>
+              <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}" title="Delete this task (it goes to the Bin for 30 days)">🗑 Delete</button>
             </div>
           </div>
         </div>`;
@@ -239,13 +239,13 @@ export const teamTaskMethods = {
     const t = (this.allTasks || []).find(x => x.id === taskId);
     const ok = await ConfirmDialog.ask({
       title: 'Delete this task?',
-      message: `"${t ? t.title : 'This task'}" will be deleted for good. If you only want to stop working on it, set its status to Cancelled instead.`,
+      message: `"${t ? t.title : 'This task'}" will be deleted. It goes to the Bin, where you can put it back for 30 days. If you only want to stop working on it, set its status to Cancelled instead.`,
       confirmLabel: 'Delete task'
     });
     if (!ok) return;
     try {
       await ApiService.deleteTask(taskId);
-      Toast.success('Task deleted.');
+      Toast.success('Task moved to the Bin.');
       await this.refreshTaskViews();
     } catch (err) {
       Toast.error(err.message || 'Could not delete that task.');
@@ -299,13 +299,13 @@ export const teamTaskMethods = {
     const m = (this.teamMembers || []).find(x => x.id === memberId);
     const ok = await ConfirmDialog.ask({
       title: `Remove ${m ? m.name : 'this person'}?`,
-      message: 'They will be taken off your team list. Tasks they have already finished stay as a record.',
+      message: 'They will be taken off your team list. Tasks they have already finished stay as a record. They go to the Bin, where you can put them back for 30 days.',
       confirmLabel: 'Remove'
     });
     if (!ok) return;
     try {
       await ApiService.deleteTeamMember(memberId);
-      Toast.success(`${m ? m.name : 'They'} removed from your team.`);
+      Toast.success(`${m ? m.name : 'They'} moved to the Bin.`);
       await this.renderPeopleWork();
     } catch (err) {
       Toast.error(err.message || 'Could not remove that person.');
