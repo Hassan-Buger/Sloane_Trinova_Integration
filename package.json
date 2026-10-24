@@ -1,6 +1,6 @@
 {
   "name": "sloane-executive-intelligence",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "description": "Sloane — Executive Intelligence & TriNova Integration Portal",
   "type": "module",
   "main": "server/src/server.js",

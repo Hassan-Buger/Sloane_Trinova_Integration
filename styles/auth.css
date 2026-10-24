@@ -22,12 +22,16 @@
 
 /* While Sloane is checking whether you are already signed in, show neither the sign-in page
    nor the dashboard, so the sign-in form never flashes up on every page load. */
+/* The version sits on the same line as the footer text, so the page stays one screen tall */
 .auth-version {
-  display: block;
-  margin-top: 4px;
+  display: inline;
   font-size: 10px;
   letter-spacing: 0.04em;
   opacity: 0.8;
+}
+
+.auth-version:not(:empty)::before {
+  content: " · ";
 }
 
 .session-check .auth-shell,
@@ -523,5 +527,128 @@
   }
   .auth-brand {
     margin-bottom: 18px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   One screen, no scrolling: on shorter screens (laptops, a zoomed-in browser,
+   phones) the sign-in page tightens its spacing so everything, down to the
+   footer, fits above the fold. Text and buttons stay full size.
+   -------------------------------------------------------------------------- */
+@media (max-height: 820px) {
+  .auth-shell {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .auth-brand {
+    margin-bottom: 16px;
+  }
+  .auth-brand-logo {
+    margin-bottom: 8px;
+  }
+  .auth-card {
+    padding: 28px 32px;
+  }
+  .auth-card-header {
+    margin-bottom: 18px;
+  }
+  .auth-form {
+    gap: 14px;
+  }
+  .auth-input {
+    height: 46px;
+  }
+  .auth-submit {
+    height: 48px;
+    margin-top: 2px;
+  }
+  .auth-trust {
+    margin-top: 16px;
+  }
+  .auth-support {
+    margin-top: 14px;
+  }
+}
+
+@media (max-height: 700px) {
+  .auth-shell {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  /* Logo and badge on one line */
+  .auth-brand {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 12px;
+  }
+  .auth-brand-logo {
+    margin-bottom: 0;
+  }
+  .auth-brand-mark {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+  .auth-brand-title {
+    font-size: 18px;
+  }
+  .auth-card {
+    padding: 22px 26px;
+  }
+  .auth-card-header {
+    margin-bottom: 14px;
+  }
+  .auth-card-header h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  .auth-card-header p {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .auth-form {
+    gap: 12px;
+  }
+  .auth-field {
+    gap: 5px;
+  }
+  .auth-input {
+    height: 44px;
+  }
+  .auth-submit {
+    height: 46px;
+  }
+  .auth-trust {
+    margin-top: 12px;
+  }
+  .auth-support {
+    margin-top: 10px;
+  }
+}
+
+/* Very short screens (a phone turned sideways, a small window): drop the extras */
+@media (max-height: 580px) {
+  .auth-card-header p,
+  .auth-trust,
+  .auth-brand-badge {
+    display: none;
+  }
+  .auth-card {
+    padding: 18px 22px;
+  }
+  .auth-input {
+    height: 42px;
+  }
+  .auth-submit {
+    height: 44px;
+  }
+}
+
+/* Narrow phones: a little less side padding inside the card */
+@media (max-width: 600px) and (max-height: 700px) {
+  .auth-card {
+    padding: 20px 18px;
   }
 }
