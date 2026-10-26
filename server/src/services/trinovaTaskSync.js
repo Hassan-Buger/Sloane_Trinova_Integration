@@ -38,21 +38,22 @@ const OVERLAP_MS = 60 * 1000;
 
 /* ------------------------------------------------------------------ mapping */
 
-const STATUS_TO_PORTAL = { Pending: 'pending', In_Progress: 'in_progress', Under_Review: 'under_review', Completed: 'completed', Cancelled: 'cancelled' };
+const STATUS_TO_PORTAL = { Pending: 'open', In_Progress: 'in_progress', Under_Review: 'under_review', Completed: 'completed', Cancelled: 'cancelled' };
 const STATUS_FROM_PORTAL = {
-  pending: 'Pending', not_started: 'Pending', queued: 'Pending',
+  open: 'Pending', pending: 'Pending', not_started: 'Pending', queued: 'Pending',
   in_progress: 'In_Progress',
   under_review: 'Under_Review', approval: 'Under_Review',
   completed: 'Completed', done: 'Completed',
   cancelled: 'Cancelled', canceled: 'Cancelled'
 };
-const PRIORITY_TO_PORTAL = { Low: 'low', Normal: 'normal', Medium: 'normal', High: 'high', Urgent: 'urgent' };
-const PRIORITY_FROM_PORTAL = { low: 'Low', normal: 'Normal', standard: 'Normal', high: 'High', urgent: 'Urgent', immediate: 'Urgent' };
+const PRIORITY_TO_PORTAL = { Low: 'low', Normal: 'normal', Medium: 'medium', High: 'high', Urgent: 'urgent' };
+const PRIORITY_FROM_PORTAL = { low: 'Low', normal: 'Normal', standard: 'Normal', medium: 'Medium', high: 'High', urgent: 'Urgent', immediate: 'Urgent' };
 
 const FIELDS = ['title', 'description', 'status', 'priority', 'due_date', 'assignee_id', 'department', 'is_blocked', 'blocked_reason'];
 
 const day = v => { const m = v ? String(v).match(/^(\d{4}-\d{2}-\d{2})/) : null; return m ? m[1] : null; };
 const str = v => (v === null || v === undefined ? '' : String(v));
+const idStr = v => (v === null || v === undefined || v === '' ? null : String(v));
 
 /** Does this staff list entry match a Sloane team member? Email first, then the full name. */
 function staffMatches(member, staff) {
@@ -61,23 +62,35 @@ function staffMatches(member, staff) {
   return !e && str(member.name).trim().toLowerCase() === str(staff.name).trim().toLowerCase();
 }
 
+/** An id in the form the portal uses: a number when the portal gave numbers, else text. */
+function sendId(value) {
+  const hit = (runtime.staff || []).find(x => x.id === String(value));
+  if (hit) return hit.rawId;
+  return /^\d+$/.test(String(value)) ? Number(value) : value;
+}
+
 /** The portal's id for a Sloane person, or null when they are not matched yet. */
 function portalPersonId(task) {
   if (!task.assigneeId) return null;
   const member = (mockDb.teamMembers || []).find(m => m.id === task.assigneeId);
   if (!member) return null;
-  if (member.portalId) return member.portalId;
+  if (member.portalId) return String(member.portalId);
   const hit = (runtime.staff || []).find(s => staffMatches(member, s));
   return hit ? hit.id : null;
 }
 
 /** Sloane's person for a portal staff id (or null). */
-function sloanePerson(portalId, name) {
-  if (!portalId) return null;
+function sloanePerson(portalId, name, email) {
+  if (!portalId && !email) return null;
   const members = mockDb.teamMembers || [];
-  const direct = members.find(m => m.portalId === portalId);
+  const direct = portalId ? members.find(m => String(m.portalId) === String(portalId)) : null;
   if (direct) return direct;
-  const staff = (runtime.staff || []).find(s => s.id === portalId);
+  const mail = str(email).trim().toLowerCase();
+  if (mail) {
+    const byMail = members.find(m => str(m.email).trim().toLowerCase() === mail);
+    if (byMail) return byMail;
+  }
+  const staff = (runtime.staff || []).find(s => s.id === String(portalId));
   if (staff) {
     const hit = members.find(m => staffMatches(m, staff));
     if (hit) return hit;
@@ -112,7 +125,7 @@ function snapshotOf(p) {
     status: STATUS_FROM_PORTAL[str(p.status).toLowerCase()] ? STATUS_TO_PORTAL[STATUS_FROM_PORTAL[str(p.status).toLowerCase()]] : str(p.status).toLowerCase(),
     priority: PRIORITY_FROM_PORTAL[str(p.priority).toLowerCase()] ? PRIORITY_TO_PORTAL[PRIORITY_FROM_PORTAL[str(p.priority).toLowerCase()]] : str(p.priority).toLowerCase(),
     due_date: day(p.due_date),
-    assignee_id: p.assignee_id || null,
+    assignee_id: idStr(p.assignee_id),
     department: str(p.department) || null,
     is_blocked: Boolean(p.is_blocked),
     blocked_reason: p.is_blocked ? (str(p.blocked_reason) || null) : null
@@ -201,13 +214,30 @@ function problemFrom(res) {
   return `TriNova answered with an unexpected error (${res.status}).`;
 }
 
+/** Is there another page after this one? Understands `pagination.has_more` and `meta.total`. */
+function hasMore(res, page, rows) {
+  const j = res.json || {};
+  if (j.pagination && typeof j.pagination.has_more === 'boolean') return j.pagination.has_more;
+  const meta = j.meta || {};
+  const total = Number(meta.total);
+  const per = Number(meta.per_page) || rows.length;
+  if (Number.isFinite(total) && per > 0) return page * per < total;
+  return rows.length >= PAGE_SIZE;
+}
+
 /* ------------------------------------------------------------------ staff */
 
 async function syncStaff(m) {
-  const res = await portalRequest('GET', '/staff');
-  if (!res.ok) return res;
-  const list = Array.isArray(res.json && res.json.data) ? res.json.data : [];
-  runtime.staff = list.filter(s => s && s.id).map(s => ({ id: String(s.id), name: str(s.name), email: str(s.email) }));
+  const all = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await portalRequest('GET', page === 1 ? '/staff' : `/staff?page=${page}`);
+    if (!res.ok) return res;
+    const rows = Array.isArray(res.json && res.json.data) ? res.json.data : [];
+    const fresh = rows.filter(r => r && r.id !== undefined && !all.some(a => String(a.id) === String(r.id)));
+    all.push(...fresh);
+    if (!fresh.length || !hasMore(res, page, rows)) break;
+  }
+  runtime.staff = all.map(s => ({ id: String(s.id), rawId: s.id, name: str(s.name), email: str(s.email) }));
   // Remember the match on the Team page so it survives a change of name
   for (const member of mockDb.teamMembers || []) {
     const hit = runtime.staff.find(s => staffMatches(member, s));
@@ -215,7 +245,7 @@ async function syncStaff(m) {
   }
   m.staffCount = runtime.staff.length;
   m.staffUnmatched = runtime.staff.filter(s => !(mockDb.teamMembers || []).some(mem => mem.portalId === s.id)).map(s => s.name || s.email || s.id);
-  return res;
+  return { ok: true };
 }
 
 /* ------------------------------------------------------------------ pull */
@@ -263,7 +293,7 @@ function applyPortal(task, p, stats) {
     else if (field === 'is_blocked') task.isBlocked = theirs.is_blocked;
     else if (field === 'blocked_reason') task.blocker = theirs.blocked_reason;
     else if (field === 'assignee_id') {
-      const person = sloanePerson(theirs.assignee_id, p.assignee_name);
+      const person = sloanePerson(theirs.assignee_id, p.assignee_name, p.assignee_email);
       task.assigneeId = person ? person.id : null;
       task.assigneeName = person ? person.name : (str(p.assignee_name) || null);
     }
@@ -296,7 +326,7 @@ function applyPortal(task, p, stats) {
 function createFromPortal(p, stats) {
   const theirs = snapshotOf(p);
   const ref = clientRef(p);
-  const person = sloanePerson(theirs.assignee_id, p.assignee_name);
+  const person = sloanePerson(theirs.assignee_id, p.assignee_name, p.assignee_email);
   const task = createTaskRecord({
     ref,
     title: str(p.title) || 'Task from TriNova',
@@ -349,8 +379,7 @@ async function pull(m, stats) {
       if (p.is_deleted) { removeFromSloane(local, stats); continue; }
       applyPortal(local, p, stats);
     }
-    const pg = res.json && res.json.pagination;
-    if (!(pg && pg.has_more) || rows.length === 0) break;
+    if (rows.length === 0 || !hasMore(res, page, rows)) break;
   }
   m.cursor = startedAt;
   return { ok: true };
@@ -387,7 +416,7 @@ async function push(m, stats) {
   for (const t of plan.toCreate) {
     if (budget-- <= 0) break;
     const fields = toPortalFields(t);
-    const body = { external_ref: t.id, client_id: t.clientId ? Number(t.clientId) : null, ...fields };
+    const body = { external_ref: t.id, client_id: t.clientId ? Number(t.clientId) : null, ...forPortal(fields) };
     const res = await portalRequest('POST', '/tasks', { body, idempotencyKey: idempotencyKeyFor(t.id) });
     if (!res.ok) return { error: res };
     const made = (res.json && res.json.data) || {};
@@ -399,7 +428,7 @@ async function push(m, stats) {
   for (const t of plan.toUpdate) {
     if (budget-- <= 0) break;
     const diff = changedFields(t);
-    const res = await portalRequest('PATCH', `/tasks/${encodeURIComponent(t.portal.id)}`, { body: diff });
+    const res = await portalRequest('PATCH', `/tasks/${encodeURIComponent(t.portal.id)}`, { body: forPortal(diff) });
     if (res.status === 404) { stats.problems.push(`"${t.title}" no longer exists on TriNova.`); t.portal = null; continue; }
     if (!res.ok) return { error: res };
     const back = (res.json && res.json.data) || {};
@@ -415,6 +444,13 @@ async function push(m, stats) {
     return { error: res };
   }
   return { ok: true };
+}
+
+/** Fields as they are put on the wire (the person's id in the portal's own form). */
+function forPortal(fields) {
+  const out = { ...fields };
+  if (out.assignee_id !== undefined && out.assignee_id !== null) out.assignee_id = sendId(out.assignee_id);
+  return out;
 }
 
 function fieldsToSnapshot(fields) {

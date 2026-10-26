@@ -44,9 +44,9 @@ function fakePortal() {
   const state = {
     calls: [], tasks: [], nextId: 2000, idem: new Map(), force: null,
     staff: [
-      { id: 'usr_priya', name: 'Priya Sharma', email: 'priya@trinova.com' },
-      { id: 'usr_mark', name: 'Mark Harrison', email: 'mark@trinova.com' },
-      { id: 'usr_sarah', name: 'Sarah Jenkins', email: 'sarah@trinova.com' }
+      { id: 1, name: 'Priya Sharma', email: 'priya@trinova.com' },
+      { id: 2, name: 'Mark Harrison', email: 'mark@trinova.com' },
+      { id: 3, name: 'Sarah Jenkins', email: 'sarah@trinova.com' }
     ]
   };
   const server = http.createServer((req, res) => {
@@ -60,14 +60,18 @@ function fakePortal() {
       if (req.headers.authorization !== `Bearer ${TASK_KEY}`) return send(401, { error: { code: 'INVALID_CREDENTIAL', message: 'bad key' } });
       if (state.force) return send(state.force.status, state.force.json || {}, state.force.headers || {});
       const p = url.pathname.replace(/^\/api\/v1/, '');
-      if (req.method === 'GET' && p === '/staff') return send(200, { status: 'success', data: state.staff });
+      if (req.method === 'GET' && p === '/staff') {
+        // The live portal lists staff a page at a time (2 here) and says how many there are in all
+        const page = Number(url.searchParams.get('page') || 1);
+        return send(200, { status: 'success', data: state.staff.slice((page - 1) * 2, page * 2), meta: { total: state.staff.length } });
+      }
       if (req.method === 'GET' && p === '/tasks') {
         const since = url.searchParams.get('updated_since');
         const page = Number(url.searchParams.get('page') || 1);
         const per = Number(url.searchParams.get('per_page') || 50);
         const all = state.tasks.filter(t => !since || t.updated_at > since);
         const rows = all.slice((page - 1) * per, page * per);
-        return send(200, { status: 'success', data: rows, pagination: { page, per_page: per, total: all.length, total_pages: Math.ceil(all.length / per), has_more: page * per < all.length } });
+        return send(200, { status: 'success', data: rows, meta: { total: all.length, page, per_page: per } });
       }
       if (req.method === 'POST' && p === '/tasks') {
         const key = req.headers['idempotency-key'];
@@ -168,7 +172,7 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
       const acme = posts.find(c => c.body.title === 'Year end for Acme');
       assert.equal(acme.body.client_id, 5, 'the portal client id is a number');
       assert.equal(acme.body.external_ref, findTask('Year end for Acme').id, 'Sloane id is the external_ref');
-      assert.equal(acme.body.status, 'pending');
+      assert.equal(acme.body.status, 'open');
       assert.equal(acme.body.priority, 'high');
       assert.equal(acme.body.due_date, '2026-11-15');
       assert.equal(acme.body.department, 'Accounts');
@@ -181,7 +185,8 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
     });
 
     test('2.2 the person is matched by email (any capitals) and remembered', () => {
-      assert.equal(mockDb.teamMembers.find(m => m.id === 'tm_priya').portalId, 'usr_priya');
+      assert.equal(mockDb.teamMembers.find(m => m.id === 'tm_priya').portalId, '1');
+      assert.equal(getStatus().staff.count, 3, 'all pages of staff were read');
       assert.deepEqual(getStatus().staff.notMatched.sort(), ['Mark Harrison', 'Sarah Jenkins']);
     });
 
@@ -222,7 +227,7 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
       t.assigneeName = 'Priya S';
       portal.state.calls.length = 0;
       await runSync();
-      assert.deepEqual(portal.state.calls.find(c => c.method === 'PATCH').body, { assignee_id: 'usr_priya' });
+      assert.deepEqual(portal.state.calls.find(c => c.method === 'PATCH').body, { assignee_id: 1 }, 'the id goes back as the number the portal uses');
     });
   });
 
@@ -230,7 +235,7 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
     test('3.1 a change in the portal is taken, and Sloane-only details stay', async () => {
       const t = findTask('Year end for Acme');
       const p = portal.state.tasks.find(x => x.external_ref === t.id);
-      Object.assign(p, { status: 'in_progress', priority: 'urgent', is_blocked: true, blocked_reason: 'Waiting for bank statements', assignee_id: 'usr_priya', updated_at: stamp() });
+      Object.assign(p, { status: 'in_progress', priority: 'urgent', is_blocked: 1, blocked_reason: 'Waiting for bank statements', assignee_id: 1, updated_at: stamp() });
       await runSync();
       assert.equal(t.status, 'In_Progress');
       assert.equal(t.priority, 'Urgent');
@@ -246,7 +251,7 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
     test('3.2 a task made in the portal appears in Sloane under TriNova Accounting', async () => {
       portal.state.tasks.push({
         id: 3001, external_ref: null, client_id: 6, company_number: '00006', title: 'Quarterly VAT Return Q3', description: 'Verify CIS',
-        status: 'pending', priority: 'normal', due_date: '2026-11-07', assignee_id: 'usr_mark', assignee_name: 'Mark Harrison',
+        status: 'open', priority: 'medium', due_date: '2026-11-07', assignee_id: 2, assignee_email: 'mark@trinova.com', assignee_name: 'Mark Harrison',
         department: 'VAT & Bookkeeping', is_blocked: false, blocked_reason: null, created_at: stamp(), updated_at: stamp(), is_deleted: false
       });
       await runSync();
@@ -258,11 +263,25 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
       assert.equal(t.companyName, 'Bright Ltd');
       assert.equal(t.department, 'VAT & Bookkeeping');
       assert.equal(t.assigneeName, 'Mark Harrison', 'a person not on the Team page keeps their name');
+      assert.equal(t.priority, 'Medium', 'the portal\u2019s "medium" is kept as Medium');
+      assert.equal(t.status, 'Pending', 'the portal\u2019s "open" means Pending');
       assert.equal(t.assigneeId, null);
       assert.equal(t.portal.id, 3001);
       // It is now a normal linked task, so a second run does not make a copy
+      portal.state.calls.length = 0;
       await runSync();
       assert.equal(mockDb.tasks.filter(x => x.title === 'Quarterly VAT Return Q3').length, 1);
+      assert.equal(portal.state.calls.filter(c => c.method === 'PATCH' || c.method === 'POST').length, 0, 'taking the portal\u2019s values sends nothing back');
+    });
+
+    test('3.2b more than one page of portal tasks are all read (meta.total, no has_more)', async () => {
+      for (let i = 0; i < 120; i++) {
+        portal.state.tasks.push({ id: 5000 + i, external_ref: null, client_id: null, title: `Bulk task ${i}`, description: '', status: 'open', priority: 'normal', due_date: null, assignee_id: null, department: null, is_blocked: 0, blocked_reason: null, created_at: stamp(), updated_at: stamp(), is_deleted: 0 });
+      }
+      await runSync();
+      assert.equal(mockDb.tasks.filter(t => /^Bulk task \d+$/.test(t.title)).length, 120);
+      const pages = portal.state.calls.filter(c => c.method === 'GET' && c.path.endsWith('/tasks')).map(c => c.query.page);
+      assert.ok(pages.includes('3'), 'it kept asking until it had everything');
     });
 
     test('3.3 both sides changed: the later change wins, and "completed" always wins', async () => {
