@@ -263,7 +263,7 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
       assert.equal(t.companyName, 'Bright Ltd');
       assert.equal(t.department, 'VAT & Bookkeeping');
       assert.equal(t.assigneeName, 'Mark Harrison', 'a person not on the Team page keeps their name');
-      assert.equal(t.priority, 'Medium', 'the portal\u2019s "medium" is kept as Medium');
+      assert.equal(t.priority, 'Normal', 'the portal\u2019s "medium" is Sloane\u2019s ordinary priority');
       assert.equal(t.status, 'Pending', 'the portal\u2019s "open" means Pending');
       assert.equal(t.assigneeId, null);
       assert.equal(t.portal.id, 3001);
@@ -282,6 +282,31 @@ describe('Unit 59: two-way task sync with the TriNova portal', () => {
       assert.equal(mockDb.tasks.filter(t => /^Bulk task \d+$/.test(t.title)).length, 120);
       const pages = portal.state.calls.filter(c => c.method === 'GET' && c.path.endsWith('/tasks')).map(c => c.query.page);
       assert.ok(pages.includes('3'), 'it kept asking until it had everything');
+    });
+
+    test('3.2c the portal has no "normal": Normal and Medium both go as "medium" and nothing flips back', async () => {
+      const t = findTask('Quarterly VAT Return Q3');
+      t.priority = 'Medium';
+      assert.deepEqual(changedFields(t), {}, 'Medium and the portal\u2019s medium are the same');
+      t.priority = 'Normal';
+      assert.deepEqual(changedFields(t), {});
+      t.priority = 'Low';
+      assert.deepEqual(changedFields(t), { priority: 'low' });
+      t.priority = 'Normal';
+    });
+
+    test('3.2d one person with two portal accounts is not swapped back and forth', async () => {
+      // Kirsty has two accounts on the portal (ids 20 and 25). The task already belongs to account 20.
+      portal.state.staff.push({ id: 20, name: 'Kirsty Allen', email: 'kirsty.allen@trinova.com' }, { id: 25, name: 'Kirsty Allen', email: 'kirsty@trinova.com' });
+      mockDb.teamMembers.find(m => m.id === 'tm_kirsty').email = 'kirsty@trinova.com';
+      const t = findTask('Quarterly VAT Return Q3');
+      const p = portal.state.tasks.find(x => x.id === 3001);
+      Object.assign(p, { assignee_id: 20, assignee_name: 'Kirsty Allen', assignee_email: 'kirsty.allen@trinova.com', updated_at: stamp() });
+      portal.state.calls.length = 0;
+      await runSync();
+      assert.equal(t.assigneeId, 'tm_kirsty', 'matched to the Team page by name');
+      assert.equal(portal.state.calls.filter(c => c.method === 'PATCH').length, 0, 'the portal\u2019s own account is kept, nothing sent');
+      assert.deepEqual(getStatus().staff.notMatched.includes('Kirsty Allen'), false, 'two accounts, one person: not reported as missing');
     });
 
     test('3.3 both sides changed: the later change wins, and "completed" always wins', async () => {

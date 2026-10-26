@@ -46,8 +46,10 @@ const STATUS_FROM_PORTAL = {
   completed: 'Completed', done: 'Completed',
   cancelled: 'Cancelled', canceled: 'Cancelled'
 };
-const PRIORITY_TO_PORTAL = { Low: 'low', Normal: 'normal', Medium: 'medium', High: 'high', Urgent: 'urgent' };
-const PRIORITY_FROM_PORTAL = { low: 'Low', normal: 'Normal', standard: 'Normal', medium: 'Medium', high: 'High', urgent: 'Urgent', immediate: 'Urgent' };
+// The portal keeps low / medium / high / urgent and stores "normal" as "medium", so Sloane's
+// Normal and Medium both go as "medium" (otherwise the two would keep changing each other)
+const PRIORITY_TO_PORTAL = { Low: 'low', Normal: 'medium', Medium: 'medium', High: 'high', Urgent: 'urgent' };
+const PRIORITY_FROM_PORTAL = { low: 'Low', normal: 'Normal', standard: 'Normal', medium: 'Normal', high: 'High', urgent: 'Urgent', immediate: 'Urgent' };
 
 const FIELDS = ['title', 'description', 'status', 'priority', 'due_date', 'assignee_id', 'department', 'is_blocked', 'blocked_reason'];
 
@@ -111,7 +113,12 @@ export function toPortalFields(task) {
     is_blocked: Boolean(task.isBlocked),
     blocked_reason: task.isBlocked ? (str(task.blocker) || null) : null
   };
-  const person = portalPersonId(task);
+  let person = portalPersonId(task);
+  const known = task.portal && task.portal.snapshot && task.portal.snapshot.assignee_id;
+  if (known && task.assigneeId) {
+    const same = sloanePerson(known, task.assigneeName, null);
+    if (same && same.id === task.assigneeId) person = String(known);
+  }
   // Someone not matched to a portal user is left out, so the portal's assignee is never wiped
   if (person) out.assignee_id = person;
   return out;
@@ -244,7 +251,10 @@ async function syncStaff(m) {
     if (hit) member.portalId = hit.id;
   }
   m.staffCount = runtime.staff.length;
-  m.staffUnmatched = runtime.staff.filter(s => !(mockDb.teamMembers || []).some(mem => mem.portalId === s.id)).map(s => s.name || s.email || s.id);
+  const members = mockDb.teamMembers || [];
+  m.staffUnmatched = [...new Set(runtime.staff
+    .filter(st => !members.some(mem => String(mem.portalId) === st.id || str(mem.name).trim().toLowerCase() === str(st.name).trim().toLowerCase()))
+    .map(st => st.name || st.email || st.id))];
   return { ok: true };
 }
 
