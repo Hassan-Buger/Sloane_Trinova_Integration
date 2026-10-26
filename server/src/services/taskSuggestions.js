@@ -22,6 +22,7 @@ import { mockDb } from '../data/db.js';
 import { buildDeadlineList } from '../routes/statutory.js';
 import { clientDirectory } from './clientDirectory.js';
 import { ukToday, daysBetween } from './weeklyReport.js';
+import { businessOfClient, inBusiness } from './businessOf.js';
 
 export const RULES = {
   accounts: { daysAhead: 30, leadDays: 7, cover: /account/i, label: 'Accounts' },
@@ -102,18 +103,20 @@ function usedKeys() {
  * Builds the suggestions for now.
  * @returns {{ suggestions: object[], dismissedCount: number }}
  */
-export function buildSuggestions(now = new Date()) {
+export function buildSuggestions(now = new Date(), { business = '' } = {}) {
   const today = ukToday(now);
   const dismissed = dismissedKeys();
   const used = usedKeys();
   const out = [];
   let dismissedCount = 0;
 
-  const consider = ({ kind, id, name, date, clientId, extraTitle = '' }) => {
+  const consider = ({ kind, id, name, date, clientId, businessArea = null, extraTitle = '' }) => {
     const rule = RULES[kind];
     const days = daysBetween(today, date);
     if (days > rule.daysAhead) return;
     const key = `deadline:${kind}:${id}:${date}`;
+    const businessName = businessArea || businessOfClient(clientId);
+    if (!inBusiness(businessName, business)) return;
     if (used.has(key)) return;
     if (dismissed.has(key)) { dismissedCount++; return; }
     if (coveredBy(kind, clientId, name)) return;
@@ -136,6 +139,7 @@ export function buildSuggestions(now = new Date()) {
       clientId: ref ? ref.clientId : null,
       companyId: ref ? ref.companyId : null,
       clientName: name,
+      businessArea: businessName,
       filingDate: date,
       daysToFiling: days,
       dueDate,
@@ -153,14 +157,14 @@ export function buildSuggestions(now = new Date()) {
     const id = d.companyNumber || d.clientId || name;
     const accounts = day(d.accountsDueDate);
     const yearly = day(d.confirmationDueDate);
-    if (accounts) consider({ kind: 'accounts', id, name, date: accounts, clientId: d.clientId || null });
-    if (yearly) consider({ kind: 'yearly_update', id, name, date: yearly, clientId: d.clientId || null });
+    if (accounts) consider({ kind: 'accounts', id, name, date: accounts, clientId: d.clientId || null, businessArea: d.businessArea });
+    if (yearly) consider({ kind: 'yearly_update', id, name, date: yearly, clientId: d.clientId || null, businessArea: d.businessArea });
   }
 
   for (const v of mockDb.vatReturns || []) {
     const date = day(v.dueDate);
     if (v.status === 'Filed' || !date || !v.clientName) continue;
-    consider({ kind: 'vat', id: v.id, name: v.clientName, date, clientId: v.clientId || null, extraTitle: v.period || '' });
+    consider({ kind: 'vat', id: v.id, name: v.clientName, date, clientId: v.clientId || null, businessArea: v.businessArea || null, extraTitle: v.period || '' });
   }
 
   // Late first, then the soonest

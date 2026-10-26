@@ -30,6 +30,7 @@ function makeFrom(s, actor) {
     actor,
     extra: {
       sourceKey: s.key,
+      businessArea: s.businessArea || null,
       origin: 'suggested',
       creatorName: `Sloane (approved by ${actor?.actorName || 'you'})`
     }
@@ -42,7 +43,7 @@ export function registerSuggestionRoutes(app, { authenticate, requireScope }) {
     req.resourceType = 'suggestion';
     // Work from the latest TriNova clients and deadlines (remembered for a minute)
     await Promise.all([clientDirectory.refresh(), trinovaDeadlines.refresh()]);
-    const { suggestions, dismissedCount } = buildSuggestions();
+    const { suggestions, dismissedCount } = buildSuggestions(new Date(), { business: req.query.business });
     res.status(200).json({ status: 'success', data: suggestions, meta: { total: suggestions.length, dismissedCount } });
   });
 
@@ -62,7 +63,7 @@ export function registerSuggestionRoutes(app, { authenticate, requireScope }) {
     req.auditAction = 'suggestions_accepted_all';
     req.resourceType = 'suggestion';
     const only = Array.isArray(req.body?.keys) ? new Set(req.body.keys.map(String)) : null;
-    const chosen = buildSuggestions().suggestions.filter(s => !only || only.has(s.key));
+    const chosen = buildSuggestions(new Date(), { business: req.body?.business }).suggestions.filter(s => !only || only.has(s.key));
     const tasks = chosen.map(s => makeFrom(s, req.actor));
     res.status(201).json({
       status: 'success',

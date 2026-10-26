@@ -18,6 +18,8 @@ import { registerExportRoutes } from './routes/exportData.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerTwoFactorRoutes } from './routes/twoFactor.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
+import { registerAutomationRoutes } from './routes/automation.js';
+import { registerAlertRoutes } from './routes/alerts.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -60,6 +62,7 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
@@ -538,6 +541,8 @@ export function createApp(options = {}) {
 
   // "Sloane suggests": tasks worked out from deadlines, made when the owner approves them
   registerSuggestionRoutes(app, { authenticate, requireScope });
+  registerAutomationRoutes(app, { authenticate, requireScope });
+  registerAlertRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });

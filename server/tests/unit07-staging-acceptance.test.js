@@ -95,7 +95,7 @@ describe('Unit 07: Staging Validation & Acceptance Testing', () => {
         id: STAGING_CLIENT_ID,
         name: "Staging Test Corporate Group",
         clientType: "Corporate Group",
-        businessArea: "Trinova Accounting",
+        businessArea: "TriNova Accounting",
         status: "Active",
         assignedManagerId: "usr_kirsty_allen",
         assignedManagerName: "Kirsty Allen",

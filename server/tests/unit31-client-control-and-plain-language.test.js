@@ -67,7 +67,7 @@ describe('Unit 31: Client control & plain-English wording', () => {
 
     test('1.2 Renaming to a name that already exists is refused (409)', async () => {
       const res = await fetch(`${baseUrl}/api/v1/businesses/${bizId}`, {
-        method: 'PATCH', headers: auth, body: JSON.stringify({ name: 'Trinova Accounting' })
+        method: 'PATCH', headers: auth, body: JSON.stringify({ name: 'TriNova Accounting' })
       });
       assert.equal(res.status, 409);
     });
@@ -88,7 +88,7 @@ describe('Unit 31: Client control & plain-English wording', () => {
     });
 
     test('1.5 A business that still has clients cannot be removed (409, plain message)', async () => {
-      const used = mockDb.businesses.find(b => b.name === 'Trinova Accounting');
+      const used = mockDb.businesses.find(b => b.name === 'TriNova Accounting');
       const res = await fetch(`${baseUrl}/api/v1/businesses/${used.id}`, { method: 'DELETE', headers: auth });
       assert.equal(res.status, 409);
       const body = await res.json();
@@ -111,7 +111,7 @@ describe('Unit 31: Client control & plain-English wording', () => {
     test('2.1 A new client is flagged as added in Sloane and gets no invented data', async () => {
       const res = await fetch(`${baseUrl}/api/v1/clients`, {
         method: 'POST', headers: auth,
-        body: JSON.stringify({ name: 'Unit31 Client Ltd', biz: 'Trinova Accounting', dirs: 'Jane Example' })
+        body: JSON.stringify({ name: 'Unit31 Client Ltd', biz: 'TriNova Accounting', dirs: 'Jane Example' })
       });
       assert.equal(res.status, 201);
       const body = await res.json();

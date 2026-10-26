@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { takeOut, takeOutAll, putInBin } from '../services/bin.js';
 import { sendError } from './helpers.js';
+import { defaultTrinovaBusiness } from '../services/businessOf.js';
 
 /**
  * Takes out everything Sloane stored for a client that is being deleted: its company, tasks,
@@ -166,7 +167,8 @@ function sloaneAddedClients(req) {
 /** The business the owner has put a TriNova client under, or null. */
 function businessFor(clientId) {
   const row = (mockDb.clientBusiness || []).find(r => r.id === String(clientId));
-  return row ? row.businessArea : null;
+  // A TriNova client belongs to TriNova Accounting unless the owner has put it under another business
+  return row && row.businessArea ? row.businessArea : defaultTrinovaBusiness();
 }
 
 function respondWithSloaneClientsOnly(req, res, trinovaStatus) {

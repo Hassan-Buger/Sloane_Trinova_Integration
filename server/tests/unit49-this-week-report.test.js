@@ -147,7 +147,7 @@ describe('Unit 49: the This week report', () => {
     assert.match(html, /data-action="printWeeklyReport"/);
     assert.match(html, /id="weeklyReport"/);
     assert.match(css, /@media print \{[\s\S]*@page \{\s*size: A4;/);
-    assert.match(css, /body\.printing-report \.view:not\(#view-reports\)/);
+    assert.match(css, /body\.printing-report \.view:not\(\.print-this\)/);
     assert.match(css, /body\.printing-report \.side,/);
   });
 });

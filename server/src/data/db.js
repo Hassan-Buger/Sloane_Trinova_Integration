@@ -11,14 +11,12 @@
  *   NODE_ENV=test or SLOANE_DEMO_DATA=true. A real install starts with no example data.
  */
 
-/** The businesses a brand-new Sloane starts with. The owner can rename or remove them. */
+/** The owner's four businesses, which a brand-new Sloane starts with. The owner can rename, add or remove them. */
 export const DEFAULT_BUSINESSES = [
-  { id: "biz-1", name: "Trinova Accounting", type: "Accountancy & Tax", status: "Active" },
+  { id: "biz-1", name: "TriNova Accounting", type: "Accountancy & Tax", status: "Active" },
   { id: "biz-2", name: "CFI Awarding", type: "Awarding Organisation", status: "Active" },
-  { id: "biz-3", name: "The Thinking Tent / Yellow Brick", type: "Consultancy & Design", status: "Active" },
-  { id: "biz-4", name: "MTDflow", type: "Fintech / SaaS", status: "Active" },
-  { id: "biz-5", name: "Meta Digital Accounting", type: "Digital Accounting", status: "Active" },
-  { id: "biz-6", name: "Other ventures & property", type: "Holdings & Investments", status: "Active" }
+  { id: "biz-3", name: "Emerald Education", type: "Education & Training", status: "Active" },
+  { id: "biz-4", name: "MTDflow", type: "Fintech / SaaS", status: "Active" }
 ];
 
 const SAMPLE_DATA = {
@@ -31,7 +29,7 @@ const SAMPLE_DATA = {
       id: "cli_woofington_grp",
       name: "Jenkins Family Holdings / Woofington Group",
       clientType: "Corporate Group",
-      businessArea: "Trinova Accounting",
+      businessArea: "TriNova Accounting",
       status: "Active",
       assignedManagerId: "usr_kirsty_allen",
       assignedManagerName: "Kirsty Allen",
@@ -58,7 +56,7 @@ const SAMPLE_DATA = {
       id: "cli_rgb_elevations",
       name: "R GB Elevations",
       clientType: "SME",
-      businessArea: "Trinova Accounting",
+      businessArea: "TriNova Accounting",
       status: "Active",
       assignedManagerId: "usr_hamza_malik",
       assignedManagerName: "Hamza Malik",
@@ -78,7 +76,7 @@ const SAMPLE_DATA = {
       id: "cli_alpha_delta",
       name: "Alpha Delta Creative",
       clientType: "Design Agency",
-      businessArea: "Trinova Accounting",
+      businessArea: "TriNova Accounting",
       status: "Active",
       assignedManagerId: "usr_kirsty_allen",
       assignedManagerName: "Kirsty Allen",
@@ -743,7 +741,12 @@ export const COLLECTIONS = {
   // Two-step sign-in: encrypted authenticator key, hashed recovery codes, trusted browsers
   security: { id: r => r.id },
   // "Not needed" answers to Sloane's suggested tasks, so they do not come back
-  suggestionDismissals: { id: r => r.id }
+  suggestionDismissals: { id: r => r.id },
+  // Notes about the install itself (for example, which one-time fix-ups have run)
+  appMeta: { id: r => r.id },
+  // What Sloane may do on her own, and what she has done (see services/automation.js)
+  automationRules: { id: r => r.id },
+  automationLog: { id: r => r.id }
 };
 
 /** Whether the built-in example records should be loaded (tests and explicit demo mode only). */

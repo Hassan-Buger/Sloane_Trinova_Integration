@@ -10,6 +10,7 @@
 
 import { mockDb } from '../../data/db.js';
 import { TimelineService } from '../timelineService.js';
+import { buildWorkContext } from './workAnswers.js';
 
 export class ContextBuilder {
   /**
@@ -184,9 +185,11 @@ export class ContextBuilder {
           })),
           clientSummaries,
           criticalOrBlockedTasks: urgentTasks
-        }
+        },
+        // Who is doing what, and what is late or stuck in each business
+        work: buildWorkContext()
       };
-      privacyAudit.sanitizedFieldsIncluded.push('executive_overview');
+      privacyAudit.sanitizedFieldsIncluded.push('executive_overview', 'team_and_business_work');
     }
 
     return {

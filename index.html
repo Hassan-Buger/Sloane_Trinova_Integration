@@ -12,12 +12,15 @@
   
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c9a66b'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='700' text-anchor='middle' fill='%23080b10' font-family='Arial,sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 
+  <link rel="manifest" href="assets/manifest.webmanifest">
+  <meta name="theme-color" content="#080b10">
+
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.12.0">
-  <link rel="stylesheet" href="styles/layout.css?v=2.12.0">
-  <link rel="stylesheet" href="styles/components.css?v=2.12.0">
-  <link rel="stylesheet" href="styles/views.css?v=2.12.0">
-  <link rel="stylesheet" href="styles/auth.css?v=2.12.0">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.15.0">
+  <link rel="stylesheet" href="styles/layout.css?v=2.15.0">
+  <link rel="stylesheet" href="styles/components.css?v=2.15.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.15.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.15.0">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -189,12 +192,27 @@
         <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close navigation drawer" title="Close drawer">✕</button>
       </div>
 
+      <div class="scope-pick">
+        <label for="businessScope">Viewing</label>
+        <select id="businessScope" class="select-input" data-change="changeBusinessScope" aria-label="Which business to show">
+          <option value="">All businesses</option>
+        </select>
+      </div>
+
       <ul class="nav-list">
         <li>
           <button class="nav-btn active" data-view="command" id="nav-command">
             <span class="nav-btn-content">
               <span>📊</span>
               <span>Today</span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" data-view="briefing" id="nav-briefing" title="Everything for the start of your day, across all your businesses">
+            <span class="nav-btn-content">
+              <span>☀️</span>
+              <span>Morning briefing</span>
             </span>
           </button>
         </li>
@@ -310,7 +328,7 @@
 
         <div class="ask-wrapper">
           <form class="ask-form" id="askForm">
-            <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane a question, e.g. What is due this week?" autocomplete="off">
+            <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane, e.g. What needs chasing?" autocomplete="off">
             <select id="topAiProviderSelect" class="ask-provider-select" title="Choose which AI answers your question">
               <option value="auto">⚡ Automatic</option>
               <option value="gemini">✨ Gemini</option>
@@ -324,8 +342,17 @@
             <button type="button" class="ask-pill-suggestion" data-prompt="What should I focus on today?">Today's focus</button>
             <button type="button" class="ask-pill-suggestion" data-prompt="Summarise overdue statutory filings.">Late filings</button>
             <button type="button" class="ask-pill-suggestion" data-prompt="Show high risk client alerts.">Risky clients</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Which clients are behind?">Clients behind</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="What needs chasing?">Needs chasing</button>
+            <button type="button" class="ask-pill-suggestion" data-prompt="Who has the most on right now?">Team workload</button>
           </div>
         </div>
+      </div>
+
+      <div class="sourcebanner scope-banner" id="scopeBanner" hidden>
+        <span>👁</span>
+        <span>Showing <strong id="scopeBannerName"></strong> only. The numbers and lists below are for that business.</span>
+        <button type="button" class="card-action-btn" data-action="clearBusinessScope">Show all businesses</button>
       </div>
 
       <!-- ====================================================================
@@ -416,7 +443,7 @@
         <!-- Businesses Quick Grid -->
         <div style="margin-bottom: 24px;">
           <div class="card-header" style="margin-bottom: 12px;">
-            <h2 style="font-size: 15px;">Your Businesses Overview</h2>
+            <h2 style="font-size: 15px;">Your businesses at a glance</h2>
             <button class="btn btn-secondary" onclick="app.switchView('businesses')" style="padding: 4px 12px; font-size: 11px;">View All ↗</button>
           </div>
           <div class="biz-grid" id="cmdBizCards" style="margin-top: 0;">
@@ -867,6 +894,23 @@
       </section>
 
       <!-- ====================================================================
+           Morning briefing: the start of the day across all the businesses, prints on A4
+           ==================================================================== -->
+      <section class="view hidden" id="view-briefing">
+        <div class="card-header report-toolbar">
+          <div>
+            <h2 style="font-size: 18px;">Morning briefing</h2>
+            <p class="page-intro">What to do first, how each business is doing, who is doing what, what is at risk, and what Sloane recommends. Use "Viewing" in the menu to see one business only.</p>
+          </div>
+          <div class="report-buttons">
+            <button type="button" class="btn btn-secondary" data-action="refreshMorningBriefing">↻ Refresh</button>
+            <button type="button" class="btn btn-primary" data-action="printMorningBriefing">🖨 Print or save as PDF</button>
+          </div>
+        </div>
+        <article class="report-paper" id="morningBriefing"></article>
+      </section>
+
+      <!-- ====================================================================
            Reports: "This week", a one-page summary that prints on A4
            ==================================================================== -->
       <section class="view hidden" id="view-reports">
@@ -921,6 +965,14 @@
 
           <div class="card" id="securityCard">
             <!-- Filled in by scripts/features/security.js -->
+          </div>
+
+          <div class="card" id="alertsCard">
+            <!-- Filled in by scripts/features/alerts.js -->
+          </div>
+
+          <div class="card" id="automationCard">
+            <!-- Filled in by scripts/features/automation.js -->
           </div>
 
           <div class="card" id="yourDataCard">
@@ -1431,6 +1483,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.12.0"></script>
+  <script type="module" src="scripts/app.js?v=2.15.0"></script>
 </body>
 </html>

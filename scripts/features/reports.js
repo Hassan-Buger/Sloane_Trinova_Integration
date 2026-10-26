@@ -155,9 +155,12 @@ export const reportMethods = {
   async printWeeklyReport() {
     if (!this.weeklyReport) await this.renderWeeklyReport();
     // Only the report is printed (see "Printing the This week report" in views.css)
+    const view = document.getElementById('view-reports');
     document.body.classList.add('printing-report');
+    if (view) view.classList.add('print-this');
     const done = () => {
       document.body.classList.remove('printing-report');
+      if (view) view.classList.remove('print-this');
       window.removeEventListener('afterprint', done);
     };
     window.addEventListener('afterprint', done);

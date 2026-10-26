@@ -22,6 +22,11 @@ import { dataExportMethods, DATA_EXPORT_ACTIONS } from './features/dataExport.js
 import { reportMethods, REPORT_ACTIONS } from './features/reports.js';
 import { securityMethods, SECURITY_ACTIONS } from './features/security.js';
 import { suggestionMethods, SUGGESTION_ACTIONS } from './features/suggestions.js';
+import { businessScopeMethods, BUSINESS_SCOPE_ACTIONS, savedBusinessScope } from './features/businessScope.js';
+import { briefingMethods, BRIEFING_ACTIONS } from './features/briefing.js';
+import { proposalMethods, PROPOSAL_ACTIONS, proposalsHtml } from './features/proposals.js';
+import { automationMethods, AUTOMATION_ACTIONS } from './features/automation.js';
+import { alertMethods, ALERT_ACTIONS } from './features/alerts.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -56,6 +61,12 @@ class SloaneApp {
     this.currentView = 'command';
     this.searchQuery = '';
     this.selectedBizFilter = 'All';
+    // The business this browser was looking at last time
+    const rememberedScope = savedBusinessScope();
+    if (rememberedScope) {
+      ApiService.setBusinessScope(rememberedScope);
+      this.selectedBizFilter = rememberedScope;
+    }
     this.selectedBrainEntryForTrinova = null;
     this.activeClient360Id = null;
     this.activeClientTab = 'overview';
@@ -71,11 +82,11 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS, ...BUSINESS_SCOPE_ACTIONS, ...BRIEFING_ACTIONS, ...PROPOSAL_ACTIONS, ...AUTOMATION_ACTIONS, ...ALERT_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
-      'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
+      'changeBusinessScope', 'changeAutomationMode', 'changeAutomationBusiness', 'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
     ]);
   }
 
@@ -192,6 +203,8 @@ class SloaneApp {
     if (!this.greetingTimer) {
       this.greetingTimer = setInterval(() => this.updateGreeting(), 60 * 1000);
     }
+    // Check for things that need attention every few minutes
+    this.startAlerts();
   }
 
   /** "Good morning / afternoon / evening, Kirsty", by UK time (Kirsty is in the UK). */
@@ -1070,6 +1083,8 @@ class SloaneApp {
       OutlookSettings.loadStatus();
       this.renderSystemStatus();
       this.renderSecurity();
+      this.renderAutomation();
+      this.renderAlertsCard();
     }
 
     if (viewId === 'bin') {
@@ -1078,6 +1093,10 @@ class SloaneApp {
 
     if (viewId === 'reports') {
       this.renderWeeklyReport();
+    }
+
+    if (viewId === 'briefing') {
+      this.renderMorningBriefing();
     }
 
     if (viewId === 'command') {
@@ -1339,21 +1358,11 @@ class SloaneApp {
       }
     }
 
-    // 3. Render Businesses Preview Grid
+    // 3. Every business at a glance (late, due this week, stuck); pressing one switches to it
     const { data: businesses } = await ApiService.getBusinesses();
-    const cmdBizGrid = document.getElementById('cmdBizCards');
-    if (cmdBizGrid) {
-      cmdBizGrid.innerHTML = (businesses || []).slice(0, 6).map(b => `
-        <div class="card" style="padding: var(--space-4); cursor: pointer;" onclick="app.switchView('businesses')">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span class="pill green" style="font-size: 10px;">${escapeHtml(b.status)}</span>
-            <span style="font-size: 11px; font-weight: 700; color: var(--accent);">${escapeHtml(b.clientCount)} ${Number(b.clientCount) === 1 ? 'client' : 'clients'}</span>
-          </div>
-          <div style="font-size: 13px; font-weight: 800; color: var(--text);">${escapeHtml(b.name)}</div>
-          <div style="font-size: 10px; color: var(--muted);">${escapeHtml(b.type)}</div>
-        </div>
-      `).join('');
-    }
+    this.lastBusinesses = businesses || [];
+    this.renderBusinessScope(this.lastBusinesses);
+    await this.renderBusinessCards();
 
     // 4. Render Waiting Sign-off from API (Task P7.3: dynamic sign-off tasks)
     const signoffContainer = document.getElementById('waitingSignoffContainer');
@@ -1896,8 +1905,8 @@ class SloaneApp {
         submitLabel: 'Mark as done',
         fields: [{ name: 'note', label: 'What happened?', type: 'textarea', required: true, maxlength: 1000 }],
         onSubmit: async v => {
-          await ApiService.completeTask(taskId, v.note);
-          Toast.success('Marked as done.');
+          const done = await ApiService.completeTask(taskId, v.note);
+          Toast.success(done.meta && done.meta.nextTask ? `Marked as done. ${done.message.split('. ').pop()}` : 'Marked as done.');
           await this.refreshTaskViews();
         }
       });
@@ -1906,8 +1915,8 @@ class SloaneApp {
 
     if (btn) btn.disabled = true;
     try {
-      await ApiService.completeTask(taskId);
-      Toast.success('Marked as done.');
+      const done = await ApiService.completeTask(taskId);
+      Toast.success(done.meta && done.meta.nextTask ? `Marked as done. ${done.message.split('. ').pop()}` : 'Marked as done.');
       await this.refreshTaskViews();
     } catch (err) {
       if (btn) btn.disabled = false;
@@ -1918,8 +1927,8 @@ class SloaneApp {
   async changeTaskStatus(taskId, status, selectEl) {
     if (selectEl) selectEl.disabled = true;
     try {
-      await ApiService.updateTask(taskId, { status });
-      Toast.success('Status updated.');
+      const changed = await ApiService.updateTask(taskId, { status });
+      Toast.success(changed.meta && changed.meta.nextTask ? `Status updated. ${changed.message.split('. ').pop()}` : 'Status updated.');
       this.cachedTasks = null;
       await this.renderPeopleWork();
       await this.renderCommandCentre();
@@ -2514,6 +2523,8 @@ class SloaneApp {
             ${escapeHtml(data.answer || 'Analysis complete.').replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>')}
           </div>
 
+          ${proposalsHtml(this, data.proposals)}
+
           <!-- Key Drivers (Only if present) -->
           ${data.key_reasons && data.key_reasons.length > 0 ? `
             <div class="ai-subheading">Why Sloane says this</div>
@@ -2661,7 +2672,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods, businessScopeMethods, briefingMethods, proposalMethods, automationMethods, alertMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

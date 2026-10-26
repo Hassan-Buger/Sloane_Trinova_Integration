@@ -93,7 +93,7 @@ describe('Unit 33: Persistence', () => {
 
     test('1.2 A client added in Sloane (with its company) and a task survive a restart', async () => {
       const cRes = await fetch(`${baseUrl}/api/v1/clients`, {
-        method: 'POST', headers: auth, body: JSON.stringify({ name: 'Persisted Client Ltd', biz: 'Trinova Accounting', no: '99999999' })
+        method: 'POST', headers: auth, body: JSON.stringify({ name: 'Persisted Client Ltd', biz: 'TriNova Accounting', no: '99999999' })
       });
       assert.equal(cRes.status, 201);
       const client = (await cRes.json()).data;

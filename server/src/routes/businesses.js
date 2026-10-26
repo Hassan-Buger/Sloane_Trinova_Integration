@@ -1,5 +1,9 @@
 import { mockDb } from '../data/db.js';
 import { takeOut, putInBin } from '../services/bin.js';
+import { buildBusinessOverview } from '../services/businessOverview.js';
+import { defaultTrinovaBusiness } from '../services/businessOf.js';
+import { clientDirectory } from '../services/clientDirectory.js';
+import { trinovaDeadlines } from '../services/trinovaDeadlines.js';
 
 /**
  * Business Areas Routes
@@ -7,10 +11,26 @@ import { takeOut, putInBin } from '../services/bin.js';
  */
 /** How many TriNova clients the owner has put under this business. */
 function linkedLiveClients(name) {
-  return (mockDb.clientBusiness || []).filter(r => r.businessArea === name).length;
+  const placed = (mockDb.clientBusiness || []).filter(r => r.businessArea === name).length;
+  // TriNova clients with no other business chosen belong to TriNova Accounting
+  if (name !== defaultTrinovaBusiness()) return placed;
+  const chosen = new Set((mockDb.clientBusiness || []).map(r => r.id));
+  return placed + clientDirectory.trinovaClients().filter(c => !chosen.has(c.id)).length;
 }
 
 export function registerBusinessRoutes(app, { authenticate, requireScope }) {
+  /**
+   * GET /api/v1/businesses/overview
+   * Every business at a glance: late, due this week, and how the work is going.
+   */
+  app.get('/api/v1/businesses/overview', authenticate, requireScope('sloane:read'), async (req, res) => {
+    req.auditAction = 'read_business_overview';
+    req.resourceType = 'business_area';
+    await Promise.all([clientDirectory.refresh(), trinovaDeadlines.refresh()]);
+    const { businesses, total } = buildBusinessOverview();
+    res.status(200).json({ status: 'success', data: businesses, meta: { total } });
+  });
+
   /**
    * GET /api/v1/businesses
    * Retrieves all business areas enriched with dynamic linked client counts.
@@ -160,6 +180,9 @@ export function registerBusinessRoutes(app, { authenticate, requireScope }) {
       }
       for (const r of (mockDb.clientBusiness || [])) {
         if (r.businessArea === previousName) r.businessArea = biz.name;
+      }
+      for (const list of [mockDb.tasks, mockDb.statutoryTracker, mockDb.vatReturns]) {
+        for (const r of (list || [])) if (r.businessArea === previousName) r.businessArea = biz.name;
       }
     }
     biz.updatedAt = new Date().toISOString();

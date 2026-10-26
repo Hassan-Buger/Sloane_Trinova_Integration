@@ -224,7 +224,7 @@ describe('Unit 39: Plain-English messages', () => {
     });
 
     test('5.4 Business messages call it a business, not a "business area"', async () => {
-      const dup = await call('POST', '/businesses', { name: 'Trinova Accounting', type: 'x' });
+      const dup = await call('POST', '/businesses', { name: 'TriNova Accounting', type: 'x' });
       assert.equal(dup.status, 409);
       const msg = await message(dup);
       assert.match(msg, /already exists/);

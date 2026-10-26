@@ -9,6 +9,10 @@ import { logger } from './middleware/sanitizer.js';
 import { persistence } from './data/persistence.js';
 import { clearExpired, BIN_DAYS } from './services/bin.js';
 import { resetAll as resetTwoFactor } from './services/twoFactor.js';
+import { migrateBusinesses } from './services/businessMigration.js';
+import { runAutomation, getRules } from './services/automation.js';
+import { clientDirectory } from './services/clientDirectory.js';
+import { trinovaDeadlines } from './services/trinovaDeadlines.js';
 
 /**
  * Validates required environment variables on startup.
@@ -66,6 +70,13 @@ if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
       logger.error(`Could not open the database: ${err.message}. Sloane will start, but nothing will be saved.`);
     }
 
+    // One-time: make the list of businesses match the owner's four (safe: see businessMigration.js)
+    const businessChange = migrateBusinesses();
+    if (businessChange === 'replaced' || businessChange === 'added') {
+      logger.info(`Businesses updated (${businessChange}).`);
+      persistence.scheduleFlush();
+    }
+
     // Emergency switch for the developer: TWO_FACTOR_RESET=true turns two-step sign-in off
     // (for when the owner has lost both the phone and the recovery codes). Remove it afterwards.
     if (String(process.env.TWO_FACTOR_RESET || '').toLowerCase() === 'true') {
@@ -89,6 +100,23 @@ if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
     clearBin();
     const binTimer = setInterval(clearBin, 6 * 60 * 60 * 1000);
     if (binTimer.unref) binTimer.unref();
+
+    // If the owner has allowed it, Sloane makes the tasks that the deadline rules find: every hour.
+    const automate = async () => {
+      try {
+        if (getRules().deadlineTasks.mode !== 'auto') return;
+        await Promise.all([clientDirectory.refresh(), trinovaDeadlines.refresh()]);
+        const out = runAutomation();
+        if (out.created > 0) {
+          logger.info(`Automation: ${out.created} task${out.created === 1 ? '' : 's'} made from the deadline rules.`);
+          persistence.scheduleFlush();
+        }
+      } catch (err) {
+        logger.warn(`Automation could not run: ${err.message}`);
+      }
+    };
+    const automationTimer = setInterval(automate, 60 * 60 * 1000);
+    if (automationTimer.unref) automationTimer.unref();
 
     const app = createApp();
     const host = process.env.HOST || '0.0.0.0';

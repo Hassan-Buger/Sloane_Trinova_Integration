@@ -13,6 +13,7 @@ import { mockDb } from '../data/db.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { buildDeadlineList } from './statutory.js';
 import { claudeService } from '../services/ai/claudeService.js';
+import { proposeTasks } from '../services/ai/taskProposals.js';
 import { config } from '../config.js';
 import { ukPartOfDay } from '../services/ukTime.js';
 
@@ -148,6 +149,36 @@ export function registerAiRoutes(app, { authenticate, requireScope }) {
           }
         });
       }
+    }
+
+    // 4.5 "Ask Priya to ...", "Remind me to ...", or pasted text with promises in it:
+    // offered back as tasks to approve. Nothing is created until the owner presses "Create task".
+    const proposed = proposeTasks(message);
+    if (proposed.proposals.length) {
+      const n = proposed.proposals.length;
+      req.auditAction = 'ai_task_proposed';
+      req.resourceType = 'executive_ai';
+      return res.status(200).json({
+        status: 'fallback',
+        source: 'sloane_task_proposals',
+        model: 'rules',
+        requestId: `ai_req_${Date.now()}`,
+        data: {
+          response_type: 'practice_assessment',
+          answer: proposed.kind === 'instruction'
+            ? 'I can make this task. Check it, then press "Create task". Nothing is made until you do.'
+            : `I found ${n} thing${n === 1 ? '' : 's'} in that text that look${n === 1 ? 's' : ''} like ${n === 1 ? 'a task' : 'tasks'}. I may have missed some, and I cannot tell who should do each one, so please check before you create anything.`,
+          risk_level: 'neutral',
+          key_reasons: [],
+          recommended_actions: [],
+          evidence: [],
+          proposals: proposed.proposals
+        },
+        privacy: { privateCeoBrainDenied: true },
+        usage: { durationMs: 0 },
+        reason: null,
+        errorMessage: null
+      });
     }
 
     try {

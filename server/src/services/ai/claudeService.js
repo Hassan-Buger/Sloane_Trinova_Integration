@@ -10,6 +10,7 @@ import { SLOANE_SYSTEM_PROMPT, BRIEFING_SYSTEM_PROMPT } from './prompts.js';
 import { mockDb } from '../../data/db.js';
 import { clientDirectory } from '../clientDirectory.js';
 import { buildDeadlineList } from '../../routes/statutory.js';
+import { answerWorkQuestion } from './workAnswers.js';
 
 export class ClaudeService {
   constructor(options = {}) {
@@ -590,6 +591,21 @@ ${query}`;
           recommended_actions,
           evidence
         },
+        usage: { durationMs }
+      };
+    }
+
+    // 3.45 Questions about people, clients that are behind, what needs chasing, or one business
+    const work = answerWorkQuestion(query);
+    if (work) {
+      return {
+        status: 'fallback',
+        source: 'sloane_rules_engine',
+        model: 'deterministic_grounded_fallback',
+        requestId,
+        reason,
+        errorMessage,
+        data: work,
         usage: { durationMs }
       };
     }

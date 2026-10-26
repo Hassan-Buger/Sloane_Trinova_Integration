@@ -13,6 +13,7 @@
 import { mockDb } from '../data/db.js';
 import { buildDeadlineList } from '../routes/statutory.js';
 import { clientDirectory } from './clientDirectory.js';
+import { businessOfClient, businessOfTask, inBusiness } from './businessOf.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CLOSED = ['Completed', 'Cancelled'];
@@ -52,7 +53,7 @@ const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.name |
  * Builds the report.
  * @param {Date} [now]
  */
-export function buildWeeklyReport(now = new Date()) {
+export function buildWeeklyReport(now = new Date(), { business = '' } = {}) {
   const today = ukToday(now);
   const weekEnd = addDays(today, 6);
   const monthEnd = addDays(today, 30);
@@ -60,21 +61,21 @@ export function buildWeeklyReport(now = new Date()) {
   // ---- Filings (accounts and yearly update), one line per filing ----
   const filings = [];
   for (const d of buildDeadlineList()) {
-    if (d.isDissolved) continue;
+    if (d.isDissolved || !inBusiness(d.businessArea, business)) continue;
     const name = d.name || d.companyName || d.companyNumber || 'Unnamed company';
     for (const [what, date] of [['Accounts', day(d.accountsDueDate)], ['Yearly update', day(d.confirmationDueDate)]]) {
       if (!date) continue;
-      filings.push({ kind: 'filing', what, name, companyNumber: d.companyNumber || '', date, days: daysBetween(today, date), clientId: d.clientId || null });
+      filings.push({ kind: 'filing', what, name, companyNumber: d.companyNumber || '', date, days: daysBetween(today, date), clientId: d.clientId || null, business: d.businessArea || null });
     }
   }
 
   // ---- VAT returns not yet filed ----
   const vat = (mockDb.vatReturns || [])
-    .filter(v => v.status !== 'Filed' && day(v.dueDate))
-    .map(v => ({ kind: 'vat', what: `VAT return${v.period ? ` (${v.period})` : ''}`, name: v.clientName, date: day(v.dueDate), days: daysBetween(today, day(v.dueDate)), status: v.status }));
+    .filter(v => v.status !== 'Filed' && day(v.dueDate) && inBusiness(v.businessArea || businessOfClient(v.clientId), business))
+    .map(v => ({ kind: 'vat', what: `VAT return${v.period ? ` (${v.period})` : ''}`, name: v.clientName, date: day(v.dueDate), days: daysBetween(today, day(v.dueDate)), status: v.status, business: v.businessArea || businessOfClient(v.clientId) || null }));
 
   // ---- Tasks ----
-  const open = (mockDb.tasks || []).filter(t => !CLOSED.includes(t.status));
+  const open = (mockDb.tasks || []).filter(t => !CLOSED.includes(t.status) && inBusiness(businessOfTask(t), business));
   const taskLine = t => ({
     kind: 'task',
     what: t.title,
@@ -83,6 +84,8 @@ export function buildWeeklyReport(now = new Date()) {
     date: day(t.dueDate),
     days: day(t.dueDate) ? daysBetween(today, day(t.dueDate)) : null,
     priority: t.priority || '',
+    business: businessOfTask(t),
+    waiting: (t.dependsOn || []).map(id => (mockDb.tasks || []).find(x => x.id === id)).filter(x => x && !CLOSED.includes(x.status)).map(x => x.title),
     stuck: t.isBlocked ? (t.blocker || 'Held up') : ''
   });
   const tasks = open.map(taskLine);
@@ -103,7 +106,7 @@ export function buildWeeklyReport(now = new Date()) {
 
   const weekAgo = Date.parse(`${addDays(today, -6)}T00:00:00Z`);
   const done = (mockDb.tasks || [])
-    .filter(t => t.status === 'Completed' && t.completedAt && Date.parse(t.completedAt) >= weekAgo)
+    .filter(t => t.status === 'Completed' && t.completedAt && Date.parse(t.completedAt) >= weekAgo && inBusiness(businessOfTask(t), business))
     .map(t => ({ ...taskLine(t), date: day(t.completedAt), how: t.completionNotes || '' }))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
@@ -124,6 +127,7 @@ export function buildWeeklyReport(now = new Date()) {
   }
 
   return {
+    business: business && business.toLowerCase() !== 'all' ? business : null,
     period: { from: today, to: weekEnd },
     generatedAt: now.toISOString(),
     counts: {

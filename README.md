@@ -174,7 +174,31 @@ On **Today**, Sloane proposes tasks it has worked out from deadlines and VAT ret
 - **No duplicates:** nothing is suggested if a task already carries the suggestion key (even a finished or cancelled one), if an open task for that client already covers that kind of work (by title: accounts / yearly update / VAT), or if the owner pressed *Not needed*. The key includes the due date, so next year's deadline is a new suggestion (recurring work).
 - **Who:** the client's manager (from TriNova `account_manager` or the client record) becomes the assignee when that person is on the Team page; otherwise the task is unassigned and the manager is named.
 - **Always approved by the owner:** nothing is made until *Create task* / *Create all* is pressed (the second asks first). Only a suggestion Sloane is making at that moment can be accepted. Tasks keep `sourceKey` and `origin: 'suggested'`, and get the usual history entry and audit entry.
-- **Not done yet (needs agreement or connections):** creating tasks automatically under agreed rules; finding work from emails, Teams and meetings; syncing tasks with TriNova (the TriNova API has no task routes that Sloane has found, and Sloane only reads from TriNova today).
+- **Automatic making** is available as an opt-in rule (see "What Sloane may do on her own" below). **Not done yet (needs connections):** finding work from emails, Teams and meetings; syncing tasks with TriNova (the TriNova API has no task routes that Sloane has found, and Sloane only reads from TriNova today). See `docs/specs/trinova-task-sync.md` and `docs/specs/microsoft-365-teams-mailboxes.md`.
+
+### Four businesses, task details and the "Viewing" choice
+
+- The four businesses are **TriNova Accounting, CFI Awarding, Emerald Education, MTDflow** (`DEFAULT_BUSINESSES` in `server/src/data/db.js`). `services/businessMigration.js` moves an install that still has the original six untouched example businesses to these four, or only adds Emerald Education, once (it remembers in `appMeta`). Businesses are kept by name.
+- A client belongs to a business (clients read from TriNova default to TriNova Accounting unless the owner chooses another: `clientBusiness`). A task, deadline or VAT return takes its client's business unless one is chosen (`services/businessOf.js`).
+- **Viewing** (sidebar) filters Today, Team & Tasks, Deadlines, Warnings, This week and suggestions to one business (`?business=`). `GET /api/v1/businesses/overview` gives every business's counts and health colour for the Today cards.
+- **Task details:** business, department, next action, waiting for (another task), repeat (weekly / monthly / quarterly / yearly: finishing one makes the next), links to emails, documents and Teams chats (web addresses only), and append-only progress notes (`POST /tasks/:id/notes`).
+
+### Morning briefing
+
+Menu → **Morning briefing** (`GET /api/v1/reports/morning`, `services/morningBriefing.js`): what to do first, today's diary and flagged emails (from Outlook when connected, read in the browser), each business's health with a plain summary, who is doing what, risks and recommendations. Wording is rule-based and never says work is on track when nothing says so; Teams is stated as not connected. Prints on A4 like This week.
+
+### Ask Sloane
+
+- **Questions about the work** (`services/ai/workAnswers.js`): "What's Mark working on?", "Which TriNova clients are behind?", "What needs chasing at Emerald?", "How is MTDflow doing?", "Who has the most on?". Answered from saved records only; an unknown name is reported, not guessed. The same facts are put in the `work` block of the context for Claude / Gemini when a key is set. Without a key the grounded rules engine answers.
+- **Delegating** (`services/ai/taskProposals.js`): "Ask Priya to chase the bank statements for Acme by Friday", "Remind me to...", or pasted email / meeting notes. Sloane answers with **Tasks to create** (assignee, date and client found); nothing is made until *Create task*. From pasted text it finds promises and requests ("I will...", "Could you...", "Action: ...") and marks each "check who should do this". Plain rules, so it can miss things.
+
+### What Sloane may do on her own
+
+Settings → **What Sloane may do on her own** (`GET /api/v1/automation`, `PUT /automation/rules`, `POST /automation/run`; signed-in owner only). One rule can be automatic: *make tasks for filing and VAT deadlines* (the same rules as "Sloane suggests"), for all businesses or one. Default **Ask me first**. When automatic, a timer in `server.js` makes the tasks hourly (at most 25 per run, never twice), marks them `origin: 'automation'`, and lists them under "What Sloane did on her own" (`automationLog`). Sending to anyone outside, spending money and sensitive decisions are shown as locked: always ask.
+
+### Alerts
+
+`GET /api/v1/alerts` lists what needs attention (late, stuck, due today, due soon with nobody on it, deadlines with no task), each with a stable id. Settings → **Alerts** turns on browser notifications for this device (`scripts/features/alerts.js`, `scripts/sw.js`, `assets/manifest.webmanifest`): while Sloane is open, or added to a phone's Home Screen, each new alert is shown once. **Alerts when Sloane is completely closed need Web Push (VAPID keys + a push service) and are not built.**
 
 ### The Bin (30 days)
 

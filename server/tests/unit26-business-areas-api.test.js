@@ -76,8 +76,8 @@ describe('Task P7.4.2: Add Business Area Working Against API', () => {
       assert.ok(Array.isArray(body.data));
       assert.ok(body.data.length > 0, 'Must return seeded business areas');
 
-      const trinovaAcct = body.data.find(b => b.name === 'Trinova Accounting');
-      assert.ok(trinovaAcct, 'Must include Trinova Accounting');
+      const trinovaAcct = body.data.find(b => b.name === 'TriNova Accounting');
+      assert.ok(trinovaAcct, 'Must include TriNova Accounting');
       assert.equal(trinovaAcct.status, 'Active');
       assert.ok(typeof trinovaAcct.clientCount === 'number');
     });
@@ -89,10 +89,10 @@ describe('Task P7.4.2: Add Business Area Working Against API', () => {
 
       assert.equal(res.status, 200);
       const body = await res.json();
-      const trinovaAcct = body.data.find(b => b.name === 'Trinova Accounting');
+      const trinovaAcct = body.data.find(b => b.name === 'TriNova Accounting');
       assert.ok(trinovaAcct);
 
-      const actualClientCount = (mockDb.clients || []).filter(c => c.businessArea === 'Trinova Accounting').length;
+      const actualClientCount = (mockDb.clients || []).filter(c => c.businessArea === 'TriNova Accounting').length;
       assert.equal(trinovaAcct.clientCount, actualClientCount);
     });
   });
@@ -167,7 +167,7 @@ describe('Task P7.4.2: Add Business Area Working Against API', () => {
           'Content-Type': 'application/json',
           'X-Requested-With': 'sloane'
         },
-        body: JSON.stringify({ name: 'Trinova Accounting', type: 'Duplicate Type' })
+        body: JSON.stringify({ name: 'TriNova Accounting', type: 'Duplicate Type' })
       });
 
       assert.equal(res.status, 409);

@@ -25,8 +25,32 @@ function initials(name) {
 }
 
 export const TEAM_TASK_ACTIONS = [
-  'openTaskForm', 'deleteTask', 'openTeamMemberForm', 'deleteTeamMember', 'toggleFinishedTasks'
+  'openTaskForm', 'deleteTask', 'openTeamMemberForm', 'deleteTeamMember', 'toggleFinishedTasks',
+  'addTaskProgress', 'toggleTaskNotes'
 ];
+
+const REPEAT_LABELS = {
+  none: 'Does not repeat',
+  weekly: 'Every week',
+  monthly: 'Every month',
+  quarterly: 'Every 3 months',
+  yearly: 'Every year'
+};
+const LINK_ICONS = { email: '✉️', document: '📄', teams: '💬', other: '🔗' };
+const SHOW_NOTES = 2;
+
+/** "name | https://..." lines to link objects, and back. */
+function linksFromText(text) {
+  return String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(line => {
+    const bar = line.lastIndexOf('|');
+    if (bar === -1) return { url: line };
+    return { label: line.slice(0, bar).trim(), url: line.slice(bar + 1).trim() };
+  });
+}
+
+function linksToText(links) {
+  return (links || []).map(l => `${l.label} | ${l.url}`).join('\n');
+}
 
 export const teamTaskMethods = {
   /** Client choices for pickers (id + name), from the Clients page's last load. */
@@ -94,12 +118,20 @@ export const teamTaskMethods = {
     const taskRow = t => {
       const done = CLOSED.includes(t.status);
       const dueClass = !done && t.dueDate && t.dueDate < todayIso() ? 'due-late' : '';
+      const waiting = done ? [] : (t.dependsOn || []).map(id => tasks.find(x => x.id === id)).filter(x => x && !CLOSED.includes(x.status));
+      const notes = t.progressNotes || [];
+      const showAllNotes = (this.expandedTaskNotes || new Set()).has(t.id);
+      const shownNotes = showAllNotes ? notes : notes.slice(-SHOW_NOTES);
       return `
         <div class="work-item ${done ? 'work-item-done' : ''}">
           <div class="work-main">
-            <div class="work-client">${escapeHtml(t.companyName || 'General task')}</div>
+            <div class="work-client">${escapeHtml(t.companyName || 'General task')}${t.businessArea ? ` <span class="pill neutral">${escapeHtml(t.businessArea)}</span>` : ''}${t.department ? ` <span class="work-dept">${escapeHtml(t.department)}</span>` : ''}${t.repeat && t.repeat !== 'none' ? ` <span class="work-dept" title="When this is done, the next one is made">↻ ${escapeHtml(REPEAT_LABELS[t.repeat] || t.repeat)}</span>` : ''}</div>
             <div class="work-title">${escapeHtml(t.title)}${t.blocker ? ` — <span class="text-red">stuck: ${escapeHtml(t.blocker)}</span>` : ''}</div>
             ${t.description ? `<div class="work-desc">${escapeHtml(t.description)}</div>` : ''}
+            ${t.nextAction && !done ? `<div class="work-next"><strong>Next:</strong> ${escapeHtml(t.nextAction)}</div>` : ''}
+            ${waiting.length ? `<div class="work-waiting">⏳ Waiting for: ${waiting.map(w => escapeHtml(w.title)).join(', ')}</div>` : ''}
+            ${(t.links || []).length ? `<div class="work-links">${t.links.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(l.url)}">${LINK_ICONS[l.kind] || LINK_ICONS.other} ${escapeHtml(l.label)}</a>`).join('')}</div>` : ''}
+            ${notes.length ? `<div class="work-notes">${notes.length > SHOW_NOTES ? `<button type="button" class="card-action-btn" data-action="toggleTaskNotes" data-id="${escapeHtml(t.id)}">${showAllNotes ? 'Show fewer notes' : `Show all ${notes.length} notes`}</button>` : ''}${shownNotes.map(n => `<div class="work-note"><span class="work-note-meta">${escapeHtml(new Date(n.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' }))} · ${escapeHtml(n.by)}</span> ${escapeHtml(n.text)}</div>`).join('')}</div>` : ''}
           </div>
           <div class="work-side">
             ${t.isBlocked && !done ? '<span class="pill red">STUCK</span>' : ''}
@@ -113,6 +145,7 @@ export const teamTaskMethods = {
                 ${this.teamOptions().map(o => `<option value="${escapeHtml(o.value)}" ${(t.assigneeId || '') === o.value ? 'selected' : ''}>${o.value ? 'Give to ' : ''}${escapeHtml(o.label)}</option>`).join('')}
               </select>
               ${done ? '' : `<button type="button" class="btn-done" data-action="markTaskDone" data-id="${escapeHtml(t.id)}" title="Tick this off as finished">✓ Done</button>`}
+              <button type="button" class="card-action-btn" data-action="addTaskProgress" data-id="${escapeHtml(t.id)}" title="Write down how this is going">＋ Note</button>
               <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}" title="Change this task">✎ Edit</button>
               <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}" title="Delete this task (it goes to the Bin for 30 days)">🗑 Delete</button>
             </div>
@@ -168,6 +201,10 @@ export const teamTaskMethods = {
     const clients = await this.getClientChoices();
     const presetClient = dataset.client || '';
     const presetAssignee = dataset.assignee || '';
+    const businesses = ((await ApiService.getBusinesses().catch(() => ({ data: [] }))).data || []).map(b => b.name);
+    const waitOptions = (this.allTasks || [])
+      .filter(t => !CLOSED.includes(t.status) && (!existing || t.id !== existing.id))
+      .map(t => ({ value: t.id, label: `${t.title}${t.companyName ? ` (${t.companyName})` : ''}` }));
 
     FormModal.open({
       title: existing ? 'Change this task' : 'Add a task',
@@ -179,6 +216,12 @@ export const teamTaskMethods = {
         { name: 'dueDate', label: 'Due date', type: 'date', full: false },
         { name: 'priority', label: 'How important is it?', type: 'select', full: false, options: PRIORITIES.map(p => ({ value: p, label: p })) },
         { name: 'blocker', label: 'Is something holding it up?', type: 'text', full: false, maxlength: 200, placeholder: 'Leave empty if nothing is' },
+        { name: 'businessArea', label: 'Which business?', type: 'select', full: false, options: [{ value: '', label: "Same as the client's business" }, ...businesses.map(b => ({ value: b, label: b }))] },
+        { name: 'department', label: 'Department (optional)', type: 'text', full: false, maxlength: 80, placeholder: 'e.g. Accounts, Tax, Payroll' },
+        { name: 'nextAction', label: 'What happens next? (optional)', type: 'text', maxlength: 300, placeholder: 'e.g. Ask Priya to send the bank statements' },
+        { name: 'dependsOn', label: 'Is it waiting for another task?', type: 'select', full: false, options: [{ value: '', label: 'Not waiting for anything' }, ...waitOptions] },
+        { name: 'repeat', label: 'Does it repeat?', type: 'select', full: false, options: Object.entries(REPEAT_LABELS).map(([value, label]) => ({ value, label })) },
+        { name: 'links', label: 'Related emails, documents or Teams chats (optional)', type: 'textarea', maxlength: 4000, placeholder: 'One per line, for example:\nTheir email | https://outlook.office.com/...\nEngagement letter | https://...sharepoint.com/...', help: 'Write a name, then a bar, then the web address. When this task repeats, the links come with the next one.' },
         { name: 'description', label: 'More detail (optional)', type: 'textarea', maxlength: 4000 }
       ],
       values: existing ? {
@@ -188,8 +231,14 @@ export const teamTaskMethods = {
         dueDate: existing.dueDate || '',
         priority: existing.priority || 'Normal',
         blocker: existing.isBlocked ? (existing.blocker || '') : '',
+        businessArea: existing.businessArea || '',
+        department: existing.department || '',
+        nextAction: existing.nextAction || '',
+        dependsOn: (existing.dependsOn || [])[0] || '',
+        repeat: existing.repeat || 'none',
+        links: linksToText(existing.links),
         description: existing.description || ''
-      } : { priority: 'Normal', clientId: presetClient, assigneeId: presetAssignee },
+      } : { priority: 'Normal', clientId: presetClient, assigneeId: presetAssignee, repeat: 'none' },
       onSubmit: async v => {
         if (existing) {
           const changes = {
@@ -200,6 +249,12 @@ export const teamTaskMethods = {
             description: v.description,
             isBlocked: Boolean(v.blocker),
             blocker: v.blocker || null,
+            businessArea: v.businessArea || null,
+            department: v.department,
+            nextAction: v.nextAction,
+            dependsOn: v.dependsOn ? [v.dependsOn] : [],
+            repeat: v.repeat,
+            links: linksFromText(v.links),
             version: existing.version
           };
           if ((existing.clientId || '') !== v.clientId) {
@@ -214,8 +269,14 @@ export const teamTaskMethods = {
             priority: v.priority,
             description: v.description,
             isBlocked: Boolean(v.blocker),
-            blocker: v.blocker || undefined
+            blocker: v.blocker || undefined,
+            department: v.department,
+            nextAction: v.nextAction,
+            repeat: v.repeat,
+            links: linksFromText(v.links)
           };
+          if (v.businessArea) payload.businessArea = v.businessArea;
+          if (v.dependsOn) payload.dependsOn = [v.dependsOn];
           if (v.assigneeId) payload.assigneeId = v.assigneeId;
           if (v.clientId) payload.clientId = v.clientId; else payload.general = true;
           await ApiService.createTask(payload);
@@ -224,6 +285,29 @@ export const teamTaskMethods = {
         await this.refreshTaskViews();
       }
     });
+  },
+
+  /** Write down how a task is going. */
+  addTaskProgress(taskId) {
+    const t = (this.allTasks || []).find(x => x.id === taskId);
+    if (!t) { Toast.error('Could not find that task. Please refresh the page.'); return; }
+    FormModal.open({
+      title: 'Progress note',
+      intro: `${t.title}${t.companyName ? ` (${t.companyName})` : ''}. Your name and today's date are added. Notes are a record, so they cannot be changed later.`,
+      submitLabel: 'Add note',
+      fields: [{ name: 'text', label: 'How is it going?', type: 'textarea', required: true, maxlength: 2000, placeholder: 'e.g. Rang the client. Records arrive on Friday.' }],
+      onSubmit: async v => {
+        await ApiService.addTaskNote(taskId, v.text);
+        Toast.success('Progress note added.');
+        await this.refreshTaskViews();
+      }
+    });
+  },
+
+  async toggleTaskNotes(taskId) {
+    this.expandedTaskNotes = this.expandedTaskNotes || new Set();
+    if (this.expandedTaskNotes.has(taskId)) this.expandedTaskNotes.delete(taskId); else this.expandedTaskNotes.add(taskId);
+    await this.renderPeopleWork();
   },
 
   async refreshTaskViews() {

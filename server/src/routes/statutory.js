@@ -19,6 +19,7 @@ import { StatutoryReconciliationEngine } from '../services/reconciliation.js';
 import { clientDirectory } from '../services/clientDirectory.js';
 import { trinovaDeadlines } from '../services/trinovaDeadlines.js';
 import { sendError, newId, isIsoDate, cleanText } from './helpers.js';
+import { businessOfClient, canonicalBusiness, defaultTrinovaBusiness, inBusiness } from '../services/businessOf.js';
 import { takeOut, putInBin } from '../services/bin.js';
 
 const VAT_STATUSES = ['Not started', 'In progress', 'Filed'];
@@ -135,7 +136,9 @@ export function buildDeadlineList(chService = companiesHouseService) {
       yearEnd: row.record.yearEnd || null,
       accountsDueDate: reconciled.accountsDue || null,
       confirmationDueDate: reconciled.confirmDue || null,
-      status: row.record.status || 'Active'
+      status: row.record.status || 'Active',
+      // The business: the one chosen for a deadline typed in by hand, else the client's
+      businessArea: row.record.businessArea || businessOfClient(row.clientId) || (row.origin === 'trinova' ? defaultTrinovaBusiness() : null)
     });
   }
   return reconciledList;
@@ -159,6 +162,7 @@ function validateDeadline(body, { creating }) {
     }
   }
   if (body.notes !== undefined && String(body.notes).length > 2000) return 'Notes can be up to 2,000 characters.';
+  if (body.businessArea && !canonicalBusiness(body.businessArea)) return 'That business is not on your list. Choose one from My Businesses.';
   return null;
 }
 
@@ -180,6 +184,7 @@ function validateVat(body, { creating }) {
     return `Status must be one of: ${VAT_STATUSES.join(', ')}.`;
   }
   if (body.notes !== undefined && String(body.notes).length > 2000) return 'Notes can be up to 2,000 characters.';
+  if (body.businessArea && !canonicalBusiness(body.businessArea)) return 'That business is not on your list. Choose one from My Businesses.';
   return null;
 }
 
@@ -202,7 +207,8 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
     const force = req.query.refresh === '1' || req.query.refresh === 'true';
     await Promise.all([clientDirectory.refresh({ force }), trinovaDeadlines.refresh({ force })]);
 
-    const reconciledList = buildDeadlineList(chService);
+    // One business at a time (?business=MTDflow), or all of them
+    const reconciledList = buildDeadlineList(chService).filter(i => inBusiness(i.businessArea, req.query.business));
 
     let filtered = reconciledList;
 
@@ -289,6 +295,7 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
       confirmationDueDate: body.confirmationDueDate || null,
       status: cleanText(body.status) || 'Active',
       notes: typeof body.notes === 'string' ? body.notes.trim() : '',
+      businessArea: body.businessArea ? canonicalBusiness(body.businessArea) : null,
       createdAt: new Date().toISOString()
     };
     mockDb.statutoryTracker.unshift(record);
@@ -321,6 +328,7 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
     }
     if (body.status !== undefined) record.status = cleanText(body.status) || 'Active';
     if (body.notes !== undefined) record.notes = String(body.notes).trim();
+    if (body.businessArea !== undefined) record.businessArea = body.businessArea ? canonicalBusiness(body.businessArea) : null;
     record.updatedAt = new Date().toISOString();
 
     res.status(200).json({ status: 'success', data: record });
@@ -467,7 +475,10 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
   app.get('/api/v1/vat-returns', authenticate, requireScope('sloane:read'), (req, res) => {
     req.auditAction = 'read_vat_returns';
     req.resourceType = 'vat_return';
-    const data = [...(mockDb.vatReturns || [])].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const data = (mockDb.vatReturns || [])
+      .map(v => ({ ...v, businessArea: v.businessArea || businessOfClient(v.clientId) }))
+      .filter(v => inBusiness(v.businessArea, req.query.business))
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     res.status(200).json({ status: 'success', data, meta: { total: data.length } });
   });
 
@@ -491,6 +502,7 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
       dueDate: body.dueDate,
       status: body.status || 'Not started',
       notes: typeof body.notes === 'string' ? body.notes.trim() : '',
+      businessArea: body.businessArea ? canonicalBusiness(body.businessArea) : null,
       createdAt: new Date().toISOString()
     };
     mockDb.vatReturns.push(vat);
@@ -517,6 +529,7 @@ export function registerStatutoryRoutes(app, { authenticate, requireScope }, cus
     if (body.dueDate !== undefined) vat.dueDate = body.dueDate;
     if (body.status !== undefined) vat.status = body.status;
     if (body.notes !== undefined) vat.notes = String(body.notes).trim();
+    if (body.businessArea !== undefined) vat.businessArea = body.businessArea ? canonicalBusiness(body.businessArea) : null;
     vat.updatedAt = new Date().toISOString();
 
     res.status(200).json({ status: 'success', data: vat });

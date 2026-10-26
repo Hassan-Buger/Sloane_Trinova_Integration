@@ -44,6 +44,18 @@ if (typeof localStorage !== 'undefined') {
 }
 
 export const ApiService = {
+  /** Which business the pages are showing ('' = all of them). Set from the sidebar. */
+  scope: { business: '' },
+
+  setBusinessScope(name) {
+    this.scope.business = name || '';
+  },
+
+  /** Adds the chosen business to the request parameters. */
+  _scoped(params = {}) {
+    return this.scope.business ? { ...params, business: this.scope.business } : params;
+  },
+
   // Current in-memory configuration
   config: {
     baseUrl: (typeof localStorage !== 'undefined' && localStorage.getItem('sloane_trinova_base_url')) || DEFAULT_BASE_URL,
@@ -474,7 +486,7 @@ export const ApiService = {
    */
   async getTasks(params = {}) {
     try {
-      const query = new URLSearchParams(params).toString();
+      const query = new URLSearchParams(this._scoped(params)).toString();
       const res = await this.request(`/tasks${query ? '?' + query : ''}`);
       return {
         status: 'success',
@@ -499,7 +511,7 @@ export const ApiService = {
       method: 'PATCH',
       body: changes
     });
-    return { status: 'success', data: res.data };
+    return { status: 'success', data: res.data, message: res.raw?.message, meta: res.meta };
   },
 
   /**
@@ -510,7 +522,7 @@ export const ApiService = {
       method: 'POST',
       body: note ? { completionNotes: note, resolution: note } : {}
     });
-    return { status: 'success', data: res.data };
+    return { status: 'success', data: res.data, message: res.raw?.message, meta: res.meta };
   },
 
   /* ==========================================================================
@@ -522,7 +534,7 @@ export const ApiService = {
    */
   async getStatutory(params = {}) {
     try {
-      const query = new URLSearchParams(params).toString();
+      const query = new URLSearchParams(this._scoped(params)).toString();
       const res = await this.request(`/statutory${query ? '?' + query : ''}`);
       return {
         status: 'success',
@@ -998,6 +1010,12 @@ export const ApiService = {
     return { status: 'success', data: res.data };
   },
 
+  /** Adds a progress note to a task (who and when are added by the server). */
+  async addTaskNote(taskId, text) {
+    const res = await this.request(`/tasks/${encodeURIComponent(taskId)}/notes`, { method: 'POST', body: { text } });
+    return { status: 'success', data: res.data };
+  },
+
   async deleteTask(taskId) {
     await this.request(`/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
     return { status: 'success' };
@@ -1044,7 +1062,7 @@ export const ApiService = {
 
   async getVatReturns() {
     try {
-      const res = await this.request('/vat-returns');
+      const res = await this.request(`/vat-returns${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`);
       return { status: 'success', data: res.data || [] };
     } catch (err) {
       return { status: 'error', data: [], error: err.message };
@@ -1173,7 +1191,7 @@ export const ApiService = {
   /* "Sloane suggests": tasks worked out from deadlines, made when the owner approves them */
 
   async getSuggestions() {
-    const res = await this.request('/suggestions', { timeout: 20000 });
+    const res = await this.request(`/suggestions${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`, { timeout: 20000 });
     return { status: 'success', data: res.data || [], meta: res.meta || {} };
   },
 
@@ -1183,7 +1201,7 @@ export const ApiService = {
   },
 
   async acceptAllSuggestions() {
-    const res = await this.request('/suggestions/accept-all', { method: 'POST', body: {} });
+    const res = await this.request('/suggestions/accept-all', { method: 'POST', body: this.scope.business ? { business: this.scope.business } : {} });
     return { status: 'success', data: res.data, message: res.raw?.message };
   },
 
@@ -1197,9 +1215,43 @@ export const ApiService = {
     return { status: 'success', message: res.raw?.message };
   },
 
+  /** The morning briefing across the businesses (or the one chosen). */
+  async getMorningBriefing() {
+    const res = await this.request(`/reports/morning${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`, { timeout: 25000 });
+    return { status: 'success', data: res.data };
+  },
+
+  /** Every business at a glance (not filtered by the chosen business). */
+  async getBusinessOverview() {
+    const res = await this.request('/businesses/overview', { timeout: 20000 });
+    return { status: 'success', data: res.data || [], meta: res.meta || {} };
+  },
+
+  /** What Sloane may do on her own, and what she did. */
+  async getAutomation() {
+    const res = await this.request('/automation');
+    return { status: 'success', data: res.data };
+  },
+
+  async saveAutomationRules(patch) {
+    const res = await this.request('/automation/rules', { method: 'PUT', body: patch });
+    return { status: 'success', data: res.data };
+  },
+
+  async runAutomation() {
+    const res = await this.request('/automation/run', { method: 'POST', body: {}, timeout: 30000 });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
+  /** What needs attention now (never filtered by the chosen business: urgent things are urgent). */
+  async getAlerts() {
+    const res = await this.request('/alerts', { timeout: 20000 });
+    return { status: 'success', data: res.data };
+  },
+
   /** The "This week" report. */
   async getWeeklyReport() {
-    const res = await this.request('/reports/this-week', { timeout: 20000 });
+    const res = await this.request(`/reports/this-week${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`, { timeout: 20000 });
     return { status: 'success', data: res.data };
   },
 
