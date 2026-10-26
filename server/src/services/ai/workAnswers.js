@@ -112,7 +112,7 @@ function aboutPerson(name, now) {
       const bits = [];
       if (t.isBlocked) bits.push(`stuck: ${t.blocker || 'held up'}`);
       if (t.dueDate) bits.push(t.dueDate < today ? `late since ${shortDate(t.dueDate.slice(0, 10))}` : `due ${shortDate(t.dueDate.slice(0, 10))}`);
-      if (t.status === 'In Progress') bits.push('in progress');
+      if (t.status === 'In_Progress') bits.push('in progress');
       return `${t.title}${t.companyName ? ` (${t.companyName})` : ''}${bits.length ? ` - ${bits.join('; ')}` : ''}`;
     });
   const parts = [`${plural(person.open, 'open task', 'open tasks')}`];

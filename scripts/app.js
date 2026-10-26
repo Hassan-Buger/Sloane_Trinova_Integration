@@ -27,6 +27,7 @@ import { briefingMethods, BRIEFING_ACTIONS } from './features/briefing.js';
 import { proposalMethods, PROPOSAL_ACTIONS, proposalsHtml } from './features/proposals.js';
 import { automationMethods, AUTOMATION_ACTIONS } from './features/automation.js';
 import { alertMethods, ALERT_ACTIONS } from './features/alerts.js';
+import { trinovaSyncMethods, TRINOVA_SYNC_ACTIONS } from './features/trinovaSync.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -82,11 +83,11 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS, ...BUSINESS_SCOPE_ACTIONS, ...BRIEFING_ACTIONS, ...PROPOSAL_ACTIONS, ...AUTOMATION_ACTIONS, ...ALERT_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS, ...BUSINESS_SCOPE_ACTIONS, ...BRIEFING_ACTIONS, ...PROPOSAL_ACTIONS, ...AUTOMATION_ACTIONS, ...ALERT_ACTIONS, ...TRINOVA_SYNC_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
-      'changeBusinessScope', 'changeAutomationMode', 'changeAutomationBusiness', 'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
+      'changeBusinessScope', 'changeAutomationMode', 'changeAutomationBusiness', 'changeTaskSync', 'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
     ]);
   }
 
@@ -1085,6 +1086,7 @@ class SloaneApp {
       this.renderSecurity();
       this.renderAutomation();
       this.renderAlertsCard();
+      this.renderTaskSync();
     }
 
     if (viewId === 'bin') {
@@ -2672,7 +2674,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods, businessScopeMethods, briefingMethods, proposalMethods, automationMethods, alertMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods, businessScopeMethods, briefingMethods, proposalMethods, automationMethods, alertMethods, trinovaSyncMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

@@ -20,6 +20,7 @@ import { registerTwoFactorRoutes } from './routes/twoFactor.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { registerAutomationRoutes } from './routes/automation.js';
 import { registerAlertRoutes } from './routes/alerts.js';
+import { registerTrinovaTaskSyncRoutes } from './routes/trinovaTaskSync.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -543,6 +544,7 @@ export function createApp(options = {}) {
   registerSuggestionRoutes(app, { authenticate, requireScope });
   registerAutomationRoutes(app, { authenticate, requireScope });
   registerAlertRoutes(app, { authenticate, requireScope });
+  registerTrinovaTaskSyncRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });

@@ -1243,6 +1243,22 @@ export const ApiService = {
     return { status: 'success', message: res.message, data: res.data };
   },
 
+  /** Task syncing with the TriNova portal. */
+  async getTaskSync() {
+    const res = await this.request('/integrations/trinova/task-sync');
+    return { status: 'success', data: res.data };
+  },
+
+  async setTaskSync(enabled) {
+    const res = await this.request('/integrations/trinova/task-sync', { method: 'PUT', body: { enabled } });
+    return { status: 'success', data: res.data };
+  },
+
+  async runTaskSync() {
+    const res = await this.request('/integrations/trinova/task-sync/run', { method: 'POST', body: {}, timeout: 60000 });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
   /** What needs attention now (never filtered by the chosen business: urgent things are urgent). */
   async getAlerts() {
     const res = await this.request('/alerts', { timeout: 20000 });

@@ -77,6 +77,8 @@ Set these in your host's settings (Railway: *Variables*). Values below are examp
 | `TRINOVA_API_KEY` | **Required to show TriNova clients. There is no default.** Without it Sloane does not call TriNova at all, says so on the Clients, Deadlines and Settings pages, and only shows clients added in Sloane. **The old key that used to be committed in this repository (`tn_sec_live_…`) must be treated as leaked: ask TriNova to rotate it and set the new one here.** |
 | `TRINOVA_API_URL` | Defaults to `https://portal.trinovaaccounting.co.uk/api/v1`. |
 | `TRINOVA_TIMEOUT_MS` | Optional. Default `8000`. |
+| `TRINOVA_TASKS_API_KEY` | Optional. A separate key with `tasks:read`, `tasks:write` and `staff:read`, so `TRINOVA_API_KEY` can stay read-only. Without it, task syncing cannot be switched on. Set it in Railway only, never in a file or in chat. |
+| `TRINOVA_WEBHOOK_SECRET` | Optional. Used to check `X-Trinova-Signature` (HMAC-SHA256 of the raw body) on `POST /api/v1/integrations/trinova/webhooks/tasks`. Without it that route answers 503. |
 
 ### Where data is saved
 
@@ -195,6 +197,17 @@ Menu → **Morning briefing** (`GET /api/v1/reports/morning`, `services/morningB
 ### What Sloane may do on her own
 
 Settings → **What Sloane may do on her own** (`GET /api/v1/automation`, `PUT /automation/rules`, `POST /automation/run`; signed-in owner only). One rule can be automatic: *make tasks for filing and VAT deadlines* (the same rules as "Sloane suggests"), for all businesses or one. Default **Ask me first**. When automatic, a timer in `server.js` makes the tasks hourly (at most 25 per run, never twice), marks them `origin: 'automation'`, and lists them under "What Sloane did on her own" (`automationLog`). Sending to anyone outside, spending money and sensitive decisions are shown as locked: always ask.
+
+### Tasks and the TriNova portal (two-way sync)
+
+Built against TriNova's contract (`GET /staff`, `GET /tasks?updated_since`, `POST /tasks` with `Idempotency-Key`, `PATCH /tasks/:id`; see `docs/specs/trinova-task-sync.md`), **off until `TRINOVA_TASKS_API_KEY` is set and the owner switches it on** in Settings → *Tasks and the TriNova portal*. At the time of writing the portal has not deployed the task routes (they answer 404), so Sloane reports "TriNova has not switched on tasks yet" and waits.
+
+- Only **TriNova Accounting** tasks (for a TriNova client or none) are sent. Other businesses, private notes, progress notes, repeat rules, dependencies, links and next action never leave Sloane.
+- New task: `POST` once, `external_ref` = Sloane's task id, stable `Idempotency-Key`. Changes: `PATCH` only the fields that differ from the portal's last known values (`task.portal.snapshot`). Delete in Sloane: `PATCH status: cancelled` (never deleted on the portal). Delete in the portal: the task goes to the Bin.
+- Pull: tasks changed since the last pull. A field only the portal changed is taken; if both changed, the later change wins and *completed* always wins. A task made in the portal appears under TriNova Accounting.
+- People are matched by email (then name) and remembered (`portalId` on the team member). Unmatched TriNova staff are listed in Settings.
+- Failures become plain sentences (key refused, not switched on yet, slow down, TriNova problem) with a longer wait each time (1, 2, 4 ... up to 60 minutes; `Retry-After` is obeyed). Whatever still differs is retried automatically; nothing is lost.
+- Runs every 4 minutes, on *Sync now*, and when a valid webhook arrives. The webhook only triggers a fresh pull: its content is never trusted to write a task. Code: `server/src/services/trinovaTaskSync.js`; tests run against a fake portal (`tests/unit59-trinova-task-sync.test.js`).
 
 ### Alerts
 

@@ -11,6 +11,7 @@ import { clearExpired, BIN_DAYS } from './services/bin.js';
 import { resetAll as resetTwoFactor } from './services/twoFactor.js';
 import { migrateBusinesses } from './services/businessMigration.js';
 import { runAutomation, getRules } from './services/automation.js';
+import { tick as taskSyncTick, setAfterChange } from './services/trinovaTaskSync.js';
 import { clientDirectory } from './services/clientDirectory.js';
 import { trinovaDeadlines } from './services/trinovaDeadlines.js';
 
@@ -117,6 +118,13 @@ if (isDirectExecution() && process.env.NODE_ENV !== 'test') {
     };
     const automationTimer = setInterval(automate, 60 * 60 * 1000);
     if (automationTimer.unref) automationTimer.unref();
+
+    // Task syncing with the TriNova portal (only when it is switched on): every 4 minutes
+    setAfterChange(() => persistence.scheduleFlush());
+    const taskSyncTimer = setInterval(() => {
+      taskSyncTick().catch(err => logger.warn(`Task sync could not run: ${err.message}`));
+    }, 4 * 60 * 1000);
+    if (taskSyncTimer.unref) taskSyncTimer.unref();
 
     const app = createApp();
     const host = process.env.HOST || '0.0.0.0';
