@@ -213,7 +213,13 @@ Built against TriNova's contract (`GET /staff`, `GET /tasks?updated_since`, `POS
 
 ### Alerts
 
-`GET /api/v1/alerts` lists what needs attention (late, stuck, due today, due soon with nobody on it, deadlines with no task), each with a stable id. Settings → **Alerts** turns on browser notifications for this device (`scripts/features/alerts.js`, `scripts/sw.js`, `assets/manifest.webmanifest`): while Sloane is open, or added to a phone's Home Screen, each new alert is shown once. **Alerts when Sloane is completely closed need Web Push (VAPID keys + a push service) and are not built.**
+`GET /api/v1/alerts` lists what needs attention (late, stuck, due today, due soon with nobody on it, deadlines with no task), each with a stable id. Settings → **Alerts** turns on notifications for this device (`scripts/features/alerts.js`, `scripts/sw.js`, `assets/manifest.webmanifest`). While Sloane is open, each new alert is shown once.
+
+**Web Push (alerts when Sloane is closed)** (`server/src/services/webPush.js`, `routes/push.js`, library `web-push`): turning alerts on also registers the device with the server (`POST /api/v1/push/subscribe`; the page registers again each time Sloane is opened, so a lost registration heals itself). Every 5 minutes the server pushes any NEW alert once (up to 3, then a summary; the alert id is the notification tag, so it never doubles with the page's own notice), and on weekday mornings from 08:00 UK time it pushes the morning briefing's headline once. Messages are encrypted for the device and signed with the server's VAPID key; a device the push service reports as gone (404/410) is forgotten. Settings has a *Test it with Sloane closed (10 seconds)* button.
+
+- **Keys:** set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in Railway (make a pair with `node server/scripts/generate-vapid-keys.js`; `VAPID_SUBJECT`, a `mailto:` address, is optional and defaults to the owner email). Without them Sloane makes a temporary pair that lasts until the next restart, and the Settings card says so.
+- **Needs saved data to last:** the registered devices are saved like everything else. If the host loses its data on a redeploy (no persistent volume or database), devices must open Sloane once to register again before closed-app alerts resume.
+- **Phones:** Android Chrome works from the browser; an iPhone or iPad needs Sloane added to the Home Screen (iOS 16.4 or newer).
 
 ### The Bin (30 days)
 

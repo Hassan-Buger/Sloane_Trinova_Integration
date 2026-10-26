@@ -7,15 +7,16 @@
  * shown once, and the first time it is switched on, what is already late is counted but not
  * announced one by one.
  *
- * Alerts when Sloane is completely closed need a push service, which is not set up yet (the
- * Settings card says so).
+ * When Sloane is completely closed, the server pushes new alerts (and the weekday morning briefing)
+ * to this device through the browser's push service (Web Push; see server/src/services/webPush.js).
+ * The page registers the device when alerts are turned on, and again each time Sloane is opened.
  */
 
 import { ApiService } from '../services/api.js';
 import { Toast } from '../components/toast.js';
 import { escapeHtml } from '../utils/html.js';
 
-export const ALERT_ACTIONS = ['enableAlerts', 'disableAlerts', 'sendTestAlert', 'checkAlertsNow'];
+export const ALERT_ACTIONS = ['enableAlerts', 'disableAlerts', 'sendTestAlert', 'sendClosedTestAlert', 'checkAlertsNow'];
 
 const SEEN_KEY = 'sloane_alerts_seen';
 const ON_KEY = 'sloane_alerts_on';
@@ -39,6 +40,25 @@ function rememberSeen(ids) {
 /** Can this browser show notifications at all? */
 export function alertsSupported() {
   return typeof Notification !== 'undefined' && 'serviceWorker' in navigator;
+}
+
+/** Can this browser receive pushes from the server while Sloane is closed? */
+export function pushSupported() {
+  return alertsSupported() && 'PushManager' in window;
+}
+
+/** The server's public key, as the bytes a browser wants. */
+function keyBytes(base64Url) {
+  const padded = base64Url + '='.repeat((4 - (base64Url.length % 4)) % 4);
+  const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function sameBytes(a, b) {
+  if (!a || !b) return false;
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  return x.length === y.length && x.every((v, i) => v === y[i]);
 }
 
 let registrationPromise = null;
@@ -84,6 +104,51 @@ export const alertMethods = {
       });
     }
     this.checkAlerts();
+    // Each time Sloane is opened, make sure this device is still registered for closed-app alerts
+    if (this.alertsOn()) this.setUpPush().then(() => { if (this.currentView === 'settings') this.renderAlertsCard(); });
+  },
+
+  /**
+   * Registers this device with the server for alerts while Sloane is closed.
+   * Never throws: the result says what happened.
+   */
+  async setUpPush() {
+    const state = { supported: pushSupported(), configured: false, subscribed: false, permanent: false, error: null };
+    this.pushState = state;
+    if (!state.supported) return state;
+    try {
+      const cfg = (await ApiService.getPushConfig()).data;
+      state.configured = Boolean(cfg && cfg.publicKey);
+      state.permanent = Boolean(cfg && cfg.permanentKeys);
+      if (!state.configured) return state;
+      const reg = await workerRegistration();
+      const key = keyBytes(cfg.publicKey);
+      let sub = await reg.pushManager.getSubscription();
+      // A subscription made with another key (the server's key changed) cannot be used: start again
+      if (sub && !sameBytes(sub.options && sub.options.applicationServerKey, key)) { await sub.unsubscribe(); sub = null; }
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      await ApiService.subscribePush(sub.toJSON());
+      state.subscribed = true;
+    } catch (err) {
+      const msg = String((err && err.message) || '');
+      state.error = /permission|denied|notallowed/i.test(msg) ? 'this browser would not register this device for them (it may be blocked in the browser’s settings)'
+        : /network|abort|service|timeout|fetch/i.test(msg) ? 'the browser’s push service could not be reached just now'
+        : 'something went wrong';
+    }
+    return state;
+  },
+
+  /** Forgets this device on the server and in the browser. */
+  async stopPush() {
+    try {
+      const reg = await workerRegistration();
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await ApiService.unsubscribePush(sub.endpoint).catch(() => {});
+        await sub.unsubscribe();
+      }
+    } catch (_) { /* nothing to undo */ }
+    this.pushState = null;
   },
 
   alertsOn() {
@@ -140,6 +205,7 @@ export const alertMethods = {
     } else if (on) {
       control = `<div class="alerts-buttons">
         <button type="button" class="btn btn-secondary btn-sm" data-action="sendTestAlert">Send a test alert</button>
+        ${this.pushState && this.pushState.subscribed ? '<button type="button" class="btn btn-secondary btn-sm" data-action="sendClosedTestAlert">Test it with Sloane closed (10 seconds)</button>' : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="disableAlerts">Turn off on this device</button></div>`;
     } else {
       control = '<button type="button" class="btn btn-primary" data-action="enableAlerts">🔔 Turn on alerts on this device</button>';
@@ -151,12 +217,23 @@ export const alertMethods = {
           ${data.alerts.length > 6 ? `<div class="alerts-more">and ${data.alerts.length - 6} more (see the Morning briefing)</div>` : ''}</div>`
       : `<p class="card-help">${data ? 'Nothing needs your attention right now, from what is saved in Sloane.' : 'Checking…'}</p>`;
 
+    // Whether alerts also arrive while Sloane is closed
+    const ps = this.pushState;
+    let closed = '';
+    if (on) {
+      if (!pushSupported()) closed = '<p class="card-help alerts-note">This browser cannot receive alerts while Sloane is closed. On an iPhone or iPad, add Sloane to the Home Screen and open it from there.</p>';
+      else if (!ps) closed = '<p class="card-help alerts-note">Checking alerts while Sloane is closed…</p>';
+      else if (ps.error) closed = `<p class="card-help alerts-note text-amber">Alerts while Sloane is closed could not be set up on this device: ${escapeHtml(ps.error)}. Alerts still work while Sloane is open.</p>`;
+      else if (!ps.configured) closed = '<p class="card-help alerts-note">Alerts while Sloane is closed are not available yet.</p>';
+      else if (ps.subscribed) closed = `<p class="card-help alerts-note">✓ Alerts also reach this device when Sloane is closed, and so does your morning briefing on weekday mornings.${ps.permanent ? '' : ' The person who looks after Sloane still needs to make this permanent; until then, open Sloane once after each update.'}</p>`;
+    }
+
     card.innerHTML = `
       <div class="card-header"><h2>Alerts</h2>${status}</div>
       <p class="card-help">Sloane can tell you when something needs you: a filing or VAT return that has gone late, a stuck task, work due today, or a task due soon that nobody has. You get each alert once, on this computer or phone.</p>
       ${control}
       ${list}
-      <p class="card-help alerts-note">Alerts arrive while Sloane is open in a browser, or added to your phone’s Home Screen. Alerts when Sloane is completely closed need an extra push-notification set-up that has not been done yet.</p>`;
+      ${on ? closed : '<p class="card-help alerts-note">Once on, alerts reach this computer or phone even when Sloane is closed. On an iPhone or iPad, add Sloane to the Home Screen first.</p>'}`;
   },
 
   async enableAlerts() {
@@ -169,6 +246,7 @@ export const alertMethods = {
       return;
     }
     store.set(ON_KEY, '1');
+    await this.setUpPush();
     const data = await this.checkAlerts({ announceAll: true });
     const n = data ? data.counts.red + data.counts.amber : 0;
     await show('Sloane alerts are on', n ? `Right now ${data.counts.red} urgent and ${data.counts.amber} due today or unassigned. You will only be told about new ones.` : 'Nothing needs your attention right now. You will be told when something does.', { tag: 'sloane-on', view: 'briefing' });
@@ -178,6 +256,7 @@ export const alertMethods = {
 
   async disableAlerts() {
     store.remove(ON_KEY);
+    await this.stopPush();
     Toast.info('Alerts are off for this device.');
     await this.renderAlertsCard();
   },
@@ -186,6 +265,16 @@ export const alertMethods = {
     const ok = await show('Test alert from Sloane', 'If you can see this, alerts work on this device.', { tag: 'sloane-test', view: 'command' });
     if (!ok) Toast.error('The test alert could not be shown. Check this browser’s notification settings.');
     else Toast.success('Test alert sent. Look for it on your screen.');
+  },
+
+  /** A test that arrives from the server, so the owner can close Sloane first and still see it. */
+  async sendClosedTestAlert() {
+    try {
+      await ApiService.sendTestPush(10000);
+      Toast.success('Close this tab (or the app) now. A test alert arrives in about 10 seconds.');
+    } catch (err) {
+      Toast.error(err.message);
+    }
   },
 
   async checkAlertsNow() {

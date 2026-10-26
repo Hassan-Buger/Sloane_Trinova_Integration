@@ -1249,6 +1249,27 @@ export const ApiService = {
     return { status: 'success', message: res.message, data: res.data };
   },
 
+  /** Alerts that reach this device when Sloane is closed (Web Push). */
+  async getPushConfig() {
+    const res = await this.request('/push/config');
+    return { status: 'success', data: res.data };
+  },
+
+  async subscribePush(subscription) {
+    const res = await this.request('/push/subscribe', { method: 'POST', body: { subscription } });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
+  async unsubscribePush(endpoint) {
+    const res = await this.request('/push/unsubscribe', { method: 'POST', body: { endpoint } });
+    return { status: 'success', data: res.data };
+  },
+
+  async sendTestPush(delayMs = 10000) {
+    const res = await this.request('/push/test', { method: 'POST', body: { delayMs } });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
   /** Task syncing with the TriNova portal. */
   async getTaskSync() {
     const res = await this.request('/integrations/trinova/task-sync');

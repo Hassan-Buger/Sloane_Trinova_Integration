@@ -78,6 +78,16 @@ export const config = {
     };
   },
 
+  // Web Push (alerts that reach a device when Sloane is closed). Set BOTH keys, in Railway;
+  // generate a pair with:  node server/scripts/generate-vapid-keys.js
+  get push() {
+    return {
+      publicKey: (process.env.VAPID_PUBLIC_KEY || '').trim(),
+      privateKey: (process.env.VAPID_PRIVATE_KEY || '').trim(),
+      subject: (process.env.VAPID_SUBJECT || '').trim()
+    };
+  },
+
   // Owner authentication configuration (Section 1.1)
   owner: {
     email: (process.env.SLON_OWNER_EMAIL || '').trim().toLowerCase(),

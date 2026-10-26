@@ -746,7 +746,9 @@ export const COLLECTIONS = {
   appMeta: { id: r => r.id },
   // What Sloane may do on her own, and what she has done (see services/automation.js)
   automationRules: { id: r => r.id },
-  automationLog: { id: r => r.id }
+  automationLog: { id: r => r.id },
+  // Devices that get alerts when Sloane is closed (see services/webPush.js)
+  pushSubscriptions: { id: r => r.id }
 };
 
 /** Whether the built-in example records should be loaded (tests and explicit demo mode only). */
