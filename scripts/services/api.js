@@ -1221,6 +1221,12 @@ export const ApiService = {
     return { status: 'success', data: res.data };
   },
 
+  /** The AI-written note for the top of the briefing ({ note: null } when there is none). */
+  async getMorningNote() {
+    const res = await this.request(`/reports/morning/note${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`, { timeout: 45000 });
+    return { status: 'success', data: res.data };
+  },
+
   /** Every business at a glance (not filtered by the chosen business). */
   async getBusinessOverview() {
     const res = await this.request('/businesses/overview', { timeout: 20000 });

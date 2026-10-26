@@ -18,6 +18,9 @@
 import { mockDb } from '../../data/db.js';
 import { buildWeeklyReport } from '../weeklyReport.js';
 import { buildBusinessOverview } from '../businessOverview.js';
+import { buildMorningBriefing } from '../morningBriefing.js';
+import { businessOfTask } from '../businessOf.js';
+import { clientDirectory } from '../clientDirectory.js';
 
 const CLOSED = ['Completed', 'Cancelled'];
 const NOBODY = 'Nobody yet';
@@ -233,6 +236,122 @@ function aboutBusiness(business, now) {
   );
 }
 
+
+/* ------------------------------------------------------------------ searching what is saved */
+
+const STOP = new Set(('what whats where which when about with have does from this that been were they them their there work working going status update '
+  + 'progress across business businesses clients client tasks task much many need needs show tell give take left over into than then also just some more most long '
+  + 'high week month today tomorrow please could would should still behind late chase chasing doing happening happen things thing anything everything '
+  + 'know like want look looking check').split(/\s+/));
+
+/** The words in a question worth looking for: no filler, no business or people names. */
+export function keywordsOf(q) {
+  const skip = new Set(['mtd', 'mtdflow']);
+  for (const b of mockDb.businesses || []) for (const w of b.name.toLowerCase().split(/\s+/)) skip.add(w);
+  for (const n of knownPeople()) for (const w of n.toLowerCase().split(/\s+/)) skip.add(w);
+  const words = String(q || '').toLowerCase().replace(/'s|’s/g, '').match(/[a-z0-9][a-z0-9'-]{3,}/g) || [];
+  return [...new Set(words)].filter(w => !STOP.has(w) && !skip.has(w));
+}
+
+const todayIso = now => buildWeeklyReport(now).period.from;
+
+/** Tasks and clients that mention the words in a question (for "Where are we with the launch?"). */
+export function searchWork(query, { business = null, limit = 12 } = {}, now = new Date()) {
+  const words = keywordsOf(query);
+  if (!words.length) return { keywords: [], tasks: [], clients: [] };
+  const today = todayIso(now);
+  const found = [];
+  for (const t of mockDb.tasks || []) {
+    if (business && businessOfTask(t) !== business) continue;
+    const notes = (t.progressNotes || []).map(n => n.text).join(' ');
+    const hay = `${t.title} ${t.description} ${t.nextAction} ${t.department} ${t.companyName} ${notes}`.toLowerCase();
+    const score = words.filter(w => hay.includes(w)).length;
+    if (!score) continue;
+    const open = !CLOSED.includes(t.status);
+    const last = (t.progressNotes || []).slice(-1)[0];
+    found.push({
+      score, open,
+      row: {
+        title: t.title,
+        client: t.companyName || null,
+        business: businessOfTask(t) || null,
+        who: t.assigneeName || NOBODY,
+        status: t.status,
+        due: t.dueDate ? String(t.dueDate).slice(0, 10) : null,
+        late: Boolean(open && t.dueDate && String(t.dueDate).slice(0, 10) < today),
+        stuck: t.isBlocked ? (t.blocker || 'Held up') : null,
+        lastNote: last && last.text ? String(last.text).slice(0, 140) : null
+      }
+    });
+  }
+  found.sort((a, b) => b.score - a.score || Number(b.open) - Number(a.open) || (a.row.due || '9999').localeCompare(b.row.due || '9999'));
+  const clients = clientDirectory.all()
+    .filter(c => c.name && words.some(w => c.name.toLowerCase().includes(w)))
+    .slice(0, 5).map(c => ({ name: c.name, source: c.source }));
+  return { keywords: words, tasks: found.slice(0, limit).map(f => f.row), clients };
+}
+
+/** "Where are we with the MTDflow launch?": what is saved about those words, and how it is going. */
+function aboutTopic(q, business, now) {
+  const { keywords, tasks, clients } = searchWork(q, { business, limit: 15 }, now);
+  const label = keywords.join(' ');
+  const where = business ? ` in ${business}` : '';
+  if (!tasks.length && !clients.length) {
+    const base = business ? ` ${aboutBusiness(business, now).answer}` : '';
+    return result(`Sloane has no task, note or client about "${label}"${where}.${base}`, {
+      reasons: ['Nothing that is saved matches those words. If this is a project, add its tasks under Team & Tasks and Sloane can track it.']
+    });
+  }
+  const done = tasks.filter(t => t.status === 'Completed').length;
+  const open = tasks.filter(t => !CLOSED.includes(t.status));
+  const late = open.filter(t => t.late).length;
+  const stuck = open.filter(t => t.stuck).length;
+  const parts = [`${done} done`, `${open.length} open`];
+  if (late) parts.push(`${late} late`);
+  if (stuck) parts.push(`${stuck} stuck`);
+  const reasons = tasks.slice(0, 10).map(t => `${t.title} - ${t.status.replace('_', ' ').toLowerCase()}${t.who !== NOBODY ? ` (${t.who})` : ' (nobody yet)'}${t.due ? `, due ${shortDate(t.due)}` : ''}${t.stuck ? `, stuck: ${t.stuck}` : ''}${t.lastNote ? `. Last note: ${t.lastNote}` : ''}`);
+  if (clients.length) reasons.push(`Clients with those words in the name: ${clients.map(c => c.name).join(', ')}`);
+  const stuckOne = open.find(t => t.stuck);
+  return result(
+    tasks.length ? `${plural(tasks.length, 'task', 'tasks')} about "${label}"${where}: ${parts.join(', ')}.` : `Sloane has no task about "${label}"${where}, only a client with that name.`,
+    {
+      risk: stuck || late ? 'red' : open.length ? 'amber' : 'low',
+      reasons,
+      actions: stuckOne ? [{ action: `Unblock "${stuckOne.title}": ${stuckOne.stuck}`, priority: 'high' }] : []
+    }
+  );
+}
+
+/** "What's happening across my businesses?": the morning briefing in short. */
+function acrossBusinesses(now) {
+  const b = buildMorningBriefing(now);
+  const reasons = [
+    ...b.priorities.map(p => `${p.title}${p.business ? ` (${p.business})` : ''}: ${p.why}`),
+    ...b.businesses.map(x => `${x.name}: ${x.summary}`)
+  ];
+  const red = b.counts.late || b.counts.stuckTasks;
+  return result(b.headline, {
+    risk: red ? 'red' : b.counts.dueThisWeek ? 'amber' : 'neutral',
+    reasons: reasons.slice(0, 12),
+    actions: b.recommendations.slice(0, 3).map(a => ({ action: a, priority: 'normal' }))
+  });
+}
+
+/** Everything about one business that the AI may need to look into it. */
+function focusBlock(business, now) {
+  const report = buildWeeklyReport(now, { business });
+  const overview = buildBusinessOverview(now).businesses.find(b => b.name === business);
+  const open = (mockDb.tasks || []).filter(t => !CLOSED.includes(t.status) && businessOfTask(t) === business);
+  return {
+    business,
+    overview: overview ? { clients: overview.clients, openTasks: overview.openTasks, late: overview.late, dueThisWeek: overview.dueThisWeek, stuckTasks: overview.stuckTasks, health: overview.health } : null,
+    late: report.late.slice(0, 12).map(i => ({ what: i.what, client: i.name, daysLate: -i.days, who: i.who || null })),
+    dueThisWeek: report.dueThisWeek.slice(0, 12).map(i => ({ what: i.what, client: i.name, date: i.date, who: i.who || null })),
+    stuck: report.stuck.slice(0, 8).map(i => ({ what: i.what, client: i.name, who: i.who, why: i.stuck })),
+    openTasks: open.slice(0, 25).map(t => ({ title: t.title, client: t.companyName || null, who: t.assigneeName || NOBODY, status: t.status, due: t.dueDate ? String(t.dueDate).slice(0, 10) : null }))
+  };
+}
+
 /**
  * Tries to answer a question about people, clients behind, chasing or one business.
  * Returns the answer fields, or null when the question is about something else.
@@ -275,6 +394,13 @@ export function answerWorkQuestion(query, now = new Date()) {
   // "Which TriNova clients are behind?"
   if (asksBehind && (asksClients || business)) return clientsBehind(business, now);
 
+  // "Where are we with the MTDflow launch?"
+  const asksWhere = /\b(where are we|where we are|status of|progress (on|with)|update on|how far|how('s| is) .+ going)\b/i.test(q);
+  if (asksWhere && keywordsOf(q).length) return aboutTopic(q, business, now);
+
+  // "What's happening across my businesses?"
+  if (!business && !people.length && /\b(what'?s (happening|going on)|across (all )?(of )?(my )?businesses|all (of )?my businesses|how are (my )?businesses)\b/i.test(q)) return acrossBusinesses(now);
+
   // "How is MTDflow doing?"
   if (business && asksBusinessStatus) return aboutBusiness(business, now);
 
@@ -285,12 +411,27 @@ export function answerWorkQuestion(query, now = new Date()) {
  * The same facts in a small block for the real AI model: each person's workload and what is
  * late or stuck in each business. Names and counts only; nothing private.
  */
-export function buildWorkContext(now = new Date()) {
+export function buildWorkContext(now = new Date(), { query = '' } = {}) {
   const report = buildWeeklyReport(now);
   const overview = buildBusinessOverview(now);
   const today = report.period.from;
   const open = (mockDb.tasks || []).filter(t => !CLOSED.includes(t.status));
+  const asked = query ? businessIn(query) : null;
+  const found = query ? searchWork(query, { business: asked }, now) : null;
+  const brief = buildMorningBriefing(now);
+  const extra = {
+    briefing: {
+      headline: brief.headline,
+      counts: brief.counts,
+      doFirst: brief.priorities.map(x => ({ what: x.title, why: x.why, business: x.business })),
+      risks: brief.risks.map(x => x.text),
+      recommendations: brief.recommendations
+    },
+    ...(asked ? { focusBusiness: focusBlock(asked, now) } : {}),
+    ...(found && (found.tasks.length || found.clients.length) ? { matches: found } : {})
+  };
   return {
+    ...extra,
     today,
     team: report.workload.map(p => ({
       person: p.who,

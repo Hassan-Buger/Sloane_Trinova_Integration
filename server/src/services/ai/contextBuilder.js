@@ -187,7 +187,7 @@ export class ContextBuilder {
           criticalOrBlockedTasks: urgentTasks
         },
         // Who is doing what, and what is late or stuck in each business
-        work: buildWorkContext()
+        work: buildWorkContext(new Date(), { query })
       };
       privacyAudit.sanitizedFieldsIncluded.push('executive_overview', 'team_and_business_work');
     }
