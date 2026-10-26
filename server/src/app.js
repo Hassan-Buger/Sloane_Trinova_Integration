@@ -17,6 +17,7 @@ import { registerBinRoutes } from './routes/bin.js';
 import { registerExportRoutes } from './routes/exportData.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerTwoFactorRoutes } from './routes/twoFactor.js';
+import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerCommunicationRoutes } from './routes/communications.js';
 import { registerSigningRoutes } from './routes/signing.js';
@@ -534,6 +535,9 @@ export function createApp(options = {}) {
 
   // Reports: the "This week" one-pager
   registerReportRoutes(app, { authenticate, requireScope });
+
+  // "Sloane suggests": tasks worked out from deadlines, made when the owner approves them
+  registerSuggestionRoutes(app, { authenticate, requireScope });
 
   // --- Mount Unit 04 Tasks & Workflow Read/Write Routes ---
   registerTaskRoutes(app, { authenticate, requireScope });

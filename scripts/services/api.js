@@ -1170,6 +1170,33 @@ export const ApiService = {
     return { status: 'success', message: res.raw?.message };
   },
 
+  /* "Sloane suggests": tasks worked out from deadlines, made when the owner approves them */
+
+  async getSuggestions() {
+    const res = await this.request('/suggestions', { timeout: 20000 });
+    return { status: 'success', data: res.data || [], meta: res.meta || {} };
+  },
+
+  async acceptSuggestion(key) {
+    const res = await this.request('/suggestions/accept', { method: 'POST', body: { key } });
+    return { status: 'success', data: res.data, message: res.raw?.message };
+  },
+
+  async acceptAllSuggestions() {
+    const res = await this.request('/suggestions/accept-all', { method: 'POST', body: {} });
+    return { status: 'success', data: res.data, message: res.raw?.message };
+  },
+
+  async dismissSuggestion(key) {
+    const res = await this.request('/suggestions/dismiss', { method: 'POST', body: { key } });
+    return { status: 'success', message: res.raw?.message };
+  },
+
+  async resetSuggestionDismissals() {
+    const res = await this.request('/suggestions/reset', { method: 'POST', body: {} });
+    return { status: 'success', message: res.raw?.message };
+  },
+
   /** The "This week" report. */
   async getWeeklyReport() {
     const res = await this.request('/reports/this-week', { timeout: 20000 });

@@ -741,7 +741,9 @@ export const COLLECTIONS = {
   // Deleted items, kept for 30 days so they can be put back (see services/bin.js)
   bin: { id: r => r.id },
   // Two-step sign-in: encrypted authenticator key, hashed recovery codes, trusted browsers
-  security: { id: r => r.id }
+  security: { id: r => r.id },
+  // "Not needed" answers to Sloane's suggested tasks, so they do not come back
+  suggestionDismissals: { id: r => r.id }
 };
 
 /** Whether the built-in example records should be loaded (tests and explicit demo mode only). */

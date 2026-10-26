@@ -166,6 +166,16 @@ Menu → **This week** (`GET /api/v1/reports/this-week`) shows a one-page summar
 
 Settings → **Your data** → **Download a copy of everything (Excel)** (`GET /api/v1/export/excel`, signed-in owner only) gives one `.xlsx` file with a sheet for each kind of record: About this file, Clients (Sloane and TriNova), Deadlines, VAT returns, Tasks, Team, Businesses, Client notes, Documents (a list; the files themselves stay in Sloane), History, Signing requests, Private notes and the Bin. Dates are real Excel dates (dd/mm/yyyy), headers are bold and frozen, and text is never written as a formula. The file is written by `server/src/services/xlsx.js` (no extra libraries).
 
+### Sloane suggests (tasks found for you)
+
+On **Today**, Sloane proposes tasks it has worked out from deadlines and VAT returns, so the owner does not have to create them by hand (`GET /api/v1/suggestions`, `POST /suggestions/accept | accept-all | dismiss | reset`; rules and code in `server/src/services/taskSuggestions.js`).
+
+- **Rules (defaults):** accounts due within 30 days or late → "Prepare and file accounts" (task due a week before the filing); yearly update due within 30 days or late → "File the yearly update" (3 days before); VAT return not filed, due within 21 days → "Prepare the VAT return" (3 days before). Late items are Urgent and due today; within 14 days High; otherwise Normal.
+- **No duplicates:** nothing is suggested if a task already carries the suggestion key (even a finished or cancelled one), if an open task for that client already covers that kind of work (by title: accounts / yearly update / VAT), or if the owner pressed *Not needed*. The key includes the due date, so next year's deadline is a new suggestion (recurring work).
+- **Who:** the client's manager (from TriNova `account_manager` or the client record) becomes the assignee when that person is on the Team page; otherwise the task is unassigned and the manager is named.
+- **Always approved by the owner:** nothing is made until *Create task* / *Create all* is pressed (the second asks first). Only a suggestion Sloane is making at that moment can be accepted. Tasks keep `sourceKey` and `origin: 'suggested'`, and get the usual history entry and audit entry.
+- **Not done yet (needs agreement or connections):** creating tasks automatically under agreed rules; finding work from emails, Teams and meetings; syncing tasks with TriNova (the TriNova API has no task routes that Sloane has found, and Sloane only reads from TriNova today).
+
 ### The Bin (30 days)
 
 Every delete above moves what it removes into the **Bin** (menu → Bin) instead of deleting it. One delete is one Bin item: a client comes back with its tasks, notes, documents and history. From the Bin the owner can **Put back** an item (it returns where it was) or **Delete for good**; **Empty the Bin** deletes everything in it. Items older than 30 days are deleted for good automatically (checked at start-up and every 6 hours). Uploaded files are only removed when their item is deleted for good. The Bin is saved like everything else (collection `bin`) and needs a signed-in browser session (it can hold private notes). Routes: `GET /api/v1/bin`, `POST /api/v1/bin/:id/restore`, `DELETE /api/v1/bin/:id`, `DELETE /api/v1/bin`.

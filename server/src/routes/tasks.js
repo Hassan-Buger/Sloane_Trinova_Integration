@@ -94,6 +94,43 @@ function recordTimeline(task, eventType, title, description, actor, extra = {}) 
   }
 }
 
+/**
+ * Makes a task and records it in the client's history. Used by "Sloane suggests" when the owner
+ * approves a suggested task (the Add a task form goes through the checks in handleCreateTask).
+ * `ref` is { companyId, clientId, clientName } or null for a general task.
+ */
+export function createTaskRecord({ ref = null, title, description = '', status = 'Pending', priority = 'Normal', dueDate = null,
+  assigneeId = null, assigneeName = null, actor = null, extra = {} }) {
+  const now = new Date().toISOString();
+  const task = {
+    id: newId('tsk'),
+    companyId: ref ? ref.companyId : null,
+    clientId: ref ? ref.clientId : null,
+    companyName: ref ? ref.clientName : null,
+    title,
+    description,
+    status,
+    priority,
+    dueDate: dueDate || null,
+    isBlocked: false,
+    blocker: null,
+    assigneeId,
+    assigneeName,
+    creatorId: actor?.actorId || 'unknown_actor',
+    creatorName: actor?.actorName || 'Authorized Staff',
+    idempotencyKey: null,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...extra
+  };
+  mockDb.tasks.unshift(task);
+  recordTimeline(task, 'TASK_CREATED', `Task Created: ${task.title}`,
+    task.description || `Task created${task.companyName ? ` for ${task.companyName}` : ''}`,
+    actor, { externalId: task.id, metadata: { dueDate: task.dueDate, assignee: task.assigneeName, source: extra.origin || null } });
+  return task;
+}
+
 export function registerTaskRoutes(app, { authenticate, requireScope }) {
   /**
    * GET /api/v1/tasks

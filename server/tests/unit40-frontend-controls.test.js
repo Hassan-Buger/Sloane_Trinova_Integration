@@ -47,8 +47,9 @@ describe('Unit 40: Front-end controls', () => {
       const x = await import('../../scripts/features/dataExport.js');
       const r = await import('../../scripts/features/reports.js');
       const s = await import('../../scripts/features/security.js');
-      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods, x.dataExportMethods, r.reportMethods, s.securityMethods);
-      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS, ...x.DATA_EXPORT_ACTIONS, ...r.REPORT_ACTIONS, ...s.SECURITY_ACTIONS]);
+      const g = await import('../../scripts/features/suggestions.js');
+      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods, x.dataExportMethods, r.reportMethods, s.securityMethods, g.suggestionMethods);
+      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS, ...x.DATA_EXPORT_ACTIONS, ...r.REPORT_ACTIONS, ...s.SECURITY_ACTIONS, ...g.SUGGESTION_ACTIONS]);
       assert.ok(Object.keys(mixins).length > 40);
     });
 
