@@ -208,7 +208,7 @@ export const alertMethods = {
         ${this.pushState && this.pushState.subscribed ? '<button type="button" class="btn btn-secondary btn-sm" data-action="sendClosedTestAlert">Test it with Sloane closed (10 seconds)</button>' : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="disableAlerts">Turn off on this device</button></div>`;
     } else {
-      control = '<button type="button" class="btn btn-primary" data-action="enableAlerts">🔔 Turn on alerts on this device</button>';
+      control = '<button type="button" class="btn btn-primary" data-action="enableAlerts">🔔︎ Turn on alerts on this device</button>';
     }
 
     const list = data && data.alerts.length

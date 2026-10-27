@@ -10,16 +10,16 @@ import { escapeHtml } from '../utils/html.js';
 export const BIN_ACTIONS = ['restoreBinItem', 'deleteBinItemForGood', 'emptyTheBin'];
 
 const KIND_ICON = {
-  business: '🏢',
-  client: '📁',
-  task: '✅',
-  team_member: '👤',
-  deadline: '⚖️',
-  vat_return: '🧾',
-  note: '📝',
-  document: '📄',
-  history: '🕘',
-  private_note: '🔒'
+  business: '🏢︎',
+  client: '📁︎',
+  task: '✅︎',
+  team_member: '👤︎',
+  deadline: '⚖︎',
+  vat_return: '🧾︎',
+  note: '📝︎',
+  document: '📄︎',
+  history: '🕘︎',
+  private_note: '🔒︎'
 };
 
 function when(value) {
@@ -77,7 +77,7 @@ export const binMethods = {
       <div class="card bin-card">
         ${items.map(item => `
           <div class="bin-row">
-            <div class="bin-icon" aria-hidden="true">${KIND_ICON[item.kind] || '🗑️'}</div>
+            <div class="bin-icon" aria-hidden="true">${KIND_ICON[item.kind] || '🗑︎'}</div>
             <div class="bin-main">
               <div class="bin-title">${escapeHtml(item.label)}</div>
               <div class="bin-meta">

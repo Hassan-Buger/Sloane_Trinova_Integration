@@ -56,7 +56,7 @@ export const automationMethods = {
         <span class="automation-sub">Otherwise Sloane checks once an hour.</span></div>` : ''}
       <div class="automation-locked">
         <div class="automation-locked-title">Always asks you first (cannot be switched to automatic)</div>
-        ${a.locked.map(l => `<div class="automation-lock"><span>🔒 ${escapeHtml(l.label)}</span><span class="automation-sub">${escapeHtml(l.note)}</span></div>`).join('')}
+        ${a.locked.map(l => `<div class="automation-lock"><span>🔒︎ ${escapeHtml(l.label)}</span><span class="automation-sub">${escapeHtml(l.note)}</span></div>`).join('')}
       </div>
       <div class="automation-log">
         <div class="automation-locked-title">What Sloane did on her own</div>

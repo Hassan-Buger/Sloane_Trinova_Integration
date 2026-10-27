@@ -123,10 +123,10 @@ export const OutlookSettings = {
     }
 
     const { message, type } = this.feedbackBanner;
-    let bg = 'rgba(201, 166, 107, 0.12)';
+    let bg = 'rgba(212, 175, 55, 0.12)';
     let border = 'var(--line)';
     let color = 'var(--text)';
-    let icon = 'ℹ️';
+    let icon = 'ℹ︎';
 
     if (type === 'success') {
       bg = 'var(--green-bg)';
@@ -137,7 +137,7 @@ export const OutlookSettings = {
       bg = 'var(--red-bg)';
       border = 'var(--red-border)';
       color = 'var(--red)';
-      icon = '⚠️';
+      icon = '⚠︎';
     }
 
     bannerEl.style.display = 'block';
@@ -226,10 +226,10 @@ export const OutlookSettings = {
     return `
       <div class="card-header" style="margin-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">📬</span>
+          <span style="font-size: 18px;">📬︎</span>
           <h2 style="margin: 0; font-size: 15px;">Email & Calendar (Outlook)</h2>
         </div>
-        <div class="outlook-status-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; background: rgba(141, 154, 170, 0.12); border: 1px solid rgba(141, 154, 170, 0.3); font-size: 11px; font-weight: 700; color: var(--muted);">
+        <div class="outlook-status-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; background: rgba(163, 155, 136, 0.12); border: 1px solid rgba(163, 155, 136, 0.3); font-size: 11px; font-weight: 700; color: var(--muted);">
           <span class="dot" style="background: var(--muted);"></span>
           <span>Not connected</span>
         </div>
@@ -253,7 +253,7 @@ export const OutlookSettings = {
 
       <div>
         <a href="/api/v1/integrations/outlook/connect" class="btn btn-primary" id="btnConnectOutlook" style="padding: 9px 18px; font-size: 13px;">
-          🔗 Connect Outlook account
+          🔗︎ Connect Outlook account
         </a>
         <p style="font-size: 11px; color: var(--muted); margin: 10px 0 0;">
           You will be taken to Microsoft to sign in, then brought straight back here.
@@ -277,7 +277,7 @@ export const OutlookSettings = {
       <!-- 1. Status Line -->
       <div class="card-header" style="margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">📬</span>
+          <span style="font-size: 18px;">📬︎</span>
           <h2 style="margin: 0; font-size: 15px;">Email & Calendar (Outlook)</h2>
         </div>
         <div class="outlook-status-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; background: var(--green-bg); border: 1px solid var(--green-border); font-size: 11px; font-weight: 700; color: var(--green);">
@@ -357,7 +357,7 @@ export const OutlookSettings = {
       <!-- 7. & 8. Action Buttons: Sync now & Disconnect -->
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
         <button type="button" class="btn btn-secondary" id="btnSyncOutlookNow" ${this.isSyncing ? 'disabled' : ''} title="Fetch your latest meetings and emails now" style="padding: 7px 14px; font-size: 12px;">
-          ${this.isSyncing ? '⏳ Syncing...' : '🔄 Sync now'}
+          ${this.isSyncing ? '⏳︎ Syncing...' : '🔄︎ Sync now'}
         </button>
 
         <button type="button" class="btn btn-danger" id="btnOpenDisconnectModal" title="Stop Sloane reading your Outlook" style="padding: 7px 14px; font-size: 12px;">
@@ -378,7 +378,7 @@ export const OutlookSettings = {
       <!-- 1. Status Line -->
       <div class="card-header" style="margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">📬</span>
+          <span style="font-size: 18px;">📬︎</span>
           <h2 style="margin: 0; font-size: 15px;">Email & Calendar (Outlook)</h2>
         </div>
         <div class="outlook-status-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; background: var(--red-bg); border: 1px solid var(--red-border); font-size: 11px; font-weight: 700; color: var(--red);">
@@ -388,8 +388,8 @@ export const OutlookSettings = {
       </div>
 
       <!-- Reconnect Notice Banner -->
-      <div class="sourcebanner" style="background: rgba(255, 93, 103, 0.08); border-color: var(--red-border); color: #ffb4b9; margin-bottom: 16px; font-size: 12px; line-height: 1.5;">
-        <span>⚠️</span>
+      <div class="sourcebanner" style="background: rgba(240, 207, 106, 0.08); border-color: var(--red-border); color: #f0cf6a; margin-bottom: 16px; font-size: 12px; line-height: 1.5;">
+        <span>⚠︎</span>
         <div>
           Microsoft authorization has expired or consent was revoked. Please sign in again to restore calendar and flagged email synchronization.
         </div>
@@ -402,7 +402,7 @@ export const OutlookSettings = {
 
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
         <a href="/api/v1/integrations/outlook/connect" class="btn btn-primary" id="btnConnectOutlook" style="padding: 8px 16px; font-size: 12px;">
-          🔗 Reconnect Outlook account
+          🔗︎ Reconnect Outlook account
         </a>
 
         <button type="button" class="btn btn-danger" id="btnOpenDisconnectModal" style="padding: 8px 16px; font-size: 12px;">
@@ -428,7 +428,7 @@ export const OutlookSettings = {
       <!-- 1. Status Line: Sync error — <short reason> -->
       <div class="card-header" style="margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">📬</span>
+          <span style="font-size: 18px;">📬︎</span>
           <h2 style="margin: 0; font-size: 15px;">Email & Calendar (Outlook)</h2>
         </div>
         <div class="outlook-status-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; background: var(--amber-bg); border: 1px solid var(--amber-border); font-size: 11px; font-weight: 700; color: var(--amber);">
@@ -437,8 +437,8 @@ export const OutlookSettings = {
         </div>
       </div>
 
-      <div class="sourcebanner" style="background: rgba(243, 181, 74, 0.08); border-color: var(--amber-border); color: #f9d892; margin-bottom: 16px; font-size: 12px;">
-        <span>⚠️</span>
+      <div class="sourcebanner" style="background: rgba(184, 146, 46, 0.08); border-color: var(--amber-border); color: #e5cf9b; margin-bottom: 16px; font-size: 12px;">
+        <span>⚠︎</span>
         <div>
           The last update did not work (${shortReason}). What you saw before is still showing. Click "Sync now" to try again.
         </div>
@@ -499,7 +499,7 @@ export const OutlookSettings = {
       <!-- Action Buttons -->
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
         <button type="button" class="btn btn-secondary" id="btnSyncOutlookNow" ${this.isSyncing ? 'disabled' : ''} style="padding: 7px 14px; font-size: 12px;">
-          ${this.isSyncing ? '⏳ Syncing...' : '🔄 Sync now'}
+          ${this.isSyncing ? '⏳︎ Syncing...' : '🔄︎ Sync now'}
         </button>
 
         <button type="button" class="btn btn-danger" id="btnOpenDisconnectModal" style="padding: 7px 14px; font-size: 12px;">
@@ -682,7 +682,7 @@ export const OutlookSettings = {
       if (bannerEl) {
         bannerEl.style.display = 'block';
         bannerEl.innerHTML = `
-          <div class="sourcebanner" style="background: rgba(78, 209, 154, 0.08); border-color: var(--green-border); color: var(--green); padding: 14px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.5;">
+          <div class="sourcebanner" style="background: rgba(207, 200, 180, 0.08); border-color: var(--green-border); color: var(--green); padding: 14px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.5;">
             <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
               <span>✓</span>
               <span>Outlook Account Disconnected</span>

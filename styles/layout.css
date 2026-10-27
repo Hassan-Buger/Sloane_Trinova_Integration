@@ -9,7 +9,7 @@
 body {
   font-family: var(--font-family);
   background-color: var(--bg);
-  background-image: radial-gradient(circle at 70% -20%, #172235 0%, #080b10 42%);
+  background-image: radial-gradient(circle at 70% -20%, #1b1708 0%, #050505 42%);
   background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
@@ -30,7 +30,7 @@ body {
   position: sticky;
   top: 0;
   height: 100vh;
-  background-color: rgba(16, 21, 29, 0.85);
+  background-color: rgba(12, 12, 12, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-right: 1px solid var(--line);
@@ -53,13 +53,13 @@ body {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent) 0%, #8a6a33 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #7a5f1e 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 900;
   font-size: 16px;
-  color: #080b10;
+  color: #050505;
   box-shadow: var(--glow-accent);
 }
 
@@ -122,13 +122,13 @@ body {
 .nav-btn:hover {
   background: var(--panel2);
   color: var(--text);
-  border-color: rgba(38, 49, 64, 0.6);
+  border-color: rgba(43, 38, 25, 0.6);
 }
 
 .nav-btn.active {
   background: var(--panel2);
   color: var(--accent);
-  border-color: rgba(201, 166, 107, 0.4);
+  border-color: rgba(212, 175, 55, 0.4);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -149,13 +149,13 @@ body {
 
 .nav-badge.badge-red {
   background: var(--red);
-  color: #fff;
-  box-shadow: 0 0 8px rgba(255, 93, 103, 0.4);
+  color: #050505;
+  box-shadow: 0 0 8px rgba(240, 207, 106, 0.4);
 }
 
 .nav-badge.badge-accent {
   background: var(--accent);
-  color: #080b10;
+  color: #050505;
   font-weight: 800;
 }
 
@@ -167,7 +167,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(16, 21, 29, 0.6);
+  background: rgba(12, 12, 12, 0.6);
   border-radius: var(--radius-sm);
 }
 
@@ -175,7 +175,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #263140 0%, #151c26 100%);
+  background: linear-gradient(135deg, #2b2619 0%, #131313 100%);
   border: 1px solid var(--accent);
   display: flex;
   align-items: center;
@@ -210,7 +210,7 @@ body {
   justify-content: space-between;
   padding: 10px 24px;
   height: 52px;
-  background: rgba(16, 21, 29, 0.95);
+  background: rgba(12, 12, 12, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
@@ -361,8 +361,8 @@ h1 {
 }
 
 .ask-btn {
-  background: linear-gradient(135deg, var(--accent) 0%, #b89355 100%);
-  color: #080b10;
+  background: linear-gradient(135deg, var(--accent) 0%, #a8862c 100%);
+  color: #050505;
   border: none;
   border-radius: 20px;
   padding: 8px 18px;
@@ -450,7 +450,7 @@ h1 {
     width: min(300px, 82vw);
     height: 100vh;
     height: 100dvh;
-    background-color: rgba(16, 21, 29, 0.98);
+    background-color: rgba(12, 12, 12, 0.98);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-right: 1px solid var(--line);
@@ -596,4 +596,30 @@ h1 {
   .card {
     padding: 14px 12px;
   }
+}
+
+/* ---- Menu icons: one colour, the colour of the text ---- */
+.nav-ico {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+}
+
+.nav-ico svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-btn .nav-ico {
+  color: var(--muted);
+}
+
+.nav-btn:hover .nav-ico,
+.nav-btn.active .nav-ico {
+  color: var(--accent);
 }

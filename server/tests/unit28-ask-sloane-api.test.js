@@ -243,9 +243,9 @@ describe('Task P7.4.4: Ask Sloane AI Assistant & Grounded Pipeline', () => {
       assert.ok(appJs.includes('this.aiConversationHistory'), 'Must maintain multi-turn history');
 
       // Provenance badges
-      assert.ok(appJs.includes('⚡ Claude 3.5 Sonnet'), 'Must include Claude badge');
-      assert.ok(appJs.includes('✨ Google Gemini'), 'Must include Gemini badge');
-      assert.ok(appJs.includes('🛡️ Answered from your saved records (not by AI)'), 'Must include truthful non-AI fallback badge');
+      assert.ok(appJs.includes('>Claude</span>'), 'Must include Claude badge');
+      assert.ok(appJs.includes('Google Gemini'), 'Must include Gemini badge');
+      assert.ok(appJs.includes('Answered from your saved records (not by AI)'), 'Must include truthful non-AI fallback badge');
 
       // Output sanitization
       assert.ok(appJs.includes('escapeHtml(data.answer'), 'Answer must be escaped');

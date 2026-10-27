@@ -60,7 +60,7 @@ export const trinovaSyncMethods = {
         </div>
         ${s.enabled ? `<div class="automation-run"><button type="button" class="btn btn-secondary btn-sm" data-action="runTaskSyncNow">Sync now</button>
           ${result ? `<span class="automation-sub">Last time: ${plural(result.pulled || 0, 'task checked', 'tasks checked')}, ${result.created || 0} new from TriNova, ${result.pushed || 0} sent.</span>` : ''}</div>` : ''}
-        ${s.lastError ? `<p class="card-help text-amber">⚠ ${escapeHtml(s.lastError)}${s.nextAttemptAt ? ` Sloane will try again at ${escapeHtml(when(s.nextAttemptAt))}.` : ''}</p>` : ''}
+        ${s.lastError ? `<p class="card-help text-amber">⚠︎ ${escapeHtml(s.lastError)}${s.nextAttemptAt ? ` Sloane will try again at ${escapeHtml(when(s.nextAttemptAt))}.` : ''}</p>` : ''}
         ${s.staff && s.staff.notMatched && s.staff.notMatched.length ? `<p class="card-help">These TriNova people are not on your Team page yet, so their tasks show their name but are not linked: ${escapeHtml(s.staff.notMatched.join(', '))}. Add them under Team &amp; Tasks with the same email.</p>` : ''}`;
     }
     card.innerHTML = `<div class="card-header"><h2>Tasks and the TriNova portal</h2>${pill}</div>${body}`;

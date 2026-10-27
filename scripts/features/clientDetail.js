@@ -7,9 +7,10 @@ import { ApiService } from '../services/api.js';
 import { Toast } from '../components/toast.js';
 import { FormModal, ConfirmDialog } from '../components/formModal.js';
 import { ReconciliationEngine } from '../services/reconciliation.js';
+import { visibleNotes, moreNotesButton, noteTextHtml, toggleExpanded, toggleList } from '../utils/compactNotes.js';
 import { escapeHtml, formatDateGB, describeDue, todayIso } from '../utils/html.js';
 
-export const CLIENT_DETAIL_ACTIONS = [
+export const CLIENT_DETAIL_ACTIONS = ['toggleNotesList', 'toggleNoteText', 
   'openDocumentUpload', 'openDocumentEdit', 'deleteDocument', 'downloadDocument',
   'openSigningForm', 'cancelSigningRequest',
   'openNoteForm', 'deleteNote',
@@ -62,9 +63,9 @@ export const clientDetailMethods = {
     }).join('');
     const id = client ? escapeHtml(String(client.id || client.clientId)) : '';
     const actions = !client ? '' : (client.addedInSloane
-      ? `<button type="button" class="card-action-btn" data-action="editClientFromBar" data-id="${id}">✎ Edit client</button>
+      ? `<button type="button" class="card-action-btn" data-action="editClientFromBar" data-id="${id}">✎︎ Edit client</button>
          <button type="button" class="card-action-btn text-red" data-action="removeClientFromBar" data-id="${id}">Remove client</button>`
-      : `<button type="button" class="card-action-btn" data-action="openClientBusinessForm" data-id="${id}" title="Choose which of your businesses this client belongs to">🏢 Choose business</button>
+      : `<button type="button" class="card-action-btn" data-action="openClientBusinessForm" data-id="${id}" title="Choose which of your businesses this client belongs to">🏢︎ Choose business</button>
          <span class="source-badge" title="Name, numbers and dates are managed in TriNova.">Managed in TriNova</span>`);
     return `
       <div class="client-bar">
@@ -170,7 +171,7 @@ export const clientDetailMethods = {
           ${box('Directors', client.dirs || '—')}
         </div>
         <div class="row-actions" style="margin-top: 14px;">
-          <button type="button" class="btn btn-secondary" data-action="editClientDeadlines" data-index="${index}">✎ Edit these dates</button>
+          <button type="button" class="btn btn-secondary" data-action="editClientDeadlines" data-index="${index}">✎︎ Edit these dates</button>
         </div>`
       : `
         <div class="table-empty" style="padding: 24px;">
@@ -212,7 +213,7 @@ export const clientDetailMethods = {
       return `
         <div class="doc-row">
           <div class="doc-main">
-            <div class="doc-name">📄 ${escapeHtml(d.filename)}</div>
+            <div class="doc-name">📄︎ ${escapeHtml(d.filename)}</div>
             <div class="doc-meta">
               <span class="pill neutral">${escapeHtml(d.category || 'General')}</span>
               ${escapeHtml(formatBytes(d.sizeBytes))}${d.uploadedBy ? ` · added by ${escapeHtml(d.uploadedBy)}` : ''} · ${escapeHtml(shortDateTime(d.createdAt))}
@@ -220,10 +221,10 @@ export const clientDetailMethods = {
             </div>
           </div>
           <div class="row-actions">
-            ${d.storagePathMissing ? '' : `<button type="button" class="card-action-btn" data-action="downloadDocument" data-id="${escapeHtml(d.id)}">⬇ Download</button>`}
-            <button type="button" class="card-action-btn" data-action="openDocumentEdit" data-id="${escapeHtml(d.id)}">✎ Rename</button>
-            ${d.isOriginal === false ? '' : `<button type="button" class="card-action-btn" data-action="openSigningForm" data-id="${escapeHtml(d.id)}">✍ Ask to sign</button>`}
-            <button type="button" class="card-action-btn text-red" data-action="deleteDocument" data-id="${escapeHtml(d.id)}">🗑 Delete</button>
+            ${d.storagePathMissing ? '' : `<button type="button" class="card-action-btn" data-action="downloadDocument" data-id="${escapeHtml(d.id)}">⬇︎ Download</button>`}
+            <button type="button" class="card-action-btn" data-action="openDocumentEdit" data-id="${escapeHtml(d.id)}">✎︎ Rename</button>
+            ${d.isOriginal === false ? '' : `<button type="button" class="card-action-btn" data-action="openSigningForm" data-id="${escapeHtml(d.id)}">✍︎ Ask to sign</button>`}
+            <button type="button" class="card-action-btn text-red" data-action="deleteDocument" data-id="${escapeHtml(d.id)}">🗑︎ Delete</button>
           </div>
         </div>`;
     }).join('');
@@ -233,7 +234,7 @@ export const clientDetailMethods = {
       return `
         <div class="doc-row">
           <div class="doc-main">
-            <div class="doc-name">✍ ${escapeHtml(r.title || r.originalFilename)}</div>
+            <div class="doc-name">✍︎ ${escapeHtml(r.title || r.originalFilename)}</div>
             <div class="doc-meta">
               <span class="pill ${cls}">${escapeHtml(text)}</span>
               ${escapeHtml((r.signers || []).map(s => `${s.name} (${s.status === 'SIGNED' ? 'signed' : 'not signed yet'})`).join(', '))}
@@ -252,7 +253,7 @@ export const clientDetailMethods = {
         <button type="button" class="btn btn-primary" style="font-size: 11px;" data-action="openDocumentUpload">+ Add a document</button>
       </div>
       ${this.clientBarHtml(client)}
-      ${docsRes.error ? `<div class="sourcebanner"><span>⚠️</span><span>Sloane could not load the documents just now: ${escapeHtml(docsRes.error)}</span></div>` : ''}
+      ${docsRes.error ? `<div class="sourcebanner"><span>⚠︎</span><span>Sloane could not load the documents just now: ${escapeHtml(docsRes.error)}</span></div>` : ''}
       <p class="card-help">Files you keep for this client. PDF, Word, Excel, pictures, text and CSV files up to 15 MB.</p>
       <div class="doc-list">
         ${docRows || '<div class="table-empty" style="padding: 24px;">No documents yet. Click "+ Add a document" to keep one here.</div>'}
@@ -262,7 +263,7 @@ export const clientDetailMethods = {
         <h3>Signing requests</h3>
       </div>
       <div class="sourcebanner">
-        <span>ℹ️</span>
+        <span class="info-i" aria-hidden="true">i</span>
         <span><strong>Please note:</strong> Sloane keeps a record of who you have asked to sign a document, but it does not send anything to the signers yet. Use this list to keep track, and send the document to them yourself.</span>
       </div>
       <div class="doc-list">
@@ -390,6 +391,22 @@ export const clientDetailMethods = {
 
   /* ------------------------------------------------------------------ Notes tab */
 
+  async toggleNotesList(listKey) {
+    toggleList(this, listKey);
+    await this.refreshNoteLists();
+  },
+
+  async toggleNoteText(id) {
+    toggleExpanded(this, id);
+    await this.refreshNoteLists();
+  },
+
+  /** Draw whichever notes list is on the page again. */
+  async refreshNoteLists() {
+    if (document.getElementById('clientNotesDetailCard') && this.activeClientTab === 'notes') await this.renderClientNotesDetail();
+    if (this.currentView === 'brain') await this.renderBrain();
+  },
+
   async renderClientNotesDetail() {
     const card = document.getElementById('clientNotesDetailCard');
     if (!card) return;
@@ -407,16 +424,17 @@ export const clientDetailMethods = {
     }
     this.clientNotes = notes;
 
-    const list = notes.map(n => `
+    const info = visibleNotes(this, 'client', notes);
+    const list = info.shown.map(n => `
       <div class="note-row">
         <div class="note-head">
           <strong>${escapeHtml(n.authorName || n.author || 'Staff')}</strong>
           <span class="syncmeta">${escapeHtml(shortDateTime(n.createdAt))}${n.editedAt ? ` · changed ${escapeHtml(shortDateTime(n.editedAt))}` : ''}</span>
         </div>
-        <p class="note-text">${escapeHtml(n.text || n.content || '')}</p>
+        ${noteTextHtml(this, n.id, n.text || n.content || '', 'note-text')}
         <div class="row-actions">
-          <button type="button" class="card-action-btn" data-action="openNoteForm" data-id="${escapeHtml(n.id)}">✎ Edit</button>
-          <button type="button" class="card-action-btn text-red" data-action="deleteNote" data-id="${escapeHtml(n.id)}">🗑 Delete</button>
+          <button type="button" class="card-action-btn" data-action="openNoteForm" data-id="${escapeHtml(n.id)}">Edit</button>
+          <button type="button" class="card-action-btn text-red" data-action="deleteNote" data-id="${escapeHtml(n.id)}">Delete</button>
         </div>
       </div>`).join('');
 
@@ -426,10 +444,11 @@ export const clientDetailMethods = {
         <button type="button" class="btn btn-primary" style="font-size: 11px;" data-action="openNoteForm">+ Add a note</button>
       </div>
       ${this.clientBarHtml(client)}
-      ${error ? `<div class="sourcebanner"><span>⚠️</span><span>Sloane could not load the notes just now: ${escapeHtml(error)}</span></div>` : ''}
+      ${error ? `<div class="sourcebanner"><span>⚠︎</span><span>Sloane could not load the notes just now: ${escapeHtml(error)}</span></div>` : ''}
       <p class="card-help">Notes for you and your team. They are kept in Sloane and are not sent to TriNova or to the client.</p>
       <div id="clientNotesListContainer">
         ${list || '<div class="table-empty" style="padding: 24px;">No internal notes recorded for this client.</div>'}
+        ${moreNotesButton('client', info, notes.length)}
       </div>
     `;
   },
@@ -546,8 +565,8 @@ export const clientDetailMethods = {
           </div>
           <div class="row-actions">
             ${done ? '' : `<button type="button" class="btn-done" data-action="markTaskDone" data-id="${escapeHtml(t.id)}">✓ Done</button>`}
-            <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}">✎ Edit</button>
-            <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}">🗑 Delete</button>
+            <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}">✎︎ Edit</button>
+            <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}">🗑︎ Delete</button>
           </div>
         </div>`;
     }).join('');
@@ -558,7 +577,7 @@ export const clientDetailMethods = {
         <button type="button" class="btn btn-primary" style="font-size: 11px;" data-action="openTaskForm" data-client="${escapeHtml(String(client.id || client.clientId))}">+ Add a task</button>
       </div>
       ${this.clientBarHtml(client)}
-      ${res.error ? `<div class="sourcebanner"><span>⚠️</span><span>Sloane could not load the tasks just now: ${escapeHtml(res.error)}</span></div>` : ''}
+      ${res.error ? `<div class="sourcebanner"><span>⚠︎</span><span>Sloane could not load the tasks just now: ${escapeHtml(res.error)}</span></div>` : ''}
       <div class="doc-list">
         ${rows || '<div class="table-empty" style="padding: 24px;">No tasks for this client yet.</div>'}
       </div>

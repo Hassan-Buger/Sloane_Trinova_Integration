@@ -48,7 +48,7 @@ export const securityMethods = {
     if (!s.enabled) {
       card.innerHTML = `${header(false)}
         <p class="card-help">Turn on two-step sign-in and signing in will need your password <strong>and</strong> a 6-digit code from an app on your phone. Even if someone learns your password, they cannot get in without your phone.</p>
-        <button type="button" class="btn btn-primary" data-action="startTwoFactorSetup">🔐 Set up with an authenticator app</button>
+        <button type="button" class="btn btn-primary" data-action="startTwoFactorSetup">🔐︎ Set up with an authenticator app</button>
         ${PASSWORD_TIP}`;
       return;
     }
@@ -107,11 +107,11 @@ export const securityMethods = {
   renderRecoveryCodes(card) {
     const codes = this.recoveryCodesToShow;
     card.innerHTML = `${header(true)}
-      <div class="sourcebanner security-save-banner"><span>🔑</span><span><strong>Save these recovery codes now.</strong> If you lose your phone, each code lets you sign in once. They will not be shown again.</span></div>
+      <div class="sourcebanner security-save-banner"><span>🔑︎</span><span><strong>Save these recovery codes now.</strong> If you lose your phone, each code lets you sign in once. They will not be shown again.</span></div>
       <div class="security-codes">${codes.map(c => `<code>${escapeHtml(c)}</code>`).join('')}</div>
       <div class="security-actions">
-        <button type="button" class="btn btn-secondary" data-action="copyRecoveryCodes">📋 Copy codes</button>
-        <button type="button" class="btn btn-secondary" data-action="downloadRecoveryCodes">⬇ Download as a text file</button>
+        <button type="button" class="btn btn-secondary" data-action="copyRecoveryCodes">📋︎ Copy codes</button>
+        <button type="button" class="btn btn-secondary" data-action="downloadRecoveryCodes">⬇︎ Download as a text file</button>
       </div>
       <label class="form-check security-saved"><input type="checkbox" id="recoveryCodesSaved"> I have saved my recovery codes somewhere safe (not on this computer only)</label>
       <button type="button" class="btn btn-primary" data-action="finishRecoveryCodes">Done</button>`;

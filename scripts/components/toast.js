@@ -21,9 +21,9 @@ export const Toast = {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 
-    let icon = 'ℹ️';
+    let icon = 'ℹ︎';
     if (type === 'success') icon = '✓';
-    if (type === 'error' || type === 'warning') icon = '⚠';
+    if (type === 'error' || type === 'warning') icon = '⚠︎';
 
     const iconSpan = document.createElement('span');
     iconSpan.style.fontWeight = 'bold';

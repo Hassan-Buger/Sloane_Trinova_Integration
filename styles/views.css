@@ -55,7 +55,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  background: rgba(255, 93, 103, 0.08);
+  background: rgba(240, 207, 106, 0.08);
   border-radius: var(--radius-sm);
   border: 1px solid var(--red-border);
   margin-bottom: 12px;
@@ -73,7 +73,7 @@
 
 .alert-desc {
   font-size: 11px;
-  color: #ffb8bd;
+  color: #f0cf6a;
   margin-top: 2px;
 }
 
@@ -470,7 +470,7 @@
 }
 
 .brain-entry:hover {
-  border-color: rgba(201, 166, 107, 0.3);
+  border-color: rgba(212, 175, 55, 0.3);
 }
 
 .brain-entry-header {
@@ -493,7 +493,7 @@
   align-items: center;
   justify-content: space-between;
   padding-top: 10px;
-  border-top: 1px solid rgba(38, 49, 64, 0.5);
+  border-top: 1px solid rgba(43, 38, 25, 0.5);
 }
 
 /* Responsive Overrides */
@@ -691,7 +691,7 @@
 .client-tab-btn.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
-  background: rgba(201, 166, 107, 0.06);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 .client-detail-header {
@@ -851,7 +851,7 @@
 
 .timeline-card.highlighted-event {
   border-color: var(--accent);
-  background: rgba(201, 166, 107, 0.08);
+  background: rgba(212, 175, 55, 0.08);
   box-shadow: 0 0 16px var(--accent-glow);
 }
 
@@ -879,7 +879,7 @@
 
 .timeline-card-body {
   font-size: 12px;
-  color: #c5d1de;
+  color: #d9d2bf;
   line-height: 1.5;
   margin-bottom: 10px;
 }
@@ -944,7 +944,7 @@
 .ask-pill-suggestion:hover {
   color: var(--accent);
   border-color: var(--accent);
-  background: rgba(201, 166, 107, 0.06);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 .ai-card-shell {
@@ -1044,7 +1044,7 @@
   position: relative;
   padding-left: 18px;
   font-size: 12.5px;
-  color: #c5d1de;
+  color: #d9d2bf;
   margin-bottom: 6px;
   line-height: 1.45;
 }
@@ -1139,8 +1139,8 @@
 }
 
 .ai-user-bubble {
-  background: rgba(201, 166, 107, 0.12);
-  border: 1px solid rgba(201, 166, 107, 0.3);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   color: var(--text);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
@@ -1208,7 +1208,7 @@
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: rgba(78, 209, 154, 0.25);
+  background-color: rgba(207, 200, 180, 0.25);
   border-color: var(--green);
 }
 
@@ -1302,7 +1302,7 @@
 .form-error {
   background: var(--red-bg);
   border: 1px solid var(--red-border);
-  color: #ffb4b9;
+  color: #f0cf6a;
   border-radius: var(--radius-sm);
   padding: 9px 12px;
   font-size: 12px;
@@ -1402,7 +1402,7 @@
   margin-bottom: 10px;
 }
 .note-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12.5px; color: var(--text); }
-.note-text { font-size: 12px; color: #c5d1de; margin: 0 0 8px 0; line-height: 1.5; white-space: pre-wrap; }
+.note-text { font-size: 12px; color: #d9d2bf; margin: 0 0 8px 0; line-height: 1.5; white-space: pre-wrap; }
 
 .row-actions-cell { white-space: nowrap; }
 .row-actions-cell .card-action-btn { margin: 2px 4px 2px 0; }
@@ -1748,7 +1748,7 @@
 }
 
 .report-paper {
-  background: linear-gradient(180deg, rgba(21, 28, 38, 0.7) 0%, rgba(16, 21, 29, 0.95) 100%);
+  background: linear-gradient(180deg, rgba(19, 19, 19, 0.7) 0%, rgba(12, 12, 12, 0.95) 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: var(--space-8);
@@ -1850,7 +1850,7 @@
 
 .report-table td {
   padding: 7px 8px;
-  border-bottom: 1px solid rgba(38, 49, 64, 0.6);
+  border-bottom: 1px solid rgba(43, 38, 25, 0.6);
   vertical-align: top;
 }
 
@@ -1965,14 +1965,14 @@
   body.printing-report .brief-sub,
   body.printing-report .brief-biz-foot { color: #444 !important; }
   body.printing-report .brief-biz { border-color: #bbb !important; }
-  body.printing-report .brief-biz.red { border-left-color: #b3141f !important; }
-  body.printing-report .brief-biz.amber { border-left-color: #8a5a00 !important; }
-  body.printing-report .brief-biz.green { border-left-color: #1d6b45 !important; }
+  body.printing-report .brief-biz.red { border-left-color: #5c4310 !important; }
+  body.printing-report .brief-biz.amber { border-left-color: #7a5c24 !important; }
+  body.printing-report .brief-biz.green { border-left-color: #444444 !important; }
   body.printing-report .brief-headline,
   body.printing-report .brief-list,
   body.printing-report .brief-priorities { color: #111 !important; }
   body.printing-report .brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  body.printing-report .late-tag { color: #b3141f !important; }
+  body.printing-report .late-tag { color: #5c4310 !important; }
 
   body.printing-report .report-title,
   body.printing-report .report-section h2,
@@ -1981,9 +1981,9 @@
 
   body.printing-report .report-tile { border-color: #bbb !important; }
   body.printing-report .report-tile.red .n,
-  body.printing-report .report-table td.late { color: #b3141f !important; }
-  body.printing-report .report-tile.amber .n { color: #8a5a00 !important; }
-  body.printing-report .report-tile.green .n { color: #1d6b45 !important; }
+  body.printing-report .report-table td.late { color: #5c4310 !important; }
+  body.printing-report .report-tile.amber .n { color: #7a5c24 !important; }
+  body.printing-report .report-tile.green .n { color: #444444 !important; }
 
   body.printing-report .report-table th {
     background: #f3eee4 !important;
@@ -2717,7 +2717,7 @@
 /* ---- Morning briefing: Sloane's note ---- */
 .brief-note {
   border: 1px solid var(--line);
-  border-left: 3px solid var(--accent, #c9a66b);
+  border-left: 3px solid var(--accent, #d4af37);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   margin: var(--space-3) 0 var(--space-4);
@@ -2756,7 +2756,7 @@
 
 .client-act-remove {
   color: var(--red);
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: rgba(240, 207, 106, 0.35);
 }
 
 /* ---- Ask Sloane has its own page ---- */
@@ -2796,4 +2796,52 @@
 
 .ask-groups {
   align-items: start;
+}
+
+/* ---- Team & Tasks: search and choose what to show ---- */
+.team-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.team-filters #taskSearch {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.team-filters #taskFilterSelect {
+  width: auto;
+  min-width: 150px;
+}
+
+/* ---- Notes lists stay short: a long note is cut, the rest is one click away ---- */
+.note-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-toggle {
+  background: none;
+  border: 0;
+  padding: 0 0 var(--space-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.note-toggle:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.notes-more {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-2);
 }

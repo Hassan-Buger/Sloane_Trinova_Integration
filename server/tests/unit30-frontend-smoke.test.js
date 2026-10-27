@@ -284,7 +284,7 @@ describe('Task P8.1: Frontend Smoke Tests & Logged-Out Boundary', () => {
       const html = OutlookSettings.renderConnected(data);
       OutlookSettings.isSyncing = false; // reset
 
-      assert.ok(html.includes('⏳ Syncing...'), 'Displays "⏳ Syncing..." status in button');
+      assert.ok(html.includes('Syncing...'), 'Displays "Syncing..." status in button');
       assert.ok(html.includes('id="btnSyncOutlookNow" disabled'), 'Sync now button is disabled while syncing');
     });
 
