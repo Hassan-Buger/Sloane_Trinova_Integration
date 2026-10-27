@@ -1613,13 +1613,13 @@ class SloaneApp {
           <td style="max-width: 180px; font-size: 11px; color: var(--muted);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span>${safeNotes}</span>
-              <div style="display: flex; gap: 4px;">
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="See history" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary client-act" title="See this client's history, notes, documents and tasks" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">History</button>
                 ${canEdit ? `
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Edit this client" onclick="event.stopPropagation(); app.openEditClient('${clientId}');">✎</button>
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px; color: var(--red); border-color: rgba(239, 68, 68, 0.3);" title="Remove this client" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">✕</button>
+                <button type="button" class="btn btn-secondary client-act" title="Edit this client" onclick="event.stopPropagation(); app.openEditClient('${clientId}');">Edit</button>
+                <button type="button" class="btn btn-secondary client-act client-act-remove" title="Remove this client (it goes to the Bin for 30 days)" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">Remove</button>
                 ` : `
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Choose which of your businesses this client belongs to" data-action="openClientBusinessForm" data-id="${clientId}">🏢</button>
+                <button type="button" class="btn btn-secondary client-act" title="Choose which of your businesses this client belongs to" data-action="openClientBusinessForm" data-id="${clientId}">Business</button>
                 <span class="source-badge" title="This client comes from TriNova, so its details are changed there.">TriNova</span>`}
               </div>
             </div>
