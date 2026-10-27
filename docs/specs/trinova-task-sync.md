@@ -4,9 +4,11 @@ For the TriNova portal developer. Developer-only; not for Kirsty.
 
 ## Where things stand
 
+**Update (v2.16.0):** Sloane's side is built and tested against a fake portal that follows this contract. It stays off until `TRINOVA_TASKS_API_KEY` is set. On 26 October 2026 the portal still answered 404 for `/tasks` and `/staff`, so the routes are not deployed yet; TriNova's engineering team confirmed this and is deploying them.
+
 - Sloane **reads** from the portal today: clients (`GET /clients`) and filing deadlines (`GET /statutory`), with a bearer key (`TRINOVA_API_KEY`).
-- The portal API has **no task routes that Sloane has found**, so tasks exist only in Sloane. Nothing is sent to the portal, and nothing a portal user does with a task reaches Sloane.
-- Two-way sync is therefore **not built**. It needs the portal to offer the routes below (or equivalent). Sloane's side is ready to plug in once they exist.
+- Until the portal deploys the task routes below, tasks exist only in Sloane: nothing is sent, and nothing a portal user does with a task reaches Sloane.
+- Sloane's side is ready (see the update above) and needs only the routes, a task key and a webhook secret from TriNova.
 
 ## What Sloane needs from the portal
 

@@ -70,7 +70,21 @@ export const config = {
       baseUrl: (process.env.TRINOVA_API_URL || 'https://portal.trinovaaccounting.co.uk/api/v1').trim().replace(/\/+$/, ''),
       // No default key. Sloane's own SLON_API_KEY must never be sent to another service either.
       apiKey: (process.env.TRINOVA_API_KEY || '').trim(),
+      // A separate key for tasks (tasks:read, tasks:write, staff:read), so the read key can stay read-only
+      tasksApiKey: (process.env.TRINOVA_TASKS_API_KEY || '').trim(),
+      // Used to check that a task message really came from TriNova (HMAC-SHA256)
+      webhookSecret: (process.env.TRINOVA_WEBHOOK_SECRET || '').trim(),
       timeoutMs: parseInt(process.env.TRINOVA_TIMEOUT_MS || '8000', 10)
+    };
+  },
+
+  // Web Push (alerts that reach a device when Sloane is closed). Set BOTH keys, in Railway;
+  // generate a pair with:  node server/scripts/generate-vapid-keys.js
+  get push() {
+    return {
+      publicKey: (process.env.VAPID_PUBLIC_KEY || '').trim(),
+      privateKey: (process.env.VAPID_PRIVATE_KEY || '').trim(),
+      subject: (process.env.VAPID_SUBJECT || '').trim()
     };
   },
 

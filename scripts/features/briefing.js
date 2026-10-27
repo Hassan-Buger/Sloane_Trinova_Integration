@@ -21,6 +21,17 @@ function outlookNote(data, fallback) {
 }
 
 export const briefingMethods = {
+  /** The AI-written note at the top (only when an AI key is set and its note passed the checks). */
+  async loadMorningNote(b) {
+    let res;
+    try { res = await ApiService.getMorningNote(); } catch (_) { return; }
+    const box = document.getElementById('briefNote');
+    const note = res && res.data && res.data.note;
+    if (!box || !note || this.morningBriefing !== b) return;
+    box.hidden = false;
+    box.innerHTML = `<div class="brief-note-label">Sloane’s note</div><p>${escapeHtml(note)}</p><div class="brief-note-foot">Written by AI from the figures below. The lists are the detail.</div>`;
+  },
+
   async renderMorningBriefing() {
     const box = document.getElementById('morningBriefing');
     if (!box) return;
@@ -38,6 +49,7 @@ export const briefingMethods = {
     }
     const b = briefingRes.r.data;
     this.morningBriefing = b;
+    this.loadMorningNote(b);
 
     const diary = diaryRes && (diaryRes.data !== undefined ? diaryRes.data : diaryRes);
     const diaryItems = diary && diary.connected && diary.enabled && Array.isArray(diary.items) ? diary.items : null;
@@ -57,6 +69,7 @@ export const briefingMethods = {
         <div class="report-made">Made ${escapeHtml(made)}</div>
       </header>
       <p class="brief-headline">${escapeHtml(b.headline)}</p>
+      <div class="brief-note" id="briefNote" hidden></div>
 
       <div class="report-tiles">
         ${tile(c.late, 'Late', c.late ? 'red' : '')}

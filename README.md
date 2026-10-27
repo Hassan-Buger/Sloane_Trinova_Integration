@@ -77,6 +77,8 @@ Set these in your host's settings (Railway: *Variables*). Values below are examp
 | `TRINOVA_API_KEY` | **Required to show TriNova clients. There is no default.** Without it Sloane does not call TriNova at all, says so on the Clients, Deadlines and Settings pages, and only shows clients added in Sloane. **The old key that used to be committed in this repository (`tn_sec_live_…`) must be treated as leaked: ask TriNova to rotate it and set the new one here.** |
 | `TRINOVA_API_URL` | Defaults to `https://portal.trinovaaccounting.co.uk/api/v1`. |
 | `TRINOVA_TIMEOUT_MS` | Optional. Default `8000`. |
+| `TRINOVA_TASKS_API_KEY` | Optional. A separate key with `tasks:read`, `tasks:write` and `staff:read`, so `TRINOVA_API_KEY` can stay read-only. Without it, task syncing cannot be switched on. Set it in Railway only, never in a file or in chat. |
+| `TRINOVA_WEBHOOK_SECRET` | Optional. Used to check `X-Trinova-Signature` (HMAC-SHA256 of the raw body) on `POST /api/v1/integrations/trinova/webhooks/tasks`. Without it that route answers 503. |
 
 ### Where data is saved
 
@@ -190,15 +192,34 @@ Menu → **Morning briefing** (`GET /api/v1/reports/morning`, `services/morningB
 ### Ask Sloane
 
 - **Questions about the work** (`services/ai/workAnswers.js`): "What's Mark working on?", "Which TriNova clients are behind?", "What needs chasing at Emerald?", "How is MTDflow doing?", "Who has the most on?". Answered from saved records only; an unknown name is reported, not guessed. The same facts are put in the `work` block of the context for Claude / Gemini when a key is set. Without a key the grounded rules engine answers.
+- **With an AI key** (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`; `AI_PROVIDER` = `auto` | `gemini` | `anthropic`): questions about people, clients that are behind, chasing, one business, "Where are we with the MTDflow launch?" (tasks, progress notes and clients that mention those words) and "What's happening across my businesses?" are still answered **exactly from the records** (`services/ai/workAnswers.js`), so the numbers are right. Any other question goes to the model with a fresh `work` block: the briefing, each person's tasks, the business named in the question in detail (`focusBusiness`) and what matches the question (`matches`). The prompt tells it to say plainly when nothing is recorded and never to invent progress.
+- **Sloane's note** (`GET /api/v1/reports/morning/note`, `services/briefingNote.js`): a few sentences at the top of the Morning briefing, written by the model from the briefing's figures only. It is dropped if it contains a number that is not in the figures, says "on track", or is the wrong length; it is kept 20 minutes per business; with no AI key there is simply no note.
 - **Delegating** (`services/ai/taskProposals.js`): "Ask Priya to chase the bank statements for Acme by Friday", "Remind me to...", or pasted email / meeting notes. Sloane answers with **Tasks to create** (assignee, date and client found); nothing is made until *Create task*. From pasted text it finds promises and requests ("I will...", "Could you...", "Action: ...") and marks each "check who should do this". Plain rules, so it can miss things.
 
 ### What Sloane may do on her own
 
 Settings → **What Sloane may do on her own** (`GET /api/v1/automation`, `PUT /automation/rules`, `POST /automation/run`; signed-in owner only). One rule can be automatic: *make tasks for filing and VAT deadlines* (the same rules as "Sloane suggests"), for all businesses or one. Default **Ask me first**. When automatic, a timer in `server.js` makes the tasks hourly (at most 25 per run, never twice), marks them `origin: 'automation'`, and lists them under "What Sloane did on her own" (`automationLog`). Sending to anyone outside, spending money and sensitive decisions are shown as locked: always ask.
 
+### Tasks and the TriNova portal (two-way sync)
+
+Built against TriNova's contract (`GET /staff`, `GET /tasks?updated_since`, `POST /tasks` with `Idempotency-Key`, `PATCH /tasks/:id`; see `docs/specs/trinova-task-sync.md`), **off until `TRINOVA_TASKS_API_KEY` is set and the owner switches it on** in Settings → *Tasks and the TriNova portal*. At the time of writing the portal has not deployed the task routes (they answer 404), so Sloane reports "TriNova has not switched on tasks yet" and waits.
+
+- Only **TriNova Accounting** tasks (for a TriNova client or none) are sent. Other businesses, private notes, progress notes, repeat rules, dependencies, links and next action never leave Sloane.
+- New task: `POST` once, `external_ref` = Sloane's task id, stable `Idempotency-Key`. Changes: `PATCH` only the fields that differ from the portal's last known values (`task.portal.snapshot`). Delete in Sloane: `PATCH status: cancelled` (never deleted on the portal). Delete in the portal: the task goes to the Bin.
+- Pull: tasks changed since the last pull. A field only the portal changed is taken; if both changed, the later change wins and *completed* always wins. A task made in the portal appears under TriNova Accounting.
+- People are matched by email (then name) and remembered (`portalId` on the team member). Unmatched TriNova staff are listed in Settings.
+- Failures become plain sentences (key refused, not switched on yet, slow down, TriNova problem) with a longer wait each time (1, 2, 4 ... up to 60 minutes; `Retry-After` is obeyed). Whatever still differs is retried automatically; nothing is lost.
+- Runs every 4 minutes, on *Sync now*, and when a valid webhook arrives. The webhook only triggers a fresh pull: its content is never trusted to write a task. Code: `server/src/services/trinovaTaskSync.js`; tests run against a fake portal (`tests/unit59-trinova-task-sync.test.js`).
+
 ### Alerts
 
-`GET /api/v1/alerts` lists what needs attention (late, stuck, due today, due soon with nobody on it, deadlines with no task), each with a stable id. Settings → **Alerts** turns on browser notifications for this device (`scripts/features/alerts.js`, `scripts/sw.js`, `assets/manifest.webmanifest`): while Sloane is open, or added to a phone's Home Screen, each new alert is shown once. **Alerts when Sloane is completely closed need Web Push (VAPID keys + a push service) and are not built.**
+`GET /api/v1/alerts` lists what needs attention (late, stuck, due today, due soon with nobody on it, deadlines with no task), each with a stable id. Settings → **Alerts** turns on notifications for this device (`scripts/features/alerts.js`, `scripts/sw.js`, `assets/manifest.webmanifest`). While Sloane is open, each new alert is shown once.
+
+**Web Push (alerts when Sloane is closed)** (`server/src/services/webPush.js`, `routes/push.js`, library `web-push`): turning alerts on also registers the device with the server (`POST /api/v1/push/subscribe`; the page registers again each time Sloane is opened, so a lost registration heals itself). Every 5 minutes the server pushes any NEW alert once (up to 3, then a summary; the alert id is the notification tag, so it never doubles with the page's own notice), and on weekday mornings from 08:00 UK time it pushes the morning briefing's headline once. Messages are encrypted for the device and signed with the server's VAPID key; a device the push service reports as gone (404/410) is forgotten. Settings has a *Test it with Sloane closed (10 seconds)* button.
+
+- **Keys:** set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in Railway (make a pair with `node server/scripts/generate-vapid-keys.js`; `VAPID_SUBJECT`, a `mailto:` address, is optional and defaults to the owner email). Without them Sloane makes a temporary pair that lasts until the next restart, and the Settings card says so.
+- **Needs saved data to last:** the registered devices are saved like everything else. If the host loses its data on a redeploy (no persistent volume or database), devices must open Sloane once to register again before closed-app alerts resume.
+- **Phones:** Android Chrome works from the browser; an iPhone or iPad needs Sloane added to the Home Screen (iOS 16.4 or newer).
 
 ### The Bin (30 days)
 

@@ -1221,6 +1221,12 @@ export const ApiService = {
     return { status: 'success', data: res.data };
   },
 
+  /** The AI-written note for the top of the briefing ({ note: null } when there is none). */
+  async getMorningNote() {
+    const res = await this.request(`/reports/morning/note${this.scope.business ? `?business=${encodeURIComponent(this.scope.business)}` : ''}`, { timeout: 45000 });
+    return { status: 'success', data: res.data };
+  },
+
   /** Every business at a glance (not filtered by the chosen business). */
   async getBusinessOverview() {
     const res = await this.request('/businesses/overview', { timeout: 20000 });
@@ -1240,6 +1246,43 @@ export const ApiService = {
 
   async runAutomation() {
     const res = await this.request('/automation/run', { method: 'POST', body: {}, timeout: 30000 });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
+  /** Alerts that reach this device when Sloane is closed (Web Push). */
+  async getPushConfig() {
+    const res = await this.request('/push/config');
+    return { status: 'success', data: res.data };
+  },
+
+  async subscribePush(subscription) {
+    const res = await this.request('/push/subscribe', { method: 'POST', body: { subscription } });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
+  async unsubscribePush(endpoint) {
+    const res = await this.request('/push/unsubscribe', { method: 'POST', body: { endpoint } });
+    return { status: 'success', data: res.data };
+  },
+
+  async sendTestPush(delayMs = 10000) {
+    const res = await this.request('/push/test', { method: 'POST', body: { delayMs } });
+    return { status: 'success', message: res.message, data: res.data };
+  },
+
+  /** Task syncing with the TriNova portal. */
+  async getTaskSync() {
+    const res = await this.request('/integrations/trinova/task-sync');
+    return { status: 'success', data: res.data };
+  },
+
+  async setTaskSync(enabled) {
+    const res = await this.request('/integrations/trinova/task-sync', { method: 'PUT', body: { enabled } });
+    return { status: 'success', data: res.data };
+  },
+
+  async runTaskSync() {
+    const res = await this.request('/integrations/trinova/task-sync/run', { method: 'POST', body: {}, timeout: 60000 });
     return { status: 'success', message: res.message, data: res.data };
   },
 

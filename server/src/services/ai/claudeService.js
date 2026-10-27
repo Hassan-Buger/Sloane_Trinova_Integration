@@ -61,9 +61,18 @@ export class ClaudeService {
    * Queries configured AI provider (Anthropic Claude or Google Gemini) with context, user message, and multi-turn history.
    * Returns validated structured output adhering to the API contract.
    */
-  async ask({ query, context = {}, history = [], systemPrompt = SLOANE_SYSTEM_PROMPT, provider = null, model = null }) {
+  async ask({ query, context = {}, history = [], systemPrompt = SLOANE_SYSTEM_PROMPT, provider = null, model = null, rules = true }) {
     const startTime = Date.now();
     const requestId = `ai_req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Questions about people, clients that are behind, chasing, one business or one topic are
+    // answered exactly from the saved records, even when an AI key is set: the numbers must be right.
+    if (rules && !context.client) {
+      const exact = answerWorkQuestion(query);
+      if (exact) {
+        return { status: 'success', source: 'sloane_work_answers', model: 'live_records', requestId, data: exact, usage: { durationMs: Date.now() - startTime } };
+      }
+    }
 
     // Resolve active AI provider preference (request parameter overrides server default)
     const effectiveProvider = (provider || this.aiProvider || 'auto').toLowerCase();

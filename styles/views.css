@@ -2713,3 +2713,36 @@
     align-items: stretch;
   }
 }
+
+/* ---- Morning briefing: Sloane's note ---- */
+.brief-note {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent, #c9a66b);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  background: var(--panel2);
+}
+
+.brief-note[hidden] {
+  display: none;
+}
+
+.brief-note-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.brief-note p {
+  margin: var(--space-1) 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.brief-note-foot {
+  font-size: 11px;
+  color: var(--muted);
+}
