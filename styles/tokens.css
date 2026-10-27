@@ -8,6 +8,10 @@
 
 /* Sloane Design Tokens — Executive Dark Palette */
 :root {
+  /* Native controls (tick boxes, date pickers, scrollbars, the search clear button) follow the black and gold look */
+  color-scheme: dark;
+  accent-color: #d4af37;
+
   /* Color Palette per 02_ui_ux_context.md */
   --bg: #050505;
   --panel: #0c0c0c;
