@@ -73,7 +73,7 @@ export const deadlineMethods = {
               <td><span class="${urgencyClass}">${escapeHtml(urgencyLabel)}</span></td>
               <td style="max-width: 220px; font-size: 11px; color: ${r.urgency === 'RED' ? 'var(--red)' : 'var(--muted)'};">${escapeHtml(r.note || r.notes || '—')}</td>
               <td class="row-actions-cell">
-                <button type="button" class="card-action-btn" data-action="openDeadlineForm" data-index="${i}" title="Change the dates for this company">✎ Edit dates</button>
+                <button type="button" class="card-action-btn" data-action="openDeadlineForm" data-index="${i}" title="Change the dates for this company">✎︎ Edit dates</button>
                 ${r.recordId ? `<button type="button" class="card-action-btn text-red" data-action="deleteDeadline" data-index="${i}" title="${r.origin === 'manual' && r.clientId ? 'Go back to the dates from the client record' : 'Remove this deadline'}">${r.origin === 'manual' && r.clientId ? 'Undo my dates' : 'Remove'}</button>` : ''}
               </td>
             </tr>`;
@@ -141,7 +141,7 @@ export const deadlineMethods = {
           </select>
         </td>
         <td class="row-actions-cell">
-          <button type="button" class="card-action-btn" data-action="openVatForm" data-index="${i}">✎ Edit</button>
+          <button type="button" class="card-action-btn" data-action="openVatForm" data-index="${i}">✎︎ Edit</button>
           <button type="button" class="card-action-btn text-red" data-action="deleteVatReturn" data-index="${i}">Remove</button>
         </td>
       </tr>`).join('');

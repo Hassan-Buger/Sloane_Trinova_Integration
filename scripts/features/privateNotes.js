@@ -7,6 +7,7 @@ import { ApiService } from '../services/api.js';
 import { StorageService } from '../services/storage.js';
 import { Toast } from '../components/toast.js';
 import { ConfirmDialog } from '../components/formModal.js';
+import { visibleNotes, moreNotesButton, noteTextHtml } from '../utils/compactNotes.js';
 import { escapeHtml } from '../utils/html.js';
 
 export const PRIVATE_NOTE_ACTIONS = [
@@ -75,13 +76,14 @@ export const privateNoteMethods = {
       return;
     }
 
-    container.innerHTML = entries.map(entry => {
+    const info = visibleNotes(this, 'private', entries);
+    container.innerHTML = info.shown.map(entry => {
       const isEditing = this.editingBrainId === entry.id;
       return `
       <div class="brain-entry">
         <div class="brain-entry-header">
-          <span class="source-badge" style="color: var(--accent); border-color: rgba(201, 166, 107, 0.4);">
-            🔒 Private
+          <span class="source-badge" style="color: var(--accent); border-color: rgba(212, 175, 55, 0.4);">
+            🔒︎ Private
           </span>
           <span>${escapeHtml(stamp(entry.createdAt))}${entry.editedAt ? ` · changed ${escapeHtml(stamp(entry.editedAt))}` : ''}</span>
         </div>
@@ -92,10 +94,10 @@ export const privateNoteMethods = {
             <button type="button" class="btn btn-secondary" data-action="cancelBrainEdit">Cancel</button>
           </div>
         ` : `
-          <div class="brain-entry-text">${escapeHtml(entry.text)}</div>
+          ${noteTextHtml(this, entry.id, entry.text, 'brain-entry-text')}
           <div class="brain-entry-footer">
             <div class="row-actions">
-              <button type="button" class="card-action-btn" data-action="startBrainEdit" data-id="${escapeHtml(entry.id)}">✎ Edit</button>
+              <button type="button" class="card-action-btn" data-action="startBrainEdit" data-id="${escapeHtml(entry.id)}">Edit</button>
               <button type="button" class="card-action-btn text-red" data-action="deleteBrainEntry" data-id="${escapeHtml(entry.id)}">Delete</button>
             </div>
             <button type="button" class="card-action-btn" data-action="openTrinovaNoteModalFor" data-id="${escapeHtml(entry.id)}" title="Copy this note into a client's Notes tab. Your private note stays here.">
@@ -105,7 +107,7 @@ export const privateNoteMethods = {
         `}
       </div>
     `;
-    }).join('');
+    }).join('') + moreNotesButton('private', info, entries.length);
   },
 
   async handleSaveBrain() {

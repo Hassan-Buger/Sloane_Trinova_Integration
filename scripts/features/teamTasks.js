@@ -36,8 +36,29 @@ const REPEAT_LABELS = {
   quarterly: 'Every 3 months',
   yearly: 'Every year'
 };
-const LINK_ICONS = { email: '✉️', document: '📄', teams: '💬', other: '🔗' };
+const LINK_ICONS = { email: '✉︎', document: '📄︎', teams: '💬︎', other: '🔗︎' };
 const SHOW_NOTES = 2;
+
+const FILTERS = {
+  open: 'Open tasks',
+  late: 'Late',
+  stuck: 'Stuck',
+  finished: 'Finished',
+  all: 'Everything'
+};
+
+/** Does a task pass the chosen filter and the words typed in the search box? */
+export function passesFilter(t, mode, words, today) {
+  const closed = CLOSED.includes(t.status);
+  if (mode === 'open' && closed) return false;
+  if (mode === 'late' && (closed || !(t.dueDate && t.dueDate < today))) return false;
+  if (mode === 'stuck' && (closed || !t.isBlocked)) return false;
+  if (mode === 'finished' && !closed) return false;
+  if (!words.length) return true;
+  const hay = [t.title, t.description, t.companyName, t.businessArea, t.department, t.assigneeName, t.nextAction, t.blocker,
+    ...(t.progressNotes || []).map(n => n.text)].join(' ').toLowerCase();
+  return words.every(w => hay.includes(w));
+}
 
 /** "name | https://..." lines to link objects, and back. */
 function linksFromText(text) {
@@ -97,9 +118,12 @@ export const teamTaskMethods = {
       return;
     }
 
-    const showFinished = Boolean(this.showFinishedTasks);
-    const visible = tasks.filter(t => showFinished || !CLOSED.includes(t.status));
-    const finishedCount = tasks.length - open.length;
+    // What to show: the chosen filter and any words in the search box
+    const mode = this.taskFilterMode || (this.showFinishedTasks ? 'all' : 'open');
+    const words = String(this.taskSearch || '').toLowerCase().split(/\s+/).filter(Boolean);
+    const filtering = mode !== 'open' || words.length > 0;
+    const visible = tasks.filter(t => passesFilter(t, mode, words, todayIso()));
+    this.renderTaskFilters(mode, visible.length, tasks.length);
 
     // Group by person: everyone on the team (even with no tasks), then "Nobody yet".
     const groups = new Map();
@@ -129,7 +153,7 @@ export const teamTaskMethods = {
             <div class="work-title">${escapeHtml(t.title)}${t.blocker ? ` — <span class="text-red">stuck: ${escapeHtml(t.blocker)}</span>` : ''}</div>
             ${t.description ? `<div class="work-desc">${escapeHtml(t.description)}</div>` : ''}
             ${t.nextAction && !done ? `<div class="work-next"><strong>Next:</strong> ${escapeHtml(t.nextAction)}</div>` : ''}
-            ${waiting.length ? `<div class="work-waiting">⏳ Waiting for: ${waiting.map(w => escapeHtml(w.title)).join(', ')}</div>` : ''}
+            ${waiting.length ? `<div class="work-waiting">⏳︎ Waiting for: ${waiting.map(w => escapeHtml(w.title)).join(', ')}</div>` : ''}
             ${(t.links || []).length ? `<div class="work-links">${t.links.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(l.url)}">${LINK_ICONS[l.kind] || LINK_ICONS.other} ${escapeHtml(l.label)}</a>`).join('')}</div>` : ''}
             ${notes.length ? `<div class="work-notes">${notes.length > SHOW_NOTES ? `<button type="button" class="card-action-btn" data-action="toggleTaskNotes" data-id="${escapeHtml(t.id)}">${showAllNotes ? 'Show fewer notes' : `Show all ${notes.length} notes`}</button>` : ''}${shownNotes.map(n => `<div class="work-note"><span class="work-note-meta">${escapeHtml(new Date(n.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' }))} · ${escapeHtml(n.by)}</span> ${escapeHtml(n.text)}</div>`).join('')}</div>` : ''}
           </div>
@@ -144,10 +168,10 @@ export const teamTaskMethods = {
               <select class="select-input" aria-label="Give to" data-change="reassignTask" data-id="${escapeHtml(t.id)}">
                 ${this.teamOptions().map(o => `<option value="${escapeHtml(o.value)}" ${(t.assigneeId || '') === o.value ? 'selected' : ''}>${o.value ? 'Give to ' : ''}${escapeHtml(o.label)}</option>`).join('')}
               </select>
-              ${done ? '' : `<button type="button" class="btn-done" data-action="markTaskDone" data-id="${escapeHtml(t.id)}" title="Tick this off as finished">✓ Done</button>`}
-              <button type="button" class="card-action-btn" data-action="addTaskProgress" data-id="${escapeHtml(t.id)}" title="Write down how this is going">＋ Note</button>
-              <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}" title="Change this task">✎ Edit</button>
-              <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}" title="Delete this task (it goes to the Bin for 30 days)">🗑 Delete</button>
+              ${done ? '' : `<button type="button" class="btn-done" data-action="markTaskDone" data-id="${escapeHtml(t.id)}" title="Tick this off as finished">Done</button>`}
+              <button type="button" class="card-action-btn" data-action="addTaskProgress" data-id="${escapeHtml(t.id)}" title="Write down how this is going">+ Note</button>
+              <button type="button" class="card-action-btn" data-action="openTaskForm" data-id="${escapeHtml(t.id)}" title="Change this task">Edit</button>
+              <button type="button" class="card-action-btn text-red" data-action="deleteTask" data-id="${escapeHtml(t.id)}" title="Delete this task (it goes to the Bin for 30 days)">Delete</button>
             </div>
           </div>
         </div>`;
@@ -166,8 +190,9 @@ export const teamTaskMethods = {
           <div class="row-actions">
             <span class="pill blue">${list.filter(t => !CLOSED.includes(t.status)).length} open</span>
             ${member && member.id ? `
-              <button type="button" class="card-action-btn" data-action="openTeamMemberForm" data-id="${escapeHtml(member.id)}" title="Change this person's details">✎ Edit</button>
+              <button type="button" class="card-action-btn" data-action="openTeamMemberForm" data-id="${escapeHtml(member.id)}" title="Change this person's details">Edit</button>
               <button type="button" class="card-action-btn text-red" data-action="deleteTeamMember" data-id="${escapeHtml(member.id)}" title="Remove this person from your team">Remove</button>` : ''}
+            ${member && !member.id ? `<button type="button" class="card-action-btn" data-action="openTeamMemberForm" data-name="${escapeHtml(member.name)}" title="Put this person on your team list, so their tasks are linked to them">Add to team</button>` : ''}
           </div>
         </div>
         <div class="work-list">
@@ -178,16 +203,44 @@ export const teamTaskMethods = {
         </div>
       </div>`;
 
-    const cards = [...groups.values()].map(card);
-    if (unassigned.tasks.length > 0 || cards.length === 0) cards.push(card(unassigned));
+    // While filtering or searching, people with nothing to show are left out
+    const shown = [...groups.values()].filter(g => !filtering || g.tasks.length > 0);
+    const cards = shown.map(card);
+    if (unassigned.tasks.length > 0 || (cards.length === 0 && !filtering)) cards.push(card(unassigned));
 
-    container.innerHTML = cards.join('') + (finishedCount > 0 ? `
-      <div style="grid-column: 1 / -1; text-align: center;">
-        <button type="button" class="btn btn-secondary" data-action="toggleFinishedTasks">${showFinished ? 'Hide' : 'Show'} ${finishedCount} finished task${finishedCount === 1 ? '' : 's'}</button>
-      </div>` : '');
+    const none = filtering && cards.length === 0
+      ? '<div class="card" style="grid-column: 1 / -1; padding: 28px; text-align: center;"><div class="table-empty">No task matches. Try other words, or choose "Everything".</div></div>'
+      : '';
+    container.innerHTML = cards.join('') + none;
+  },
+
+  /** The search box and the "show" choice above the list. */
+  renderTaskFilters(mode, shownCount, totalCount) {
+    const bar = document.getElementById('teamFilters');
+    if (!bar) return;
+    const select = document.getElementById('taskFilterSelect');
+    if (select) select.value = mode;
+    const count = document.getElementById('taskFilterCount');
+    if (count) count.textContent = shownCount === totalCount ? `${totalCount} task${totalCount === 1 ? '' : 's'}` : `Showing ${shownCount} of ${totalCount}`;
+    if (!this.taskSearchBound) {
+      this.taskSearchBound = true;
+      const box = document.getElementById('taskSearch');
+      let timer = null;
+      if (box) box.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { this.taskSearch = box.value; this.renderPeopleWork(); }, 220);
+      });
+    }
+  },
+
+  async changeTaskFilter(_id, value) {
+    this.taskFilterMode = FILTERS[value] ? value : 'open';
+    this.showFinishedTasks = this.taskFilterMode === 'all' || this.taskFilterMode === 'finished';
+    await this.renderPeopleWork();
   },
 
   async toggleFinishedTasks() {
+    this.taskFilterMode = (this.taskFilterMode === 'all') ? 'open' : 'all';
     this.showFinishedTasks = !this.showFinishedTasks;
     await this.renderPeopleWork();
   },
@@ -355,8 +408,9 @@ export const teamTaskMethods = {
   },
 
   /** Add a team member (no id) or change one. */
-  async openTeamMemberForm(memberId) {
+  async openTeamMemberForm(memberId, el, dataset = {}) {
     const existing = memberId ? (this.teamMembers || []).find(m => m.id === memberId) : null;
+    const presetName = dataset.name || '';
     FormModal.open({
       title: existing ? `Change ${existing.name}` : 'Add someone to your team',
       submitLabel: existing ? 'Save changes' : 'Add to team',
@@ -365,13 +419,20 @@ export const teamTaskMethods = {
         { name: 'role', label: 'What do they do?', type: 'text', maxlength: 100, placeholder: 'e.g. Accountant', full: false },
         { name: 'email', label: 'Email (optional)', type: 'email', full: false }
       ],
-      values: existing ? { name: existing.name, role: existing.role || '', email: existing.email || '' } : {},
+      values: existing ? { name: existing.name, role: existing.role || '', email: existing.email || '' } : (presetName ? { name: presetName } : {}),
       onSubmit: async v => {
         if (existing) {
           await ApiService.updateTeamMember(existing.id, v);
           Toast.success('Saved.');
         } else {
-          await ApiService.createTeamMember(v);
+          const made = await ApiService.createTeamMember(v);
+          // Tasks that only carried this person's name are now linked to them
+          const person = made && made.data;
+          if (presetName && person && person.id) {
+            for (const t of (this.allTasks || []).filter(x => !x.assigneeId && x.assigneeName === presetName)) {
+              await ApiService.updateTask(t.id, { assigneeId: person.id, version: t.version }).catch(() => {});
+            }
+          }
           Toast.success(`${v.name} added to your team.`);
         }
         await this.renderPeopleWork();
@@ -381,18 +442,43 @@ export const teamTaskMethods = {
 
   async deleteTeamMember(memberId) {
     const m = (this.teamMembers || []).find(x => x.id === memberId);
-    const ok = await ConfirmDialog.ask({
-      title: `Remove ${m ? m.name : 'this person'}?`,
-      message: 'They will be taken off your team list. Tasks they have already finished stay as a record. They go to the Bin, where you can put them back for 30 days.',
-      confirmLabel: 'Remove'
-    });
-    if (!ok) return;
-    try {
+    const name = m ? m.name : 'this person';
+    const open = (this.allTasks || []).filter(t => t.assigneeId === memberId && !CLOSED.includes(t.status));
+    const finish = async () => {
       await ApiService.deleteTeamMember(memberId);
-      Toast.success(`${m ? m.name : 'They'} moved to the Bin.`);
-      await this.renderPeopleWork();
-    } catch (err) {
-      Toast.error(err.message || 'Could not remove that person.');
+      Toast.success(`${name} moved to the Bin.`);
+      await this.refreshTaskViews();
+    };
+
+    // Nothing open: one question
+    if (!open.length) {
+      const ok = await ConfirmDialog.ask({
+        title: `Remove ${name}?`,
+        message: 'They will be taken off your team list. Tasks they have already finished stay as a record. They go to the Bin, where you can put them back for 30 days.',
+        confirmLabel: 'Remove'
+      });
+      if (!ok) return;
+      try { await finish(); } catch (err) { Toast.error(err.message || 'Could not remove that person.'); }
+      return;
     }
+
+    // Open tasks: choose who gets them (or nobody) in the same step
+    const others = (this.teamMembers || []).filter(x => x.id !== memberId);
+    FormModal.open({
+      title: `Remove ${name}?`,
+      submitLabel: 'Move their tasks and remove',
+      fields: [{
+        name: 'to',
+        label: `${name} has ${open.length} open task${open.length === 1 ? '' : 's'}. Who should ${open.length === 1 ? 'it' : 'they'} go to?`,
+        type: 'select',
+        options: [...others.map(o => ({ value: o.id, label: o.name })), { value: '', label: 'Nobody yet (I will give them out later)' }],
+        help: 'Tasks they have already finished stay as a record. They go to the Bin, where you can put them back for 30 days.'
+      }],
+      values: { to: others.length ? others[0].id : '' },
+      onSubmit: async v => {
+        for (const t of open) await ApiService.updateTask(t.id, { assigneeId: v.to || null, version: t.version });
+        await finish();
+      }
+    });
   }
 };

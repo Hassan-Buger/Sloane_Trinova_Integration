@@ -21,9 +21,9 @@ export function proposalsHtml(app, proposals) {
     const key = `${group}_${i}`;
     app.proposalStore[key] = { ...p, group, done: false };
     const meta = [
-      p.assigneeName ? `👤 ${escapeHtml(p.assigneeName)}` : '👤 Nobody yet',
-      p.dueDate ? `📅 ${escapeHtml(formatDateGB(p.dueDate))}` : '📅 No date',
-      p.clientName ? `🏢 ${escapeHtml(p.clientName)}` : '',
+      p.assigneeName ? `👤︎ ${escapeHtml(p.assigneeName)}` : '👤︎ Nobody yet',
+      p.dueDate ? `📅︎ ${escapeHtml(formatDateGB(p.dueDate))}` : '📅︎ No date',
+      p.clientName ? `🏢︎ ${escapeHtml(p.clientName)}` : '',
       p.businessArea ? escapeHtml(p.businessArea) : ''
     ].filter(Boolean).join(' · ');
     return `

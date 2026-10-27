@@ -87,7 +87,7 @@ class SloaneApp {
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
-      'changeBusinessScope', 'changeAutomationMode', 'changeAutomationBusiness', 'changeTaskSync', 'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
+      'changeBusinessScope', 'changeAutomationMode', 'changeAutomationBusiness', 'changeTaskSync', 'changeTaskFilter', 'reassignTask', 'changeTaskStatusFromList', 'changeVatStatus', 'selectClientInTab'
     ]);
   }
 
@@ -463,7 +463,7 @@ class SloaneApp {
     const statusDot = document.getElementById('trinovaStatusDot');
     const statusText = document.getElementById('trinovaStatusText');
     const look = {
-      ok: ['green', 'var(--green)', '⚡ TriNova: Connected', 'Sloane is reading your clients from TriNova. Click for details.'],
+      ok: ['green', 'var(--green)', '⚡︎ TriNova: Connected', 'Sloane is reading your clients from TriNova. Click for details.'],
       not_configured: ['neutral', 'var(--muted)', 'TriNova: Not set up', 'Sloane has not been given TriNova\'s access key yet, so it cannot show your TriNova clients. Click for details.'],
       unreachable: ['neutral', 'var(--amber)', 'TriNova: Cannot reach', 'Sloane could not reach TriNova just now. Click for details.'],
       checking: ['neutral', 'var(--amber)', 'TriNova: Checking...', 'Sloane is checking the connection to TriNova.'],
@@ -904,16 +904,16 @@ class SloaneApp {
         }
         const result = await ApiService.testAnthropicKey();
         btnTestClaudeKey.disabled = false;
-        btnTestClaudeKey.textContent = '⚡ Test the AI';
+        btnTestClaudeKey.textContent = '⚡︎ Test the AI';
         if (claudeStatusEl) {
           claudeStatusEl.style.display = 'block';
           if (result.ok) {
-            claudeStatusEl.style.color = '#10b981';
-            claudeStatusEl.textContent = `✅ ${result.message}`;
+            claudeStatusEl.style.color = '#cfc8b4';
+            claudeStatusEl.textContent = `✅︎ ${result.message}`;
             Toast.success('The AI is working.');
           } else {
-            claudeStatusEl.style.color = '#ef4444';
-            claudeStatusEl.textContent = `❌ ${result.message}`;
+            claudeStatusEl.style.color = '#f0cf6a';
+            claudeStatusEl.textContent = `❌︎ ${result.message}`;
             Toast.error('The AI is not working right now.');
           }
         }
@@ -1097,6 +1097,10 @@ class SloaneApp {
       this.renderWeeklyReport();
     }
 
+    if (viewId === 'ask') {
+      setTimeout(() => { const box = document.getElementById('askInput'); if (box) box.focus(); }, 50);
+    }
+
     if (viewId === 'briefing') {
       this.renderMorningBriefing();
     }
@@ -1217,9 +1221,9 @@ class SloaneApp {
         if (status === 'reconnect_required' && !this._dismissedReconnectBanner) {
           reconnectBannerEl.style.display = 'block';
           reconnectBannerEl.innerHTML = `
-            <div class="sourcebanner" style="background: rgba(255, 93, 103, 0.1); border: 1px solid var(--red-border); color: #ffb4b9; padding: 12px 16px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div class="sourcebanner" style="background: rgba(240, 207, 106, 0.1); border: 1px solid var(--red-border); color: #f0cf6a; padding: 12px 16px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
               <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 16px;">⚠️</span>
+                <span style="font-size: 16px;">⚠︎</span>
                 <div style="font-size: 12.5px; line-height: 1.4;">
                   <strong style="color: var(--red);">Outlook Reconnect Required:</strong>
                   <span style="color: var(--text);">Microsoft authorization has expired or consent was revoked. Reconnect your account to resume diary and email sync.</span>
@@ -1227,7 +1231,7 @@ class SloaneApp {
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
                 <a href="/api/v1/integrations/outlook/connect" class="btn btn-primary" id="btnReconnectOutlookBanner" style="padding: 6px 14px; font-size: 11.5px; text-decoration: none;">
-                  🔗 Reconnect Now
+                  🔗︎ Reconnect Now
                 </a>
                 <button type="button" class="btn btn-secondary" id="btnDismissReconnectBanner" style="padding: 6px 10px; font-size: 11px;">
                   ✕
@@ -1494,8 +1498,8 @@ class SloaneApp {
           </div>
         </div>
         <div class="row-actions">
-          <button type="button" class="btn btn-secondary" onclick="app.openEditBiz('${sanitizeId(b.id)}')">✎ Edit</button>
-          <button type="button" class="btn btn-secondary" style="color: var(--red); border-color: rgba(239, 68, 68, 0.3);" onclick="app.deleteBiz('${sanitizeId(b.id)}')">Remove</button>
+          <button type="button" class="btn btn-secondary" onclick="app.openEditBiz('${sanitizeId(b.id)}')">✎︎ Edit</button>
+          <button type="button" class="btn btn-secondary" style="color: var(--red); border-color: rgba(240, 207, 106, 0.3);" onclick="app.deleteBiz('${sanitizeId(b.id)}')">Remove</button>
         </div>
       </div>
     `).join('');
@@ -1613,13 +1617,13 @@ class SloaneApp {
           <td style="max-width: 180px; font-size: 11px; color: var(--muted);">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span>${safeNotes}</span>
-              <div style="display: flex; gap: 4px;">
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="See history" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">⏱️</button>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary client-act" title="See this client's history, notes, documents and tasks" onclick="event.stopPropagation(); app.selectClient360('${clientId}');">History</button>
                 ${canEdit ? `
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Edit this client" onclick="event.stopPropagation(); app.openEditClient('${clientId}');">✎</button>
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px; color: var(--red); border-color: rgba(239, 68, 68, 0.3);" title="Remove this client" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">✕</button>
+                <button type="button" class="btn btn-secondary client-act" title="Edit this client" onclick="event.stopPropagation(); app.openEditClient('${clientId}');">Edit</button>
+                <button type="button" class="btn btn-secondary client-act client-act-remove" title="Remove this client (it goes to the Bin for 30 days)" onclick="event.stopPropagation(); app.deleteClient('${clientId}', '${safeName}');">Remove</button>
                 ` : `
-                <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 10px;" title="Choose which of your businesses this client belongs to" data-action="openClientBusinessForm" data-id="${clientId}">🏢</button>
+                <button type="button" class="btn btn-secondary client-act" title="Choose which of your businesses this client belongs to" data-action="openClientBusinessForm" data-id="${clientId}">Business</button>
                 <span class="source-badge" title="This client comes from TriNova, so its details are changed there.">TriNova</span>`}
               </div>
             </div>
@@ -2198,7 +2202,7 @@ class SloaneApp {
       if (events.length === 0) {
         container.innerHTML = `
           <div class="timeline-empty">
-            <div style="font-size: 24px; margin-bottom: 8px;">⏱️</div>
+            <div style="font-size: 24px; margin-bottom: 8px;">⏱︎</div>
             <strong style="color: var(--text);">No timeline records found</strong>
             <p style="margin: 4px 0 12px 0;">No chronological events match the current filters for ${escapeHtml(activeClient.name)}.</p>
             <button type="button" class="btn btn-secondary" style="font-size: 11px;" onclick="app.timelineEventTypeFilter=''; app.timelineSeverityFilter=''; document.getElementById('timelineEventTypeFilter').value=''; document.getElementById('timelineSeverityFilter').value=''; app.renderTimeline('${clientId}')">Clear Filters</button>
@@ -2246,7 +2250,7 @@ class SloaneApp {
         html += `
           <div class="timeline-date-group">
             <div class="timeline-date-title">
-              <span>📅 ${escapeHtml(groupName)}</span>
+              <span>📅︎ ${escapeHtml(groupName)}</span>
               <span style="opacity: 0.7; font-size: 10px;">(${groupEvents.length})</span>
             </div>
             ${groupEvents.map(evt => {
@@ -2272,7 +2276,7 @@ class SloaneApp {
                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
                           <span class="pill ${sevPillClass}" style="font-size: 9.5px; padding: 1px 6px;">${safeSeverity}</span>
                           <span class="source-badge" style="font-size: 9.5px;">${safeEventType}</span>
-                          ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒 Only you</span>' : ''}
+                          ${evt.visibility === 'private' ? '<span class="pill red" style="font-size: 9.5px;">🔒︎ Only you</span>' : ''}
                         </div>
                       </div>
                       <div class="timeline-card-time">${dateStr} · ${timeStr}</div>
@@ -2282,16 +2286,16 @@ class SloaneApp {
                     </div>
                     <div class="timeline-card-footer">
                       <div class="row-actions" style="margin: 0 0 8px 0;">
-                        ${evt.source === 'user' ? `<button type="button" class="card-action-btn" data-action="openHistoryForm" data-id="${escapeHtml(evt.id)}">✎ Edit</button>` : ''}
-                        <button type="button" class="card-action-btn text-red" data-action="deleteHistoryEntry" data-id="${escapeHtml(evt.id)}">🗑 Delete</button>
+                        ${evt.source === 'user' ? `<button type="button" class="card-action-btn" data-action="openHistoryForm" data-id="${escapeHtml(evt.id)}">✎︎ Edit</button>` : ''}
+                        <button type="button" class="card-action-btn text-red" data-action="deleteHistoryEntry" data-id="${escapeHtml(evt.id)}">🗑︎ Delete</button>
                       </div>
                       <div class="timeline-card-tags">
                         <span class="timeline-actor-tag">
-                          <span>👤</span>
+                          <span>👤︎</span>
                           <span>${safeActor}</span>
                         </span>
                         <span class="timeline-actor-tag" style="color: var(--accent);">
-                          <span>🔌</span>
+                          <span>🔌︎</span>
                           <span>${safeSource}</span>
                         </span>
                       </div>
@@ -2483,15 +2487,15 @@ class SloaneApp {
 
       const riskLevel = data.risk_level;
       const riskClass = riskLevel === 'red' ? 'risk-red' : riskLevel === 'amber' ? 'risk-amber' : riskLevel === 'low' ? 'risk-low' : 'risk-neutral';
-      const riskIcon = riskLevel === 'red' ? '🔴 RED: needs action now' : riskLevel === 'amber' ? '🟠 AMBER: keep an eye on this' : riskLevel === 'low' ? '🟢 LOW RISK' : '⚪ SUMMARY';
+      const riskIcon = riskLevel === 'red' ? '\u25CF NEEDS ACTION NOW' : riskLevel === 'amber' ? '\u25CF KEEP AN EYE ON THIS' : riskLevel === 'low' ? '\u25CF LOW RISK' : '\u25CF SUMMARY';
 
       const isClaude = res.source === 'anthropic_claude';
       const isGemini = res.source === 'google_gemini';
       const providerBadge = isClaude
-        ? `<span class="source-badge ch-live" style="font-size: 10px;">⚡ Claude 3.5 Sonnet</span>`
+        ? `<span class="source-badge ch-live" style="font-size: 10px;">Claude</span>`
         : isGemini
-        ? `<span class="source-badge ch-live" style="font-size: 10px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">✨ Google Gemini</span>`
-        : `<span class="source-badge" style="font-size: 10px; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">🛡️ Answered from your saved records (not by AI)</span>`;
+        ? `<span class="source-badge ch-live" style="font-size: 10px; background: rgba(163, 155, 136, 0.15); color: #a39b88; border: 1px solid rgba(163, 155, 136, 0.3);">Google Gemini</span>`
+        : `<span class="source-badge" style="font-size: 10px; background: rgba(163, 155, 136, 0.15); color: #a39b88; border: 1px solid rgba(163, 155, 136, 0.25);">Answered from your saved records (not by AI)</span>`;
 
       // Remove inline loading if present
       const inlineLoadingEl = document.getElementById('aiInlineLoading');
@@ -2556,7 +2560,7 @@ class SloaneApp {
             <div class="ai-evidence-box">
               ${data.evidence.map(ev => `
                 <div class="ai-evidence-item">
-                  <span style="color: #c5d1de;">${escapeHtml(ev.reason || 'Record cited')}</span>
+                  <span style="color: #d9d2bf;">${escapeHtml(ev.reason || 'Record cited')}</span>
                   ${ev.timeline_event_id ? `
                     <button type="button" class="ai-evidence-link" style="background: none; border: none; font-size: 11px; padding: 2px 6px;" onclick="app.jumpToTimelineEvent('${sanitizeId(ev.timeline_event_id)}', '${sanitizeId(targetClientId || '')}')">
                       View Event #${escapeHtml(ev.timeline_event_id.substring(0, 12))} ↗

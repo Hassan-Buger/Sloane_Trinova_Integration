@@ -2,7 +2,7 @@
 
 /* Cards */
 .card {
-  background: linear-gradient(180deg, rgba(21, 28, 38, 0.7) 0%, rgba(16, 21, 29, 0.95) 100%);
+  background: linear-gradient(180deg, rgba(19, 19, 19, 0.7) 0%, rgba(12, 12, 12, 0.95) 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 18px 20px;
@@ -11,7 +11,7 @@
 }
 
 .card:hover {
-  border-color: rgba(201, 166, 107, 0.25);
+  border-color: rgba(212, 175, 55, 0.25);
   box-shadow: var(--shadow-md);
 }
 
@@ -53,14 +53,14 @@
 
 /* Redcard Variant (For High Severity / Urgent Alerts) */
 .redcard {
-  background: linear-gradient(180deg, rgba(45, 18, 22, 0.6) 0%, rgba(20, 10, 12, 0.95) 100%);
+  background: linear-gradient(180deg, rgba(40, 32, 10, 0.6) 0%, rgba(14, 11, 4, 0.95) 100%);
   border: 1px solid var(--red-border);
-  box-shadow: 0 4px 20px rgba(255, 93, 103, 0.15);
+  box-shadow: 0 4px 20px rgba(240, 207, 106, 0.15);
 }
 
 .redcard:hover {
   border-color: var(--red);
-  box-shadow: 0 6px 24px rgba(255, 93, 103, 0.25);
+  box-shadow: 0 6px 24px rgba(240, 207, 106, 0.25);
 }
 
 /* Metric Tiles */
@@ -106,22 +106,22 @@
 
 .dot.red {
   background-color: var(--red);
-  box-shadow: 0 0 8px rgba(255, 93, 103, 0.7);
+  box-shadow: 0 0 8px rgba(240, 207, 106, 0.7);
 }
 
 .dot.amber {
   background-color: var(--amber);
-  box-shadow: 0 0 8px rgba(243, 181, 74, 0.7);
+  box-shadow: 0 0 8px rgba(184, 146, 46, 0.7);
 }
 
 .dot.green {
   background-color: var(--green);
-  box-shadow: 0 0 8px rgba(78, 209, 154, 0.7);
+  box-shadow: 0 0 8px rgba(207, 200, 180, 0.7);
 }
 
 .dot.blue {
   background-color: var(--blue);
-  box-shadow: 0 0 8px rgba(98, 168, 255, 0.7);
+  box-shadow: 0 0 8px rgba(163, 155, 136, 0.7);
 }
 
 /* Pills */
@@ -162,9 +162,9 @@
 }
 
 .pill.neutral {
-  background-color: rgba(141, 154, 170, 0.12);
+  background-color: rgba(163, 155, 136, 0.12);
   color: var(--muted);
-  border: 1px solid rgba(141, 154, 170, 0.3);
+  border: 1px solid rgba(163, 155, 136, 0.3);
 }
 
 /* Rank Badge (Used in Top 3) */
@@ -190,7 +190,7 @@
   border-radius: 4px;
   background: var(--panel2);
   color: var(--accent);
-  border: 1px solid rgba(201, 166, 107, 0.3);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -225,7 +225,7 @@ th {
 
 td {
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(38, 49, 64, 0.5);
+  border-bottom: 1px solid rgba(43, 38, 25, 0.5);
   color: var(--text);
   vertical-align: middle;
 }
@@ -235,7 +235,7 @@ tr:last-child td {
 }
 
 tbody tr:hover {
-  background-color: rgba(21, 28, 38, 0.5);
+  background-color: rgba(19, 19, 19, 0.5);
 }
 
 .table-empty {
@@ -313,8 +313,8 @@ tbody tr:hover {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #b89355 100%);
-  color: #080b10;
+  background: linear-gradient(135deg, var(--accent) 0%, #a8862c 100%);
+  color: #050505;
   box-shadow: var(--shadow-sm);
 }
 
@@ -331,7 +331,7 @@ tbody tr:hover {
 
 .btn-secondary:hover {
   background: var(--panel3);
-  border-color: rgba(201, 166, 107, 0.4);
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
 .btn-danger {
@@ -341,7 +341,7 @@ tbody tr:hover {
 }
 
 .btn-danger:hover {
-  background: rgba(255, 93, 103, 0.22);
+  background: rgba(240, 207, 106, 0.22);
 }
 
 /* Data Provenance & Badges */
@@ -366,13 +366,13 @@ tbody tr:hover {
 }
 
 .source-badge.ch-live {
-  border-color: rgba(78, 209, 154, 0.4);
+  border-color: rgba(207, 200, 180, 0.4);
   color: var(--green);
 }
 
 .sourcebanner {
-  background: rgba(243, 181, 74, 0.08);
-  border: 1px solid rgba(243, 181, 74, 0.25);
+  background: rgba(184, 146, 46, 0.08);
+  border: 1px solid rgba(184, 146, 46, 0.25);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   font-size: 11px;
@@ -496,7 +496,7 @@ tbody tr:hover {
   justify-content: flex-end;
   gap: 12px;
   flex-shrink: 0;
-  background: rgba(16, 21, 29, 0.85);
+  background: rgba(12, 12, 12, 0.85);
   backdrop-filter: blur(4px);
 }
 
@@ -532,8 +532,23 @@ tbody tr:hover {
 /* Form Grids */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px 18px;
+}
+
+/* A long option or placeholder must not push a form field past the edge of its dialog */
+.form-grid > *,
+.form-control {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#clientSearchInput {
+  width: min(340px, 100%);
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+  filter: invert(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(0.9);
 }
 
 .form-group {
@@ -616,7 +631,7 @@ textarea.form-control {
 }
 
 .toast.toast-info {
-  border-color: rgba(201, 166, 107, 0.4);
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
 .toast.toast-warning {
@@ -632,4 +647,18 @@ textarea.form-control {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ---- A plain gold "i" for information notes (instead of a blue emoji) ---- */
+.info-i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+  font: italic 700 11px/1 Georgia, serif;
+  flex-shrink: 0;
 }
