@@ -1097,6 +1097,10 @@ class SloaneApp {
       this.renderWeeklyReport();
     }
 
+    if (viewId === 'ask') {
+      setTimeout(() => { const box = document.getElementById('askInput'); if (box) box.focus(); }, 50);
+    }
+
     if (viewId === 'briefing') {
       this.renderMorningBriefing();
     }

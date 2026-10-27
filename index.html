@@ -16,11 +16,11 @@
   <meta name="theme-color" content="#080b10">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.18.2">
-  <link rel="stylesheet" href="styles/layout.css?v=2.18.2">
-  <link rel="stylesheet" href="styles/components.css?v=2.18.2">
-  <link rel="stylesheet" href="styles/views.css?v=2.18.2">
-  <link rel="stylesheet" href="styles/auth.css?v=2.18.2">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.19.0">
+  <link rel="stylesheet" href="styles/layout.css?v=2.19.0">
+  <link rel="stylesheet" href="styles/components.css?v=2.19.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.19.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.19.0">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -209,6 +209,14 @@
           </button>
         </li>
         <li>
+          <button class="nav-btn" data-view="ask" id="nav-ask" title="Ask a question or give an instruction in plain words">
+            <span class="nav-btn-content">
+              <span>💬</span>
+              <span>Ask Sloane</span>
+            </span>
+          </button>
+        </li>
+        <li>
           <button class="nav-btn" data-view="briefing" id="nav-briefing" title="Everything for the start of your day, across all your businesses">
             <span class="nav-btn-content">
               <span>☀️</span>
@@ -326,27 +334,6 @@
           <h1 id="greetingHeading">Good day</h1>
         </div>
 
-        <div class="ask-wrapper">
-          <form class="ask-form" id="askForm">
-            <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane, e.g. What needs chasing?" autocomplete="off">
-            <select id="topAiProviderSelect" class="ask-provider-select" title="Choose which AI answers your question">
-              <option value="auto">⚡ Automatic</option>
-              <option value="gemini">✨ Gemini</option>
-              <option value="anthropic">🤖 Claude</option>
-            </select>
-            <button type="submit" class="ask-btn" id="askSubmitBtn">Ask</button>
-          </form>
-          <div class="ask-suggestions" id="askSuggestions">
-            <span style="font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-right: 2px;">Ask:</span>
-            <button type="button" class="ask-pill-suggestion" data-prompt="What statutory deadlines need immediate attention today?">Deadlines due</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="What should I focus on today?">Today's focus</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Summarise overdue statutory filings.">Late filings</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Show high risk client alerts.">Risky clients</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Which clients are behind?">Clients behind</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="What needs chasing?">Needs chasing</button>
-            <button type="button" class="ask-pill-suggestion" data-prompt="Who has the most on right now?">Team workload</button>
-          </div>
-        </div>
       </div>
 
       <div class="sourcebanner scope-banner" id="scopeBanner" hidden>
@@ -890,6 +877,62 @@
             <!-- Dynamically Populated -->
           </div>
 
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           Ask Sloane: questions and instructions in plain words (answers open in a window)
+           ==================================================================== -->
+      <section class="view hidden" id="view-ask">
+        <div class="card-header">
+          <div>
+            <h2 style="font-size: 18px;">Ask Sloane</h2>
+            <p class="page-intro">Ask a question or give an instruction in plain words. Sloane answers from your own records. It makes nothing until you press "Create task".</p>
+          </div>
+        </div>
+
+        <div class="ask-wrapper ask-page-wrapper">
+          <form class="ask-form" id="askForm">
+            <input type="text" class="ask-input" id="askInput" placeholder="Ask Sloane, e.g. What needs chasing?" autocomplete="off">
+            <select id="topAiProviderSelect" class="ask-provider-select" title="Choose which AI answers your question">
+              <option value="auto">⚡ Automatic</option>
+              <option value="gemini">✨ Gemini</option>
+              <option value="anthropic">🤖 Claude</option>
+            </select>
+            <button type="submit" class="ask-btn" id="askSubmitBtn">Ask</button>
+          </form>
+        </div>
+
+        <div class="ask-groups" id="askSuggestions">
+          <div class="card ask-group">
+            <h3>Deadlines and clients</h3>
+            <div class="ask-chips">
+              <button type="button" class="ask-pill-suggestion" data-prompt="What statutory deadlines need immediate attention today?">Deadlines due</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="Summarise overdue statutory filings.">Late filings</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="Show high risk client alerts.">Risky clients</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="Which clients are behind?">Clients behind</button>
+            </div>
+          </div>
+          <div class="card ask-group">
+            <h3>Your team and your day</h3>
+            <div class="ask-chips">
+              <button type="button" class="ask-pill-suggestion" data-prompt="What should I focus on today?">Today's focus</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="What needs chasing?">Needs chasing</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="Who has the most on right now?">Team workload</button>
+              <button type="button" class="ask-pill-suggestion" data-prompt="What's happening across my businesses?">Across my businesses</button>
+            </div>
+          </div>
+          <div class="card ask-group">
+            <h3>You can also type things like</h3>
+            <ul class="ask-examples">
+              <li>What's Priya working on?</li>
+              <li>What needs chasing at Emerald?</li>
+              <li>Where are we with the MTDflow launch?</li>
+              <li>Ask Priya to chase the bank statements by Friday.</li>
+              <li>Paste an email or meeting notes, and Sloane suggests the tasks in it.</li>
+            </ul>
+            <p class="card-help">Sloane cannot see your emails or Teams yet, so it works from what is saved in Sloane.</p>
+          </div>
         </div>
       </section>
 
@@ -1487,6 +1530,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.18.2"></script>
+  <script type="module" src="scripts/app.js?v=2.19.0"></script>
 </body>
 </html>
