@@ -1482,10 +1482,11 @@ class SloaneApp {
     }
 
     this.lastBusinesses = businesses;
-    container.innerHTML = businesses.map(b => `
+    container.innerHTML = businesses.map((b, idx) => `
       <div class="card biz-card">
         <div>
           <div class="biz-card-header">
+            <span class="row-num">#${idx + 1}</span>
             <span class="pill ${b.status === 'Paused' ? 'amber' : 'green'}">${escapeHtml(b.status === 'Paused' ? 'Paused' : 'Active')}</span>
           </div>
           <div class="biz-name">${escapeHtml(b.name)}</div>
@@ -1578,11 +1579,11 @@ class SloaneApp {
     if (!tbody) return;
 
     if (clients.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">No clients found. Try a different search, or click "+ Add a client".</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="table-empty">No clients found. Try a different search, or click "+ Add a client".</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = clients.map(c => {
+    tbody.innerHTML = clients.map((c, idx) => {
       const riskClass = c.risk === 'High' ? 'red' : c.risk === 'Medium' ? 'amber' : 'green';
       const clientId = sanitizeId(c.id || c.clientId || 'client_record');
       const safeName = escapeHtml(c.name);
@@ -1598,6 +1599,7 @@ class SloaneApp {
 
       return `
         <tr class="client-row" style="cursor: pointer;" title="Click to see this client's history" onclick="app.selectClient360('${clientId}')">
+          <td class="col-num">${idx + 1}</td>
           <td>
             <div style="font-weight: 700; color: var(--text);">${safeName}</div>
             <div style="font-size: 11px; color: var(--muted);">${safeBiz}</div>

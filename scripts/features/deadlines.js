@@ -60,6 +60,7 @@ export const deadlineMethods = {
           const urgencyLabel = r.urgency === 'RED' ? 'RED · ACT NOW' : (r.urgency === 'AMBER' ? 'AMBER · COMING UP' : 'CLEAR · ON TRACK');
           return `
             <tr>
+              <td class="col-num">${i + 1}</td>
               <td>
                 <div style="font-weight: 700; color: var(--text);">${escapeHtml(r.name || r.companyName)}</div>
                 <div class="source">
@@ -79,7 +80,7 @@ export const deadlineMethods = {
             </tr>`;
         }).join('');
       } else {
-        tbody.innerHTML = `<tr><td colspan="8" class="table-empty" style="text-align: center; padding: 24px;">
+        tbody.innerHTML = `<tr><td colspan="9" class="table-empty" style="text-align: center; padding: 24px;">
           No deadlines yet. Deadlines appear here from your TriNova clients and from clients you add. You can also add a deadline yourself with "+ Add a deadline".
         </td></tr>`;
       }
@@ -100,8 +101,9 @@ export const deadlineMethods = {
     if (actionTbody) {
       const actionItems = records.filter(r => r.urgency === 'RED' || r.urgency === 'AMBER');
       if (actionItems.length > 0) {
-        actionTbody.innerHTML = actionItems.map(a => `
+        actionTbody.innerHTML = actionItems.map((a, idx) => `
           <tr>
+            <td class="col-num">${idx + 1}</td>
             <td style="font-weight: 700; color: var(--text);">${escapeHtml(a.name || a.companyName)}</td>
             <td style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(a.companyNumber || '—')}</td>
             <td style="color: ${a.urgency === 'RED' ? 'var(--red)' : 'var(--text)'}; font-weight: 600;">${escapeHtml(a.hasStrikeOff ? 'Companies House plans to remove this company from the register' : (a.accountsOverdue ? 'Accounts are late, so penalties may apply' : 'Accounts are due soon'))}</td>
@@ -110,7 +112,7 @@ export const deadlineMethods = {
           </tr>
         `).join('');
       } else {
-        actionTbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="text-align: center; padding: 24px;">Nothing needs doing right now.</td></tr>`;
+        actionTbody.innerHTML = `<tr><td colspan="6" class="table-empty" style="text-align: center; padding: 24px;">Nothing needs doing right now.</td></tr>`;
       }
     }
 
@@ -123,15 +125,16 @@ export const deadlineMethods = {
     const res = await ApiService.getVatReturns();
     this.vatRows = res.data || [];
     if (res.error) {
-      vatTbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="text-align: center; padding: 24px;">Sloane could not load your VAT returns just now: ${escapeHtml(res.error)}</td></tr>`;
+      vatTbody.innerHTML = `<tr><td colspan="6" class="table-empty" style="text-align: center; padding: 24px;">Sloane could not load your VAT returns just now: ${escapeHtml(res.error)}</td></tr>`;
       return;
     }
     if (this.vatRows.length === 0) {
-      vatTbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="text-align: center; padding: 24px;">No VAT returns saved yet. Click "+ Add a VAT return" to keep track of one.</td></tr>`;
+      vatTbody.innerHTML = `<tr><td colspan="6" class="table-empty" style="text-align: center; padding: 24px;">No VAT returns saved yet. Click "+ Add a VAT return" to keep track of one.</td></tr>`;
       return;
     }
     vatTbody.innerHTML = this.vatRows.map((v, i) => `
       <tr>
+        <td class="col-num">${i + 1}</td>
         <td style="font-weight: 700; color: var(--text);">${escapeHtml(v.clientName)}</td>
         <td>${escapeHtml(v.period)}</td>
         <td>${escapeHtml(formatDateGB(v.dueDate))}<div class="syncmeta">${escapeHtml(v.status === 'Filed' ? '' : describeDue(v.dueDate))}</div></td>

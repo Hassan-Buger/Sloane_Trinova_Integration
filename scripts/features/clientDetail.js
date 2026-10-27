@@ -207,11 +207,12 @@ export const clientDetailMethods = {
     const signedByDoc = new Map();
     for (const r of requests) if (!signedByDoc.has(r.documentId)) signedByDoc.set(r.documentId, r);
 
-    const docRows = docs.map(d => {
+    const docRows = docs.map((d, idx) => {
       const sign = signedByDoc.get(d.id);
       const [signText, signClass] = sign ? (SIGNING_LABEL[sign.status] || [sign.status, 'neutral']) : [];
       return `
         <div class="doc-row">
+          <span class="row-num" style="width: 22px; flex-shrink: 0; align-self: center;">#${idx + 1}</span>
           <div class="doc-main">
             <div class="doc-name">📄︎ ${escapeHtml(d.filename)}</div>
             <div class="doc-meta">
@@ -229,10 +230,11 @@ export const clientDetailMethods = {
         </div>`;
     }).join('');
 
-    const signRows = requests.map(r => {
+    const signRows = requests.map((r, idx) => {
       const [text, cls] = SIGNING_LABEL[r.status] || [r.status, 'neutral'];
       return `
         <div class="doc-row">
+          <span class="row-num" style="width: 22px; flex-shrink: 0; align-self: center;">#${idx + 1}</span>
           <div class="doc-main">
             <div class="doc-name">✍︎ ${escapeHtml(r.title || r.originalFilename)}</div>
             <div class="doc-meta">
@@ -425,10 +427,10 @@ export const clientDetailMethods = {
     this.clientNotes = notes;
 
     const info = visibleNotes(this, 'client', notes);
-    const list = info.shown.map(n => `
+    const list = info.shown.map((n, idx) => `
       <div class="note-row">
         <div class="note-head">
-          <strong>${escapeHtml(n.authorName || n.author || 'Staff')}</strong>
+          <span><span class="row-num" style="margin-right: 6px;">#${idx + 1}</span> <strong>${escapeHtml(n.authorName || n.author || 'Staff')}</strong></span>
           <span class="syncmeta">${escapeHtml(shortDateTime(n.createdAt))}${n.editedAt ? ` · changed ${escapeHtml(shortDateTime(n.editedAt))}` : ''}</span>
         </div>
         ${noteTextHtml(this, n.id, n.text || n.content || '', 'note-text')}
@@ -551,10 +553,11 @@ export const clientDetailMethods = {
     this.allTasks = [...(this.allTasks || []).filter(t => !tasks.some(x => x.id === t.id)), ...tasks];
     if (!this.teamMembers) this.teamMembers = (await ApiService.getTeam()).data || [];
 
-    const rows = tasks.map(t => {
+    const rows = tasks.map((t, idx) => {
       const done = ['Completed', 'Cancelled'].includes(t.status);
       return `
         <div class="doc-row ${done ? 'work-item-done' : ''}">
+          <span class="row-num" style="width: 22px; flex-shrink: 0; align-self: center;">#${idx + 1}</span>
           <div class="doc-main">
             <div class="doc-name">${escapeHtml(t.title)}</div>
             <div class="doc-meta">

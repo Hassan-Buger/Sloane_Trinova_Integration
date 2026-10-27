@@ -585,6 +585,16 @@ export const OutlookSettings = {
         ModalManager.open('outlookDisconnectModal', btnDisconnect);
       });
     }
+
+    // 6. Connect / Reconnect Button Loading State
+    const btnConnect = document.getElementById('btnConnectOutlook');
+    if (btnConnect) {
+      btnConnect.addEventListener('click', () => {
+        btnConnect.innerHTML = '⏳︎ Connecting to Microsoft...';
+        btnConnect.style.pointerEvents = 'none';
+        btnConnect.style.opacity = '0.7';
+      });
+    }
   },
 
   /**

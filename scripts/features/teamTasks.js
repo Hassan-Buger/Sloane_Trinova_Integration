@@ -139,7 +139,7 @@ export const teamTaskMethods = {
       } else unassigned.tasks.push(t);
     }
 
-    const taskRow = t => {
+    const taskRow = (t, index = 0) => {
       const done = CLOSED.includes(t.status);
       const dueClass = !done && t.dueDate && t.dueDate < todayIso() ? 'due-late' : '';
       const waiting = done ? [] : (t.dependsOn || []).map(id => tasks.find(x => x.id === id)).filter(x => x && !CLOSED.includes(x.status));
@@ -148,6 +148,7 @@ export const teamTaskMethods = {
       const shownNotes = showAllNotes ? notes : notes.slice(-SHOW_NOTES);
       return `
         <div class="work-item ${done ? 'work-item-done' : ''}">
+          <div class="row-num" style="width: 24px; flex-shrink: 0; padding-top: 2px;" aria-label="Task ${index + 1}">#${index + 1}</div>
           <div class="work-main">
             <div class="work-client">${escapeHtml(t.companyName || 'General task')}${t.businessArea ? ` <span class="pill neutral">${escapeHtml(t.businessArea)}</span>` : ''}${t.department ? ` <span class="work-dept">${escapeHtml(t.department)}</span>` : ''}${t.repeat && t.repeat !== 'none' ? ` <span class="work-dept" title="When this is done, the next one is made">↻ ${escapeHtml(REPEAT_LABELS[t.repeat] || t.repeat)}</span>` : ''}</div>
             <div class="work-title">${escapeHtml(t.title)}${t.blocker ? ` — <span class="text-red">stuck: ${escapeHtml(t.blocker)}</span>` : ''}</div>
@@ -196,7 +197,7 @@ export const teamTaskMethods = {
           </div>
         </div>
         <div class="work-list">
-          ${list.length ? list.map(taskRow).join('') : '<div class="table-empty" style="padding: 14px;">No tasks.</div>'}
+          ${list.length ? list.map((t, idx) => taskRow(t, idx)).join('') : '<div class="table-empty" style="padding: 14px;">No tasks.</div>'}
         </div>
         <div class="person-footer">
           <button type="button" class="card-action-btn" data-action="openTaskForm" data-assignee="${escapeHtml(member && member.id ? member.id : '')}">${member ? `+ Add a task for ${escapeHtml(member.name.split(' ')[0])}` : '+ Add a task'}</button>

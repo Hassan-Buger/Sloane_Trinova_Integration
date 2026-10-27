@@ -84,6 +84,21 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
    * Actor identity is strictly resolved from single-use state parameter.
    */
   app.get('/api/v1/integrations/outlook/callback', async (req, res) => {
+    const isHtmlAccept = String(req.headers?.accept || '').includes('text/html');
+
+    function respondError(statusCode, code, message, details) {
+      if (isHtmlAccept) {
+        res.writeHead(302, { Location: `/index.html?outlook_error=${encodeURIComponent(message)}` });
+        return res.end();
+      }
+      return res.status(statusCode).json({
+        error: {
+          code,
+          message,
+          ...(details ? { details } : {})
+        }
+      });
+    }
     // 1. Handle user-denied or provider errors (user cancelled, consent denied)
     if (req.query.error) {
       const errorReason = req.query.error_description || req.query.error || 'Authentication denied';
@@ -102,12 +117,11 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
     const stateResult = consumeState(req.query.state);
     if (!stateResult.valid) {
       logger.warn(`Outlook OAuth callback rejected state: ${stateResult.error}`);
-      return res.status(400).json({
-        error: {
-          code: stateResult.error || 'INVALID_STATE',
-          message: stateResult.message || 'This sign-in link is invalid or has already been used.'
-        }
-      });
+      return respondError(
+        400,
+        stateResult.error || 'INVALID_STATE',
+        stateResult.message || 'This sign-in link is invalid or has already been used.'
+      );
     }
 
     const stateData = stateResult.data;
@@ -115,12 +129,11 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
     // 3. Validate presence of authorization code
     const code = req.query.code;
     if (!code || typeof code !== 'string') {
-      return res.status(400).json({
-        error: {
-          code: 'MISSING_CODE',
-          message: 'Microsoft did not send back what Sloane needed. Please try connecting again.'
-        }
-      });
+      return respondError(
+        400,
+        'MISSING_CODE',
+        'Microsoft did not send back what Sloane needed. Please try connecting again.'
+      );
     }
 
     // 4. Exchange authorization code at Microsoft token endpoint
@@ -151,12 +164,11 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       });
     } catch (netErr) {
       logger.error(`Network error contacting Microsoft token endpoint: ${netErr.message}`);
-      return res.status(502).json({
-        error: {
-          code: 'MICROSOFT_NETWORK_ERROR',
-          message: 'Sloane could not reach Microsoft to finish connecting. Please try again in a minute.'
-        }
-      });
+      return respondError(
+        502,
+        'MICROSOFT_NETWORK_ERROR',
+        'Sloane could not reach Microsoft to finish connecting. Please try again in a minute.'
+      );
     }
 
     if (!tokenRes.ok) {
@@ -167,36 +179,33 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       } catch {}
 
       logger.warn(`Microsoft token endpoint rejected code exchange: HTTP ${status}`);
-      return res.status(status >= 500 ? 502 : 400).json({
-        error: {
-          code: 'TOKEN_ENDPOINT_ERROR',
-          message: 'Microsoft would not finish the connection. Please try connecting again.',
-          details: errDetails
-        }
-      });
+      return respondError(
+        status >= 500 ? 502 : 400,
+        'TOKEN_ENDPOINT_ERROR',
+        'Microsoft would not finish the connection. Please try connecting again.',
+        errDetails
+      );
     }
 
     let tokenData;
     try {
       tokenData = await tokenRes.json();
     } catch (parseErr) {
-      return res.status(502).json({
-        error: {
-          code: 'INVALID_TOKEN_RESPONSE',
-          message: 'Microsoft sent an answer that Sloane could not read. Please try connecting again.'
-        }
-      });
+      return respondError(
+        502,
+        'INVALID_TOKEN_RESPONSE',
+        'Microsoft sent an answer that Sloane could not read. Please try connecting again.'
+      );
     }
 
     // 5. Validate that offline_access granted a refresh_token
     if (!tokenData.refresh_token || typeof tokenData.refresh_token !== 'string') {
       logger.error('Token endpoint response missing required refresh_token');
-      return res.status(400).json({
-        error: {
-          code: 'MISSING_REFRESH_TOKEN',
-          message: 'Microsoft did not give Sloane lasting access. Please try connecting again and choose Accept on every screen.'
-        }
-      });
+      return respondError(
+        400,
+        'MISSING_REFRESH_TOKEN',
+        'Microsoft did not give Sloane lasting access. Please try connecting again and choose Accept on every screen.'
+      );
     }
 
     // 6. Verify id_token signature and claims against Microsoft JWKS (Option A)
@@ -211,12 +220,35 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       });
     } catch (identErr) {
       logger.warn(`id_token validation failed: ${identErr.message}`);
-      return res.status(401).json({
-        error: {
-          code: 'INVALID_ID_TOKEN',
-          message: 'Sloane could not confirm who signed in at Microsoft (verification failed). Please try connecting again.'
+      return respondError(
+        401,
+        'INVALID_ID_TOKEN',
+        'Sloane could not confirm who signed in at Microsoft (verification failed). Please try connecting again.'
+      );
+    }
+
+    // 6.5 Optional non-destructive Microsoft Graph connection check (/v1.0/me)
+    if (options.verifyGraphConnection || (!options.keyset && tokenData.access_token)) {
+      try {
+        const graphCheckRes = await fetchFn('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`
+          },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (graphCheckRes && graphCheckRes.ok) {
+          const meData = await graphCheckRes.json();
+          if (meData.mail || meData.userPrincipalName) {
+            identity.accountEmail = meData.mail || meData.userPrincipalName || identity.accountEmail;
+          }
+          if (meData.displayName) {
+            identity.displayName = meData.displayName || identity.displayName;
+          }
+          logger.info(`Microsoft Graph connection verified for [${identity.accountEmail}]`);
         }
-      });
+      } catch (graphErr) {
+        logger.warn(`Microsoft Graph verification check skipped or failed: ${graphErr.message}`);
+      }
     }
 
     // 7. Persist encrypted connection record in vault
@@ -251,12 +283,11 @@ export function registerOutlookAuthRoutes(app, { authenticate }, options = {}) {
       });
     } catch (saveErr) {
       logger.error(`Failed to save encrypted connection in vault: ${saveErr.message}`);
-      return res.status(500).json({
-        error: {
-          code: 'VAULT_SAVE_ERROR',
-          message: 'Sloane could not save the connection safely. Please tell your Sloane administrator.'
-        }
-      });
+      return respondError(
+        500,
+        'VAULT_SAVE_ERROR',
+        'Sloane could not save the connection safely. Please tell your Sloane administrator.'
+      );
     }
 
     logger.info(`Outlook account connected successfully for [${identity.accountEmail}] bound to actor [${stateData.actorId}]`);

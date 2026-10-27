@@ -40,11 +40,12 @@ function table(rows, columns, emptyText) {
   return `
     <table class="report-table">
       <thead><tr>${columns.map(c => `<th${cellClass(c)}>${escapeHtml(c.label)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(r => `<tr>${columns.map(c => `<td${cellClass(c, r)}>${c.html ? c.html(r) : escapeHtml(c.value(r))}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tbody>${rows.map((r, rIdx) => `<tr>${columns.map(c => `<td${cellClass(c, r)}>${c.html ? c.html(r, rIdx) : escapeHtml(c.value(r, rIdx))}</td>`).join('')}</tr>`).join('')}</tbody>
     </table>`;
 }
 
 const ITEM_COLUMNS = [
+  { label: '#', value: (_r, idx) => String(idx + 1), nowrap: true, right: true },
   { label: 'What', value: r => r.what },
   { label: 'Client or company', value: r => r.name },
   { label: 'Due', value: r => formatDateGB(r.date), nowrap: true },
