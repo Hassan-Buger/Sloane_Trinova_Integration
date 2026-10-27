@@ -149,40 +149,43 @@ describe('Unit 61: Web Push', () => {
   });
 
   describe('3. The 5-minute scan', () => {
+    // A Saturday, so the weekday morning briefing never fires in these tests, whatever the real time is
+    const SATURDAY = new Date('2026-11-07T14:00:00Z');
+
     test('3.1 the first scan announces nothing; then a new alert is pushed once', async () => {
       mockDb.statutoryTracker.push({ id: 'dl1', origin: 'manual', companyNumber: '61000001', name: 'Old Ltd', accountsDueDate: plus(-30), confirmationDueDate: null, status: 'Active', businessArea: 'TriNova Accounting' });
       saveSubscription(fakeDevice().subscription);
-      const first = await scanAndPush(new Date());
+      const first = await scanAndPush(SATURDAY);
       assert.equal(sent.length, 0, 'what was already late is not announced');
       assert.equal(first.alerts, 0);
       mockDb.tasks.push(task('s1', 'Chase statements', { isBlocked: true, blocker: 'Waiting for the client', assigneeName: 'Priya', businessArea: 'TriNova Accounting' }));
-      const second = await scanAndPush(new Date());
+      const second = await scanAndPush(SATURDAY);
       assert.equal(second.alerts, 1);
       assert.equal(sent[0].payload.title, '"Chase statements" is stuck');
       assert.equal(sent[0].payload.body, 'Waiting for the client (Priya).');
       assert.match(sent[0].payload.tag, /^stuck:Chase statements/, 'the alert id is the tag, so it replaces rather than repeats');
       assert.equal(sent[0].payload.view, 'people');
-      await scanAndPush(new Date());
+      await scanAndPush(SATURDAY);
       assert.equal(sent.length, 1, 'announced once only');
     });
 
     test('3.2 more than 3 new alerts become 3 and a summary; something that clears and returns is announced again', async () => {
       saveSubscription(fakeDevice().subscription);
-      await scanAndPush(new Date());
+      await scanAndPush(SATURDAY);
       for (let i = 0; i < 5; i++) mockDb.tasks.push(task(`b${i}`, `Stuck ${i}`, { isBlocked: true, blocker: 'Held up', businessArea: 'MTDflow' }));
-      await scanAndPush(new Date());
+      await scanAndPush(SATURDAY);
       assert.equal(sent.length, 4);
       assert.equal(sent[3].payload.title, '2 more alerts');
       sent.length = 0;
       mockDb.tasks.length = 0;
-      await scanAndPush(new Date());
+      await scanAndPush(SATURDAY);
       mockDb.tasks.push(task('b0', 'Stuck 0', { isBlocked: true, blocker: 'Held up', businessArea: 'MTDflow' }));
-      await scanAndPush(new Date());
+      await scanAndPush(SATURDAY);
       assert.equal(sent.length, 1, 'it came back, so it is announced again');
     });
 
     test('3.3 with no device, nothing runs', async () => {
-      assert.deepEqual(await scanAndPush(new Date()), { alerts: 0, briefing: false, primed: false });
+      assert.deepEqual(await scanAndPush(SATURDAY), { alerts: 0, briefing: false, primed: false });
       assert.equal(sent.length, 0);
     });
   });

@@ -54,7 +54,8 @@ export const StorageService = {
       if (Array.isArray(parsed)) {
         return parsed.filter(c => {
           const crn = (c.no || c.company_number || '').trim();
-          return !['12345678', '08923412', '11223344', '07788991'].includes(crn);
+          // Old example records are hidden by their company number, but never a client the owner added
+          return c.addedInSloane || !['12345678', '08923412', '11223344', '07788991'].includes(crn);
         });
       }
       return INITIAL_CLIENTS;
