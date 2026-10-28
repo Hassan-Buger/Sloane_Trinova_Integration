@@ -28,6 +28,7 @@ import { proposalMethods, PROPOSAL_ACTIONS, proposalsHtml } from './features/pro
 import { automationMethods, AUTOMATION_ACTIONS } from './features/automation.js';
 import { alertMethods, ALERT_ACTIONS } from './features/alerts.js';
 import { trinovaSyncMethods, TRINOVA_SYNC_ACTIONS } from './features/trinovaSync.js';
+import { settingsTabMethods, SETTINGS_TAB_ACTIONS } from './features/settingsTabs.js';
 
 // Task P7.3: All demo arrays (DIARY_ITEMS, ATTENTION_EMAILS, TOP3_ITEMS, WAITING_SIGNOFF,
 // PEOPLE_WORK, ACCOUNTS_TRACKER, ACTION_TRACKER, VAT_TRACKER) removed from UI path.
@@ -83,7 +84,7 @@ class SloaneApp {
     this.lastClients = [];
     this.showFinishedTasks = false;
     this.actionNames = new Set([
-      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS, ...BUSINESS_SCOPE_ACTIONS, ...BRIEFING_ACTIONS, ...PROPOSAL_ACTIONS, ...AUTOMATION_ACTIONS, ...ALERT_ACTIONS, ...TRINOVA_SYNC_ACTIONS,
+      ...TEAM_TASK_ACTIONS, ...DEADLINE_ACTIONS, ...CLIENT_DETAIL_ACTIONS, ...PRIVATE_NOTE_ACTIONS, ...BIN_ACTIONS, ...DATA_EXPORT_ACTIONS, ...REPORT_ACTIONS, ...SECURITY_ACTIONS, ...SUGGESTION_ACTIONS, ...BUSINESS_SCOPE_ACTIONS, ...BRIEFING_ACTIONS, ...PROPOSAL_ACTIONS, ...AUTOMATION_ACTIONS, ...ALERT_ACTIONS, ...TRINOVA_SYNC_ACTIONS, ...SETTINGS_TAB_ACTIONS,
       'markTaskDone', 'openEditClient', 'openEditBiz', 'deleteBiz', 'deleteClient', 'selectClient360'
     ]);
     this.changeNames = new Set([
@@ -1081,6 +1082,7 @@ class SloaneApp {
     }
 
     if (viewId === 'settings') {
+      this.openSavedSettingsTab();
       OutlookSettings.loadStatus();
       this.renderSystemStatus();
       this.renderSecurity();
@@ -1482,11 +1484,10 @@ class SloaneApp {
     }
 
     this.lastBusinesses = businesses;
-    container.innerHTML = businesses.map((b, idx) => `
+    container.innerHTML = businesses.map(b => `
       <div class="card biz-card">
         <div>
           <div class="biz-card-header">
-            <span class="row-num">#${idx + 1}</span>
             <span class="pill ${b.status === 'Paused' ? 'amber' : 'green'}">${escapeHtml(b.status === 'Paused' ? 'Paused' : 'Active')}</span>
           </div>
           <div class="biz-name">${escapeHtml(b.name)}</div>
@@ -1579,11 +1580,11 @@ class SloaneApp {
     if (!tbody) return;
 
     if (clients.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" class="table-empty">No clients found. Try a different search, or click "+ Add a client".</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="table-empty">No clients found. Try a different search, or click "+ Add a client".</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = clients.map((c, idx) => {
+    tbody.innerHTML = clients.map(c => {
       const riskClass = c.risk === 'High' ? 'red' : c.risk === 'Medium' ? 'amber' : 'green';
       const clientId = sanitizeId(c.id || c.clientId || 'client_record');
       const safeName = escapeHtml(c.name);
@@ -1599,7 +1600,6 @@ class SloaneApp {
 
       return `
         <tr class="client-row" style="cursor: pointer;" title="Click to see this client's history" onclick="app.selectClient360('${clientId}')">
-          <td class="col-num">${idx + 1}</td>
           <td>
             <div style="font-weight: 700; color: var(--text);">${safeName}</div>
             <div style="font-size: 11px; color: var(--muted);">${safeBiz}</div>
@@ -2680,7 +2680,7 @@ class SloaneApp {
 }
 
 // The Team & Tasks, Deadlines, client page and private notes features live in ./features/.
-Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods, businessScopeMethods, briefingMethods, proposalMethods, automationMethods, alertMethods, trinovaSyncMethods);
+Object.assign(SloaneApp.prototype, teamTaskMethods, deadlineMethods, clientDetailMethods, privateNoteMethods, binMethods, dataExportMethods, reportMethods, securityMethods, suggestionMethods, businessScopeMethods, briefingMethods, proposalMethods, automationMethods, alertMethods, trinovaSyncMethods, settingsTabMethods);
 
 // Instantiate and attach globally for inline handlers
 if (typeof window !== 'undefined') {

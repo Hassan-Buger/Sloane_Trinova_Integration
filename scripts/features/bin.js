@@ -75,9 +75,8 @@ export const binMethods = {
 
     container.innerHTML = `
       <div class="card bin-card">
-        ${items.map((item, idx) => `
+        ${items.map(item => `
           <div class="bin-row">
-            <span class="row-num" style="width: 24px; flex-shrink: 0; align-self: center;">#${idx + 1}</span>
             <div class="bin-icon" aria-hidden="true">${KIND_ICON[item.kind] || '🗑︎'}</div>
             <div class="bin-main">
               <div class="bin-title">${escapeHtml(item.label)}</div>

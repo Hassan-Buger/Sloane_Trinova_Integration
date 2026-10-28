@@ -16,11 +16,11 @@
   <meta name="theme-color" content="#050505">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles/tokens.css?v=2.20.1">
-  <link rel="stylesheet" href="styles/layout.css?v=2.20.1">
-  <link rel="stylesheet" href="styles/components.css?v=2.20.1">
-  <link rel="stylesheet" href="styles/views.css?v=2.20.1">
-  <link rel="stylesheet" href="styles/auth.css?v=2.20.1">
+  <link rel="stylesheet" href="styles/tokens.css?v=2.21.0">
+  <link rel="stylesheet" href="styles/layout.css?v=2.21.0">
+  <link rel="stylesheet" href="styles/components.css?v=2.21.0">
+  <link rel="stylesheet" href="styles/views.css?v=2.21.0">
+  <link rel="stylesheet" href="styles/auth.css?v=2.21.0">
 </head>
 <body class="session-check">
   <script>setTimeout(function () { document.body.classList.remove("session-check"); }, 6000);</script>
@@ -556,7 +556,6 @@
             <table>
               <thead>
                 <tr>
-                  <th class="col-num" aria-label="Row number">#</th>
                   <th>Company / Client</th>
                   <th>Company number</th>
                   <th>Year end</th>
@@ -771,7 +770,6 @@
           <table>
             <thead>
               <tr>
-                <th class="col-num" aria-label="Row number">#</th>
                 <th>Company</th>
                 <th>Company number</th>
                 <th>Year end</th>
@@ -797,7 +795,6 @@
           <table>
             <thead>
               <tr>
-                <th class="col-num" aria-label="Row number">#</th>
                 <th>Company</th>
                 <th>Company number</th>
                 <th>The problem</th>
@@ -820,7 +817,6 @@
           <table>
             <thead>
               <tr>
-                <th class="col-num" aria-label="Row number">#</th>
                 <th>Client</th>
                 <th>Period</th>
                 <th>Due date</th>
@@ -1004,48 +1000,64 @@
            ==================================================================== -->
       <section class="view hidden" id="view-settings">
         <div class="settings-wrapper">
-          
-          <div class="card-header" style="margin-bottom: 16px;">
+
+          <div class="card-header" style="margin-bottom: 0;">
             <div>
               <h2 style="font-size: 18px;">Settings</h2>
-              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-                Choose what Sloane can read from your email and calendar, and switch it on or off at any time.
-              </p>
+              <p class="page-intro">How Sloane is set up, what it is connected to, what tells you things, how you sign in, and a copy of your data.</p>
             </div>
           </div>
 
-          <!-- Alert Notification Banner -->
+          <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+            <button type="button" class="settings-tab active" role="tab" aria-selected="true" data-action="selectSettingsTab" data-id="overview">Overview</button>
+            <button type="button" class="settings-tab" role="tab" aria-selected="false" data-action="selectSettingsTab" data-id="connections">Connections</button>
+            <button type="button" class="settings-tab" role="tab" aria-selected="false" data-action="selectSettingsTab" data-id="alerts">Alerts &amp; automation</button>
+            <button type="button" class="settings-tab" role="tab" aria-selected="false" data-action="selectSettingsTab" data-id="security">Security</button>
+            <button type="button" class="settings-tab" role="tab" aria-selected="false" data-action="selectSettingsTab" data-id="data">Your data</button>
+          </div>
+
+          <!-- Alert Notification Banner (shown on every tab) -->
           <div id="outlookAlertBanner" style="display: none; margin-bottom: 16px;"></div>
 
-          <div class="card" id="systemStatusCard">
-            <!-- Populated dynamically: where data is saved, what is connected -->
+          <div class="settings-pane" data-pane="overview">
+            <div class="card" id="systemStatusCard">
+                        <!-- Populated dynamically: where data is saved, what is connected -->
+                      </div>
           </div>
 
-          <div class="card" id="securityCard">
-            <!-- Filled in by scripts/features/security.js -->
+          <div class="settings-pane hidden" data-pane="connections">
+            <div class="card" id="trinovaSyncCard">
+                        <!-- Filled in by scripts/features/trinovaSync.js -->
+                      </div>
+
+            <!-- Outlook Integration Card per §4.1 -->
+            <div class="card" id="outlookSettingsCard">
+                        <!-- Populated dynamically by OutlookSettings component post-session -->
+                      </div>
           </div>
 
-          <div class="card" id="alertsCard">
-            <!-- Filled in by scripts/features/alerts.js -->
+          <div class="settings-pane hidden" data-pane="alerts">
+            <div class="card" id="alertsCard">
+                        <!-- Filled in by scripts/features/alerts.js -->
+                      </div>
+
+            <div class="card" id="automationCard">
+                        <!-- Filled in by scripts/features/automation.js -->
+                      </div>
           </div>
 
-          <div class="card" id="trinovaSyncCard">
-            <!-- Filled in by scripts/features/trinovaSync.js -->
+          <div class="settings-pane hidden" data-pane="security">
+            <div class="card" id="securityCard">
+                        <!-- Filled in by scripts/features/security.js -->
+                      </div>
           </div>
 
-          <div class="card" id="automationCard">
-            <!-- Filled in by scripts/features/automation.js -->
-          </div>
-
-          <div class="card" id="yourDataCard">
-            <div class="card-header"><h2>Your data</h2></div>
-            <p class="card-help">Download a copy of everything kept in Sloane as one Excel file: clients, deadlines, VAT returns, tasks, team, notes, history, documents list, signing requests, your private notes and the Bin. Keep it somewhere safe, because it holds client information.</p>
-            <button type="button" class="btn btn-primary" data-action="downloadEverything">⬇︎ Download a copy of everything (Excel)</button>
-          </div>
-
-          <!-- Outlook Integration Card per §4.1 -->
-          <div class="card" id="outlookSettingsCard">
-            <!-- Populated dynamically by OutlookSettings component post-session -->
+          <div class="settings-pane hidden" data-pane="data">
+            <div class="card" id="yourDataCard">
+                        <div class="card-header"><h2>Your data</h2></div>
+                        <p class="card-help">Download a copy of everything kept in Sloane as one Excel file: clients, deadlines, VAT returns, tasks, team, notes, history, documents list, signing requests, your private notes and the Bin. Keep it somewhere safe, because it holds client information.</p>
+                        <button type="button" class="btn btn-primary" data-action="downloadEverything">⬇︎ Download a copy of everything (Excel)</button>
+                      </div>
           </div>
 
         </div>
@@ -1545,6 +1557,6 @@
   <div id="toast-container"></div>
 
   <!-- Main Application Script (ES Module) with Cache-Buster -->
-  <script type="module" src="scripts/app.js?v=2.20.1"></script>
+  <script type="module" src="scripts/app.js?v=2.21.0"></script>
 </body>
 </html>

@@ -54,8 +54,9 @@ describe('Unit 40: Front-end controls', () => {
       const au = await import('../../scripts/features/automation.js');
       const al = await import('../../scripts/features/alerts.js');
       const ts = await import('../../scripts/features/trinovaSync.js');
-      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods, x.dataExportMethods, r.reportMethods, s.securityMethods, g.suggestionMethods, sc.businessScopeMethods, br.briefingMethods, pr.proposalMethods, au.automationMethods, al.alertMethods, ts.trinovaSyncMethods);
-      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS, ...x.DATA_EXPORT_ACTIONS, ...r.REPORT_ACTIONS, ...s.SECURITY_ACTIONS, ...g.SUGGESTION_ACTIONS, ...sc.BUSINESS_SCOPE_ACTIONS, ...br.BRIEFING_ACTIONS, ...pr.PROPOSAL_ACTIONS, ...au.AUTOMATION_ACTIONS, ...al.ALERT_ACTIONS, ...ts.TRINOVA_SYNC_ACTIONS]);
+      const st = await import('../../scripts/features/settingsTabs.js');
+      Object.assign(mixins, t.teamTaskMethods, d.deadlineMethods, c.clientDetailMethods, p.privateNoteMethods, b.binMethods, x.dataExportMethods, r.reportMethods, s.securityMethods, g.suggestionMethods, sc.businessScopeMethods, br.briefingMethods, pr.proposalMethods, au.automationMethods, al.alertMethods, ts.trinovaSyncMethods, st.settingsTabMethods);
+      actionNames = new Set([...t.TEAM_TASK_ACTIONS, ...d.DEADLINE_ACTIONS, ...c.CLIENT_DETAIL_ACTIONS, ...p.PRIVATE_NOTE_ACTIONS, ...b.BIN_ACTIONS, ...x.DATA_EXPORT_ACTIONS, ...r.REPORT_ACTIONS, ...s.SECURITY_ACTIONS, ...g.SUGGESTION_ACTIONS, ...sc.BUSINESS_SCOPE_ACTIONS, ...br.BRIEFING_ACTIONS, ...pr.PROPOSAL_ACTIONS, ...au.AUTOMATION_ACTIONS, ...al.ALERT_ACTIONS, ...ts.TRINOVA_SYNC_ACTIONS, ...st.SETTINGS_TAB_ACTIONS]);
       assert.ok(Object.keys(mixins).length > 40);
     });
 
